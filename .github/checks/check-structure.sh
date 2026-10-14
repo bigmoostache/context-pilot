@@ -59,6 +59,7 @@ while IFS= read -r f; do
   fi
 done < <(find . \
   \( -type d \( -name target \
+      -o -path './.worktrees' \
       -o -path './deploy/ansible/.venv' \
       -o -path './deploy/ansible/.artifacts' \) -prune \) \
   -o \( -name '*.rs' -print \))
@@ -76,6 +77,8 @@ while IFS= read -r dir; do
 done < <(find . -mindepth 1 \
   \( -type d \( \
       -path './.git' \
+      -o -path './.worktrees' \
+      -o -path './.playwright-cli' \
       -o -path './.context-pilot' \
       -o -path './docs' \
       -o -path './jobs' \

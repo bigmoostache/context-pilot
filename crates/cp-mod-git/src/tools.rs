@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use super::GIT_CMD_TIMEOUT_SECS;
@@ -11,7 +12,7 @@ use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
-use super::classify::{CommandClass, classify_git, validate_git_command};
+use super::classify::{CommandClass, check_worktree_safety, classify_git, validate_git_command};
 
 /// Max lines for inline output (matches console's `easy_bash` threshold).
 const INLINE_MAX_LINES: usize = 150;
@@ -41,6 +42,11 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         }
     };
 
+    let cwd = state.workdir();
+    if let Err(e) = check_worktree_safety(&args).and_then(|()| check_workdir(&cwd)) {
+        return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true);
+    }
+
     // Classify
     let class = classify_git(&args);
 
@@ -50,7 +56,7 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
         if invalidations.is_empty() {
             cp_base::panels::mark_panels_dirty(state, Kind::GIT_RESULT);
         } else {
-            for ctx in &mut state.context {
+            for ctx in &mut state.agent_mut().context {
                 if ctx.context_type.as_str() == Kind::GIT_RESULT
                     && let Some(cached_cmd) = ctx.get_meta_str("result_command")
                     && invalidations.iter().any(|re| re.is_match(cached_cmd))
@@ -66,22 +72,49 @@ pub(crate) fn execute_git_command(tool: &ToolUse, state: &mut State) -> ToolResu
     let github_token = cp_vault::vault().get("github").map(|s| s.expose().to_owned());
 
     spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_add(5), move || {
-        run_git_command(&args, github_token.as_ref(), &command_owned)
+        run_git_command(&args, github_token.as_ref(), &command_owned, &cwd)
     })
 }
+
+/// Fail clearly when the agent's workdir vanished (worktree removed by another
+/// thread or by hand) instead of a misleading spawn error.
+fn check_workdir(cwd: &std::path::Path) -> Result<(), String> {
+    if cwd.is_dir() {
+        return Ok(());
+    }
+    Err(format!(
+        "this agent's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+        cwd.display()
+    ))
+}
+
+/// Per-invocation suffix so concurrent pushes never share an askpass script.
+static ASKPASS_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Run one git invocation off the main loop: wire up `GIT_ASKPASS` from a
 /// token-bearing temp script (when a token is present), execute with a timeout,
 /// clean the script up, and fold the result into a [`ToolOutput`].
-fn run_git_command(args: &[String], github_token: Option<&String>, command_owned: &str) -> ToolOutput {
+fn run_git_command(
+    args: &[String],
+    github_token: Option<&String>,
+    command_owned: &str,
+    cwd: &std::path::Path,
+) -> ToolOutput {
     let start = Instant::now();
 
     let mut cmd = Command::new("git");
-    let _c = cmd.args(args).env("GIT_TERMINAL_PROMPT", "0");
+    // An inherited GIT_DIR / GIT_WORK_TREE would override the cwd.
+    let _c = cmd
+        .args(args)
+        .current_dir(cwd)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env("GIT_TERMINAL_PROMPT", "0");
 
     // HTTPS auth via GIT_ASKPASS when GITHUB_TOKEN is available.
     let askpass_tempfile = github_token.and_then(|token| {
-        let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}", std::process::id()));
+        let seq = ASKPASS_SEQ.fetch_add(1, Ordering::Relaxed);
+        let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}_{seq}", std::process::id()));
         let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
         std::fs::write(&askpass_path, &script).is_ok().then(|| {
             #[cfg(unix)]
@@ -103,7 +136,7 @@ fn run_git_command(args: &[String], github_token: Option<&String>, command_owned
     }
 
     match result {
-        Ok(output) => format_git_output(&output, command_owned, elapsed_ms),
+        Ok(output) => format_git_output(&output, command_owned, elapsed_ms, cwd),
         Err(e) => {
             let content = if e.kind() == std::io::ErrorKind::NotFound {
                 "git not found. Ensure git is installed and on PATH.".to_owned()
@@ -116,7 +149,12 @@ fn run_git_command(args: &[String], github_token: Option<&String>, command_owned
 }
 
 /// Decide inline-vs-panel for a completed git command.
-fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u128) -> ToolOutput {
+fn format_git_output(
+    output: &std::process::Output,
+    command: &str,
+    elapsed_ms: u128,
+    cwd: &std::path::Path,
+) -> ToolOutput {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = if stderr.trim().is_empty() {
@@ -156,7 +194,10 @@ fn format_git_output(output: &std::process::Output, command: &str, elapsed_ms: u
         is_error,
         Some(
             DynPanel::new(Kind::GIT_RESULT.to_owned(), display_name)
-                .metadata(vec![("result_command".to_owned(), command.to_owned())])
+                .metadata(vec![
+                    ("result_command".to_owned(), command.to_owned()),
+                    ("result_cwd".to_owned(), cwd.to_string_lossy().into_owned()),
+                ])
                 .content(display_content),
         ),
         false,

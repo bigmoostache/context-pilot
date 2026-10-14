@@ -76,7 +76,7 @@ pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<A
     }
 
     let system_prompt = request.system_prompt.as_ref().map_or_else(
-        || library::default_agent_content().to_owned(),
+        || library::default_system_content().to_owned(),
         |prompt| {
             if let Some(context) = request.extra_context.as_ref() {
                 let msg = INJECTIONS.providers.cleaner_mode.trim_end().replace(concat!("{", "context", "}"), context);
@@ -86,6 +86,16 @@ pub(in crate::llms) fn build_messages_and_system(request: &LlmRequest) -> (Vec<A
             prompt.clone()
         },
     );
+
+    for msg in &mut api_messages {
+        msg.content = std::mem::take(&mut msg.content)
+            .into_iter()
+            .map(|block| match block {
+                ContentBlock::Text { text } => ContentBlock::Text { text: super::non_blank_text(&text).to_owned() },
+                ContentBlock::ToolUse { .. } | ContentBlock::ToolResult { .. } => block,
+            })
+            .collect();
+    }
 
     (api_messages, system_prompt)
 }

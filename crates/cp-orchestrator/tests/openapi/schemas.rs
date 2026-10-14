@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use super::{arr, r};
 
-/// Agent/thread/panel/tool schemas — the domain model.
+/// Agent/agent/panel/tool schemas — the domain model.
 #[expect(
     clippy::too_many_lines,
     reason = "flat OpenAPI schema literal: one linear json! object enumerating the domain schemas; splitting it into sub-builders is churn with no readability gain — the openapi spec-builder twin of the flat State::default initializer"
@@ -22,7 +22,7 @@ pub(super) fn core() -> Value {
             "properties": { "error": { "type": "string" } },
             "required": ["error"]
         },
-        "Agent": {
+        "Fleet": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -42,14 +42,14 @@ pub(super) fn core() -> Value {
                 "contextHit": { "type": "integer" },
                 "contextMiss": { "type": "integer" },
                 "task": { "type": "string" },
-                "threads": { "type": "integer" },
+                "agents": { "type": "integer" },
                 "lastActivity": { "type": "string" },
                 "hasAvatar": { "type": "boolean" },
                 "accent": r("AccentToken")
             },
-            "required": ["id", "name", "folder", "status", "costUsd", "threads", "lastActivity"]
+            "required": ["id", "name", "folder", "status", "costUsd", "agents", "lastActivity"]
         },
-        "AgentMetrics": {
+        "FleetMetrics": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -83,31 +83,37 @@ pub(super) fn core() -> Value {
             },
             "required": ["name", "category", "status"]
         },
-        "ThreadDetail": {
+        "AgentDetail": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string", "enum": ["MY_TURN", "THEIR_TURN", "ACTIVE"] },
-                "agentId": { "type": "string" },
-                "agent": { "type": "string" },
-                "createdAt": { "type": "string" },
+                "fleetId": { "type": "string" },
+                "fleet": { "type": "string" },
+                // Creation time, epoch ms.
+                "createdAt": { "type": "integer" },
+                // Tree depth in the ordered agent list (0 = root).
+                "depth": { "type": "integer" },
                 "lastActivity": { "type": "string" },
                 "lastActivityMs": { "type": "integer" },
                 "unread": { "type": "integer" },
                 "archived": { "type": "boolean" },
                 "paused": { "type": "boolean" },
                 "focused": { "type": "boolean" },
-                // Parent thread id when this thread was branched out of another
-                // (branch_thread command); null for a thread created from scratch.
+                // Parent agent id when this agent was branched out of another
+                // (branch_agent command); null for an agent created from scratch.
                 "branchedFrom": { "type": "string", "nullable": true },
-                "log": arr(r("ThreadMsg")),
-                "tasks": arr(r("ThreadTask")),
-                "notes": arr(r("ThreadNote"))
+                // Managing agent (T860 sub-agents); null for a root agent.
+                "parentAgentId": { "type": "string", "nullable": true },
+                "description": { "type": "string" },
+                "log": arr(r("AgentMsg")),
+                "tasks": arr(r("AgentTask")),
+                "notes": arr(r("AgentNote"))
             },
-            "required": ["id", "name", "status", "agentId", "log"]
+            "required": ["id", "name", "status", "fleetId", "log"]
         },
-        "ThreadTask": {
+        "AgentTask": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -118,7 +124,7 @@ pub(super) fn core() -> Value {
             },
             "required": ["id", "name", "status"]
         },
-        "ThreadNote": {
+        "AgentNote": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -127,7 +133,7 @@ pub(super) fn core() -> Value {
             },
             "required": ["id", "title", "content"]
         },
-        "ThreadMsg": {
+        "AgentMsg": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
@@ -152,20 +158,20 @@ pub(super) fn core() -> Value {
             },
             "required": ["name"]
         },
-        "ThreadsResponse": {
+        "AgentsResponse": {
             "type": "object",
             "properties": {
-                "focusedThreadId": { "type": "string", "nullable": true },
-                "threads": arr(r("ThreadDetail"))
+                "focusedAgentId": { "type": "string", "nullable": true },
+                "agents": arr(r("AgentDetail"))
             },
-            "required": ["threads"]
+            "required": ["agents"]
         },
         "LibraryItem": {
             "type": "object",
             "properties": {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
-                "kind": { "type": "string", "enum": ["agent", "skill", "command"] },
+                "kind": { "type": "string", "enum": ["system", "skill", "command"] },
                 "description": { "type": "string" },
                 "meta": { "type": "string" },
                 "body": { "type": "string" },

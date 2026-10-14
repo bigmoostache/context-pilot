@@ -67,7 +67,7 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     // Pre-invalidate cached panels for mutating commands (needs &mut State).
     if class == CommandClass::Mutating {
         let invalidations = super::cache_invalidation::find_invalidations(command);
-        for ctx in &mut state.context {
+        for ctx in &mut state.agent_mut().context {
             if ctx.context_type.as_str() == Kind::GITHUB_RESULT {
                 let matches = ctx
                     .get_meta_str("result_command")
@@ -82,38 +82,56 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     }
 
     // All commands: run async, decide inline vs panel on completion.
-    let command_owned = command.to_owned();
+    let run = GhRun { args, token, command: command.to_owned(), cwd: state.workdir() };
+    spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || run_gh(&run))
+}
 
-    spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || {
-        let start = Instant::now();
+/// One `gh` invocation, owned so it can move into the async worker.
+struct GhRun {
+    /// Validated argv (without the leading `gh`).
+    args: Vec<String>,
+    /// Token exported as `GITHUB_TOKEN`/`GH_TOKEN` and redacted from output.
+    token: String,
+    /// Raw command string, used for panel naming and refresh.
+    command: String,
+    /// Executing agent's workdir.
+    cwd: std::path::PathBuf,
+}
 
-        let mut cmd = Command::new("gh");
-        let _r = cmd
-            .args(&args)
-            .env("GITHUB_TOKEN", &token)
-            .env("GH_TOKEN", &token)
-            .env("GH_PROMPT_DISABLED", "1")
-            .env("NO_COLOR", "1");
+/// Run `gh` in the agent's workdir with a timeout and shape the result.
+fn run_gh(run: &GhRun) -> ToolOutput {
+    let start = Instant::now();
 
-        let result = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS);
-        let elapsed_ms = start.elapsed().as_millis();
+    let mut cmd = Command::new("gh");
+    let _r = cmd
+        .args(&run.args)
+        .current_dir(&run.cwd)
+        .env("GITHUB_TOKEN", &run.token)
+        .env("GH_TOKEN", &run.token)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("NO_COLOR", "1");
 
-        match result {
-            Ok(output) => format_gh_output(&output, &command_owned, &token, elapsed_ms),
-            Err(e) => {
-                let content = if e.kind() == std::io::ErrorKind::NotFound {
-                    "gh CLI not found. Install: https://cli.github.com".to_owned()
-                } else {
-                    format!("Error running gh: {e}")
-                };
-                ToolOutput::error(content)
-            }
+    let result = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS);
+    let elapsed_ms = start.elapsed().as_millis();
+
+    match result {
+        Ok(output) => format_gh_output(&output, run, elapsed_ms),
+        Err(e) => {
+            let content = if e.kind() == std::io::ErrorKind::NotFound {
+                "gh CLI not found. Install: https://cli.github.com".to_owned()
+            } else {
+                format!("Error running gh: {e}")
+            };
+            ToolOutput::error(content)
         }
-    })
+    }
 }
 
 /// Decide inline-vs-panel for a completed gh command.
-fn format_gh_output(output: &std::process::Output, command: &str, token: &str, elapsed_ms: u128) -> ToolOutput {
+fn format_gh_output(output: &std::process::Output, run: &GhRun, elapsed_ms: u128) -> ToolOutput {
+    let command = run.command.as_str();
+    let token = run.token.as_str();
+    let cwd = run.cwd.as_path();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = if stderr.trim().is_empty() {
@@ -150,7 +168,10 @@ fn format_gh_output(output: &std::process::Output, command: &str, token: &str, e
         command.to_owned()
     };
     let dyn_panel = DynPanel::new(Kind::GITHUB_RESULT.to_owned(), display_name)
-        .metadata(vec![("result_command".to_owned(), command.to_owned())])
+        .metadata(vec![
+            ("result_command".to_owned(), command.to_owned()),
+            ("result_cwd".to_owned(), cwd.to_string_lossy().into_owned()),
+        ])
         .content(display_content);
     ToolOutput::new(format!("Panel created: {DYN_PANEL_ID_PLACEHOLDER}"), is_error, None, false).with_panel(dyn_panel)
 }

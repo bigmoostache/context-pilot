@@ -1,6 +1,6 @@
 //! Hourly reconcile + embedding-backup tick.
 //!
-//! One background thread per agent. Every [`TICK_INTERVAL`] it runs, in order:
+//! One background agent per agent. Every [`TICK_INTERVAL`] it runs, in order:
 //!
 //! 1. [`reconcile`](crate::index::reconcile) — repair the index against the
 //!    CURRENT disk (catches drift the live watcher missed: dropped FS events, a
@@ -40,7 +40,7 @@ pub(crate) struct TickParams {
     pub indexer_tx: mpsc::Sender<IndexerCmd>,
 }
 
-/// Handle to the running tick thread. Dropping it stops the thread (and joins
+/// Handle to the running tick agent. Dropping it stops the agent (and joins
 /// it), so a TUI reload that replaces `SearchState` tears the old tick down
 /// cleanly instead of stacking a second one.
 pub(crate) struct BackupTickHandle {
@@ -52,7 +52,7 @@ pub(crate) struct BackupTickHandle {
 struct TickInner {
     /// Send `()` (or drop) to ask the loop to stop at the next wake.
     stop: mpsc::Sender<()>,
-    /// The tick thread, joined on drop.
+    /// The tick agent, joined on drop.
     join: Option<JoinHandle<()>>,
 }
 

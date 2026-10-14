@@ -28,7 +28,7 @@ use super::{run_stream, sse};
 /// Redeem the ticket and stream an agent's deltas as SSE until disconnect.
 pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Backend>>, query: &str) {
     let params = QueryParams::parse(query);
-    let Some(agent_id) = params.get("agent") else {
+    let Some(fleet_id) = params.get("agent") else {
         respond_json(request, &rest::HttpReply { status: 400, body: "{\"error\":\"missing agent\"}".to_owned() });
         return;
     };
@@ -55,10 +55,10 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
                 Ok(Some(user)) => {
                     // Implicit access to all agents (manager+) bypasses the
                     // per-agent ACL (design §13.3); everyone else needs a row.
-                    if user.can_manage_all_agents() {
+                    if user.can_manage_all_fleets() {
                         true
                     } else {
-                        auth.check_access(agent_id, user_id).is_ok_and(|role| role.is_some())
+                        auth.check_access(fleet_id, user_id).is_ok_and(|role| role.is_some())
                     }
                 }
                 _ => false,
@@ -74,7 +74,7 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
     }
 
     // Resolve the agent's oplog directory before committing to a stream.
-    let Some(entry) = load_entry(state, agent_id) else {
+    let Some(entry) = load_entry(state, fleet_id) else {
         respond_json(request, &rest::HttpReply { status: 404, body: "{\"error\":\"unknown agent\"}".to_owned() });
         return;
     };
@@ -84,10 +84,10 @@ pub(in crate::transport) fn handle_stream(request: Request, state: &Arc<Mutex<Ba
 
     let (sink, body) = sse::channel();
     let producer_state = Arc::clone(state);
-    let agent = agent_id.to_owned();
+    let agent = fleet_id.to_owned();
     let oplog_dir = PathBuf::from(&entry.oplog_path);
     let _producer = thread::spawn(move || {
-        let ctx = super::StreamCtx { sink: &sink, state: &producer_state, agent_id: &agent, oplog_dir: &oplog_dir };
+        let ctx = super::StreamCtx { sink: &sink, state: &producer_state, fleet_id: &agent, oplog_dir: &oplog_dir };
         run_stream(&ctx, last_rev);
     });
 

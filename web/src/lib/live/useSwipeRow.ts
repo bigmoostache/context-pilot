@@ -4,7 +4,7 @@ import { prefersReducedMotion } from "@/lib/utils"
 
 // ── Swipe-to-reveal gesture engine (T630) ────────────────────────────
 //
-// The interaction behind the mobile ThreadList's iOS-Messages-style
+// The interaction behind the mobile AgentList's iOS-Messages-style
 // swipe-left-to-reveal-actions row, factored out of the component so the
 // presentation file stays a thin renderer (design rule M141 — logic out of the
 // component; here the "logic" is a self-contained pointer-gesture state machine).
@@ -179,7 +179,7 @@ export function useSwipeRow(actionWidth: number): SwipeRow {
   }
 
   /** Swallow the tap that ENDS an open swipe so it closes the row instead of
-   *  selecting the thread beneath. A tap on a closed row (dx 0) passes through. */
+   *  selecting the agent beneath. A tap on a closed row (dx 0) passes through. */
   const onClickCapture = (e: React.MouseEvent) => {
     if (dxRef.current === 0) return
     e.preventDefault()

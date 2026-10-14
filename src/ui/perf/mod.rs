@@ -15,8 +15,13 @@ mod snapshot;
 mod sys_stat;
 /// Plain-text dump of the perf snapshot (Ctrl+R clipboard copy).
 pub(crate) mod text;
+/// Buffered, byte-counting stdout writer behind the ratatui terminal.
+pub(crate) mod tty;
 pub(crate) use overlay::render_perf_overlay_from_ir;
-use snapshot::compute_op_snapshot;
+use snapshot::{compute_op_snapshot, ring_std_ms};
+
+/// Rows of the F12 op table; only these get the windowed std computed.
+const STD_DISPLAY_ROWS: usize = 10;
 use sys_stat::read_proc_stat;
 
 use crate::infra::constants::PERF_STATS_REFRESH_MS;
@@ -176,10 +181,11 @@ impl PerfMetrics {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        // Ensure the entry exists (write lock), then immediately release.
-        // The OpStats fields are independently synchronized (atomics + inner RwLock),
-        // so we re-acquire a cheaper read lock for the actual recording.
-        {
+        // Fast path: shared read lock (the OpStats fields are atomics + an inner
+        // RwLock). The exclusive write lock is taken only the first time a name
+        // is seen, not on every guard drop.
+        let known = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner).contains_key(name);
+        if !known {
             let mut ops = self.ops.write().unwrap_or_else(std::sync::PoisonError::into_inner);
             let _r = ops.entry(name).or_default();
         }
@@ -270,54 +276,40 @@ impl PerfMetrics {
 
     /// Get snapshot of metrics for display
     pub(crate) fn snapshot(&self) -> PerfSnapshot {
-        /// Type alias for raw operation data extracted under lock:
-        /// `(name, total_us, count, sum_sq_us, max_us, recent_samples)`.
-        type RawOp = (&'static str, u64, u64, u64, u64, Vec<u64>);
-
         // Extract frame data and release lock before processing ops
         let frame_samples: Vec<f64> = {
             let frame_times = self.frame_times.read().unwrap_or_else(std::sync::PoisonError::into_inner);
             frame_times.recent(40).iter().map(|&us| float_math::div_u64(us, 1_000.0f64)).collect()
         };
 
-        // Extract op data under lock, then process without holding it
-        let raw_ops: Vec<RawOp> = {
-            let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-            ops.iter()
-                .map(|(name, stats)| {
-                    let recent = stats
-                        .samples
-                        .read()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .recent(SAMPLE_RING_SIZE);
-                    (
-                        *name,
-                        stats.total_us.load(Ordering::Relaxed),
-                        stats.count.load(Ordering::Relaxed),
-                        stats.sum_sq_us.load(Ordering::Relaxed),
-                        stats.max_us.load(Ordering::Relaxed),
-                        recent,
-                    )
-                })
-                .collect()
-        };
-
-        let mut op_snapshots: Vec<OpSnapshot> = raw_ops
+        // Atomics only for every op (~850): no per-op ring lock or copy.
+        // NO profile! guards while `ops` is locked: recording a new op name
+        // takes `ops.write()` on this same thread and deadlocks.
+        let ops = self.ops.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut op_snapshots: Vec<OpSnapshot> = ops
             .iter()
-            .map(|entry| {
+            .map(|(name, stats)| {
                 compute_op_snapshot(&OpRaw {
-                    name: entry.0,
-                    total_us: entry.1,
-                    count: entry.2,
-                    sum_sq_us: entry.3,
-                    max_us: entry.4,
-                    recent: &entry.5,
+                    name,
+                    total_us: stats.total_us.load(Ordering::Relaxed),
+                    count: stats.count.load(Ordering::Relaxed),
+                    sum_sq_us: stats.sum_sq_us.load(Ordering::Relaxed),
+                    max_us: stats.max_us.load(Ordering::Relaxed),
                 })
             })
             .collect();
 
         // Sort by total time descending (hotspots first)
         op_snapshots.sort_by(|a, b| b.total_ms.partial_cmp(&a.total_ms).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Windowed std only for the rows the F12 op table displays.
+        for op in op_snapshots.iter_mut().take(STD_DISPLAY_ROWS) {
+            if let Some(stats) = ops.get(op.name) {
+                let ring = stats.samples.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+                op.std_ms = ring_std_ms(&ring.recent(SAMPLE_RING_SIZE));
+            }
+        }
+        drop(ops);
 
         let frame_avg_ms = if frame_samples.is_empty() { 0.0f64 } else { float_math::mean(&frame_samples) };
         let frame_max_ms = frame_samples.iter().copied().fold(0.0f64, f64::max);
@@ -399,7 +391,7 @@ impl PerfMetrics {
 
 /// One operation's raw lifetime counters plus its recent-sample ring, as
 /// extracted under lock (bundled to stay under the argument cap).
-struct OpRaw<'snap> {
+struct OpRaw {
     /// Operation name.
     name: &'static str,
     /// Cumulative time (µs).
@@ -410,8 +402,6 @@ struct OpRaw<'snap> {
     sum_sq_us: u64,
     /// Lifetime maximum sample (µs).
     max_us: u64,
-    /// Recent-sample ring contents (µs).
-    recent: &'snap [u64],
 }
 
 /// Snapshot of operation statistics for display.

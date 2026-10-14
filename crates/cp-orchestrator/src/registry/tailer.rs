@@ -4,13 +4,13 @@
 //! Each [`poll`](Tailer::poll) returns only the entries appended since the
 //! previous call, in `rev` order. The `rev` is monotonic and no entry is
 //! skipped, so the consumer sees a complete, ordered event stream. The tailer
-//! is a **pure poll primitive** — no kernel watch, no thread. The live driver
+//! is a **pure poll primitive** — no kernel watch, no agent. The live driver
 //! (inotify + backstop timer) belongs to the runtime loop, exactly as
 //! [`FleetScanner`](crate::registry::FleetScanner) is a pure scan+diff driven
 //! by an external cadence.
 //!
 //! Split out of `channel.rs` (which retains the read/write
-//! [`AgentHandle`](crate::registry::channel::AgentHandle)) to keep each file
+//! [`FleetHandle`](crate::registry::channel::FleetHandle)) to keep each file
 //! within the workspace's per-file line budget; the `Tailer` remains reachable
 //! at `tailer::Tailer` (the crate root re-exports the `tailer` module).
 
@@ -184,9 +184,9 @@ mod tests {
         OpEntryKind::PhaseTransition { phase: Phase::Streaming }
     }
 
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,

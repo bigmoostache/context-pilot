@@ -9,8 +9,8 @@
 pub enum Scope {
     /// Read by `cp-orchestrator` only.
     Orchestrator,
-    /// Read by the `cpilot` agent only.
-    Agent,
+    /// Read by the `cpilot` fleet process only.
+    Fleet,
     /// Read by both binaries.
     Both,
     /// Never read by either binary: injected into child processes (callback
@@ -24,8 +24,8 @@ pub enum Scope {
 pub enum Target {
     /// The orchestration backend.
     Orchestrator,
-    /// The agent TUI.
-    Agent,
+    /// The fleet TUI (`cpilot`).
+    Fleet,
     /// Every non-child variable - the lenient in-process fallback used when no
     /// binary installed a validated environment (tests).
     Any,
@@ -37,7 +37,7 @@ impl Target {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Orchestrator => "orchestrator",
-            Self::Agent => "agent",
+            Self::Fleet => "fleet",
             Self::Any => "any",
         }
     }
@@ -53,7 +53,7 @@ impl Scope {
             Self::ChildOnly => false,
             Self::Both => true,
             Self::Orchestrator => matches!(target, Target::Orchestrator | Target::Any),
-            Self::Agent => matches!(target, Target::Agent | Target::Any),
+            Self::Fleet => matches!(target, Target::Fleet | Target::Any),
         }
     }
 
@@ -62,7 +62,7 @@ impl Scope {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Orchestrator => "orchestrator",
-            Self::Agent => "agent",
+            Self::Fleet => "fleet",
             Self::Both => "both",
             Self::ChildOnly => "child only",
         }

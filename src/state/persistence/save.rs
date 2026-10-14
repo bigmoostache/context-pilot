@@ -16,35 +16,67 @@ use super::writer::{DeleteOp, WriteBatch, WriteOp};
 /// Errors directory name
 const ERRORS_DIR: &str = "errors";
 
+/// Subdirectory holding `<id>.json` for modules that opt into
+/// [`save_revision`](cp_base::modules::Module::save_revision).
+pub(super) const MODULES_DIR: &str = "modules";
+
+thread_local! {
+    /// Last stamp written per own-file module. Starts empty, so the first save
+    /// after boot/reload writes every own-file module once.
+    static SAVED_REVISIONS: std::cell::RefCell<HashMap<String, u64>> = std::cell::RefCell::new(HashMap::new());
+    /// History-panel message files already written this process. Those
+    /// messages are frozen once detached, so each file is written only once.
+    static SAVED_HISTORY_MSGS: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::new(std::collections::HashSet::new());
+}
+
+/// `modules/<id>.json` writes for own-file modules whose stamp moved since the
+/// last save. Unchanged modules cost one stamp read: no JSON, no write.
+fn module_file_ops(state: &State, dir: &std::path::Path) -> Vec<WriteOp> {
+    let mut ops = Vec::new();
+    for module in crate::modules::all_modules() {
+        let Some(rev) = module.save_revision(state) else { continue };
+        let id = module.id();
+        if SAVED_REVISIONS.with_borrow(|m| m.get(id) == Some(&rev)) {
+            continue;
+        }
+        let _g = crate::infra::profiler::dyn_guard("module_file_", id);
+        let Ok(json) = serde_json::to_vec(&module.save_module_data(state)) else { continue };
+        ops.push(WriteOp { path: dir.join(MODULES_DIR).join(format!("{id}.json")), content: json });
+        let _prev = SAVED_REVISIONS.with_borrow_mut(|m| m.insert(id.to_owned(), rev));
+    }
+    ops
+}
+
 /// (global, worker) module-data maps keyed by module id.
 type ModuleDataMaps = (HashMap<String, serde_json::Value>, HashMap<String, serde_json::Value>);
 
 /// (`important_panel_uids` by kind, `panel_uid` → local id) worker maps.
 type PanelUidMaps = (HashMap<Kind, String>, HashMap<String, String>);
 
-/// The `states/<id>.json` file id for whichever thread is currently resident
-/// in `state` — the file this save writes.
+/// The `states/<id>.json` file id for the executing agent — the file this
+/// save writes.
 ///
 /// Both thread kinds write a file named after their own thread id:
-/// - a **background** thread (resident only during its advancement step, so
-///   `resident_thread_id != focused_thread_id`) writes `states/<tid>.json`,
-///   which is why a background thread's mid-step `save_state_async` cannot
-///   clobber the focused thread's file;
-/// - the **focused** thread writes `states/<tid>.json` too. Keying it by id
+/// - a **background** agent (executing only during its advancement step or
+///   save) writes `states/<tid>.json`,
+///   which is why a background agent's mid-step `save_state_async` cannot
+///   clobber the focused agent's file;
+/// - the **focused** agent writes `states/<tid>.json` too. Keying it by id
 ///   rather than by position is what makes focus-switching safe across a
 ///   reload: under a fixed `main_worker` name, switching focus and then
-///   reloading loads the *previously* focused thread's context into the newly
+///   reloading loads the *previously* focused agent's context into the newly
 ///   focused one.
 ///
 /// An **unfocused** agent (boot before any `Read`; focus cleared by
-/// archive/delete) has no thread to name, so it keeps the legacy
+/// archive/delete) has no agent to name, so it keeps the legacy
 /// [`DEFAULT_WORKER_ID`] file. Boot selects the matching id through
 /// [`worker::focused_worker_id`], which mirrors this rule and adds a one-shot
 /// fallback to the legacy name for installs saved before pointers existed.
-fn resident_worker_id(state: &State) -> String {
-    let focused = cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone();
-    match state.resident_thread_id.as_ref() {
-        Some(tid) if Some(tid) != focused.as_ref() => tid.clone(),
+fn executing_worker_id(state: &State) -> String {
+    let focused = cp_mod_agents::types::FocusState::get(state).focused_agent_id.clone();
+    match state.executing_agent_id() {
+        Some(tid) if Some(tid) != focused.as_deref() => tid.to_owned(),
         _ => focused.unwrap_or_else(|| DEFAULT_WORKER_ID.to_owned()),
     }
 }
@@ -53,12 +85,13 @@ fn resident_worker_id(state: &State) -> String {
 /// [`build_panel_write_ops`]): every panel with a UID except the compiled-in
 /// SYSTEM / LIBRARY panels.
 ///
-/// [`save_all_threads`](crate::app::App::save_all_threads) unions this across
-/// every thread to prune orphaned `panels/<uid>.json` exactly once — pruning
-/// per-thread would delete other threads' panels (all threads share the
+/// [`save_all_agents`](crate::app::App::save_all_agents) unions this across
+/// every agent to prune orphaned `panels/<uid>.json` exactly once — pruning
+/// per-agent would delete other agents' panels (all agents share the
 /// `panels/` dir, keyed by the fleet-global UID counter).
 pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> {
     state
+        .agent()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() != Kind::SYSTEM && c.context_type.as_str() != Kind::LIBRARY)
@@ -72,7 +105,12 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut worker_modules = HashMap::new();
     for module in crate::modules::all_modules() {
         let _g = crate::infra::profiler::dyn_guard("save_mod_", module.id());
-        let data = module.save_module_data(state);
+        // Own-file modules are written by `module_file_ops`, not inlined.
+        let data = if module.save_revision(state).is_some() {
+            serde_json::Value::Null
+        } else {
+            module.save_module_data(state)
+        };
         if !data.is_null() {
             if module.is_global() {
                 let _r = global_modules.insert(module.id().to_owned(), data);
@@ -86,7 +124,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
         }
     }
     // Cache optimization engine (survives reloads via worker state)
-    if let Some(json) = state.cache_engine_json.as_ref()
+    if let Some(json) = state.agent().cache_engine_json.as_ref()
         && let Ok(val) = serde_json::from_str::<serde_json::Value>(json)
     {
         let _r = worker_modules.insert("cache_engine".to_owned(), val);
@@ -98,7 +136,7 @@ fn build_module_data_maps(state: &State) -> ModuleDataMaps {
 /// live conversation messages, or a history panel's frozen chunk, else empty.
 fn panel_message_uids(ctx: &crate::state::Entry, state: &State) -> Vec<String> {
     if ctx.context_type.as_str() == Kind::CONVERSATION {
-        state.messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
+        state.agent().messages.iter().map(|m| m.uid.clone().unwrap_or_else(|| m.id.clone())).collect()
     } else if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY {
         ctx.history_messages
             .as_ref()
@@ -117,7 +155,7 @@ fn build_panel_write_ops(
     known_uids: &mut std::collections::HashSet<String>,
 ) -> Vec<WriteOp> {
     let mut writes = Vec::new();
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         if ctx.context_type.as_str() == Kind::SYSTEM || ctx.context_type.as_str() == Kind::LIBRARY {
             continue;
         }
@@ -139,15 +177,20 @@ fn build_panel_write_ops(
     writes
 }
 
-/// Emit one `{uid}.yaml` write op per message held in a `ConversationHistory` panel.
+/// Emit one `{uid}.yaml` write op per `ConversationHistory` message not yet
+/// written this process. Goes on the durable lane: the id is marked written
+/// as soon as the op is built, so a coalesced batch must not drop it.
 fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> Vec<WriteOp> {
     let mut writes = Vec::new();
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         if ctx.context_type.as_str() == Kind::CONVERSATION_HISTORY
             && let Some(msgs) = ctx.history_messages.as_ref()
         {
             for msg in msgs {
                 let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
+                if !SAVED_HISTORY_MSGS.with_borrow_mut(|s| s.insert(file_id.clone())) {
+                    continue;
+                }
                 if let Ok(yaml) = serde_yaml::to_string(msg) {
                     writes.push(WriteOp {
                         path: messages_dir.join(format!("{file_id}.yaml")),
@@ -163,8 +206,8 @@ fn build_history_message_ops(state: &State, messages_dir: &std::path::Path) -> V
 /// Scan the panels dir and emit a delete op for every `{uid}.json` whose UID is
 /// no longer live in `known_uids`.
 ///
-/// `pub(crate)` so [`save_all_threads`](crate::app::App::save_all_threads) can
-/// run it once over the union of every thread's UIDs (see [`panel_uids_of`]).
+/// `pub(crate)` so [`save_all_agents`](crate::app::App::save_all_agents) can
+/// run it once over the union of every agent's UIDs (see [`panel_uids_of`]).
 pub(crate) fn collect_orphan_deletes(
     panels_dir: &std::path::Path,
     known_uids: &std::collections::HashSet<String>,
@@ -189,7 +232,7 @@ pub(crate) fn collect_orphan_deletes(
 /// Build `important_panel_uids` + `panel_uid_to_local_id` maps for the worker state.
 fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
     let mut important_uids: HashMap<Kind, String> = HashMap::new();
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         let dominated = (ctx.context_type.is_fixed() || ctx.context_type.as_str() == Kind::CONVERSATION)
             && ctx.context_type.as_str() != Kind::SYSTEM
             && ctx.context_type.as_str() != Kind::LIBRARY;
@@ -198,6 +241,7 @@ fn build_panel_uid_maps(state: &State) -> PanelUidMaps {
         }
     }
     let panel_uid_to_local_id: HashMap<String, String> = state
+        .agent()
         .context
         .iter()
         .filter(|c| c.uid.is_some() && !c.context_type.is_fixed() && c.context_type.as_str() != Kind::CONVERSATION)
@@ -217,17 +261,18 @@ fn shared_config_op(
     let shared_config = SharedConfig::default()
         .with_active_theme(state.active_theme.clone())
         .with_owner_pid(Some(current_pid()))
-        // Draft lives per-thread in `states/<id>.json`; the shared slot is
+        // Draft lives per-agent in `states/<id>.json`; the shared slot is
         // emptied so a background-thread save can't clobber the focused draft.
-        .with_ui(state.selected_context, String::new(), 0)
+        .with_ui(state.agent().selected_context, String::new(), 0)
         .with_view_mode(state.view_mode)
         .with_modules(global_modules);
-    let json = serde_json::to_string_pretty(&shared_config).ok()?;
+    // Compact, not pretty: config.json is ~1.2 MB and rewritten on every save.
+    let json = serde_json::to_string(&shared_config).ok()?;
     Some(WriteOp { path: dir.join(CONFIG_FILE), content: json.into_bytes() })
 }
 
-/// Serialize the resident thread's `states/<id>.json` (see
-/// [`resident_worker_id`]). Timed as `….worker_state`.
+/// Serialize the executing agent's `states/<id>.json` (see
+/// [`executing_worker_id`]). Timed as `….worker_state`.
 fn worker_state_op(
     state: &State,
     worker_modules: HashMap<String, serde_json::Value>,
@@ -235,14 +280,14 @@ fn worker_state_op(
 ) -> Option<WriteOp> {
     let _g = crate::profile!("worker_state");
     let (important_uids, panel_uid_to_local_id) = build_panel_uid_maps(state);
-    let worker_id = resident_worker_id(state);
+    let worker_id = executing_worker_id(state);
     let worker_state = WorkerState::default()
         .with_worker_id(worker_id.clone())
         .with_panel_uids(important_uids, panel_uid_to_local_id)
-        .with_id_counters(state.next_tool_id, state.next_result_id)
-        .with_draft(state.composer.text.clone(), state.composer.cursor)
+        .with_id_counters(state.agent().next_tool_id, state.agent().next_result_id)
+        .with_draft(state.agent().composer.text.clone(), state.agent().composer.cursor)
         .with_modules(worker_modules);
-    let json = serde_json::to_string_pretty(&worker_state).ok()?;
+    let json = serde_json::to_string(&worker_state).ok()?;
     Some(WriteOp {
         path: dir.join(crate::infra::constants::STATES_DIR).join(format!("{worker_id}.json")),
         content: json.into_bytes(),
@@ -263,15 +308,20 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(crate::infra::constants::MESSAGES_DIR),
         dir.join(cp_mod_logs::LOGS_DIR),
         dir.join(cp_mod_console::CONSOLE_DIR),
-        dir.join(cp_mod_threads::types::persist::THREADS_DIR),
+        dir.join(cp_mod_agents::types::persist::AGENTS_DIR),
+        dir.join(cp_groups::persist::GROUPS_DIR),
+        dir.join(cp_mod_agents::types::activity::ACTIVITY_DIR),
+        dir.join(MODULES_DIR),
     ];
 
-    // Per-thread message files, only for threads changed since last write.
+    // Group message files + agent activity files, only those changed since last write.
     let mut durable: Vec<WriteOp> = {
         let _g = crate::profile!("thread_files");
-        let threads = &cp_mod_threads::types::ThreadsState::get(state).threads;
-        cp_mod_threads::types::persist::dirty_thread_file_ops(threads)
+        let groups = &cp_groups::types::GroupsState::get(state).groups;
+        let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
+        cp_groups::persist::dirty_group_file_ops(groups)
             .into_iter()
+            .chain(cp_mod_agents::types::activity::dirty_file_ops(agents))
             .map(|(path, content)| WriteOp { path, content })
             .collect()
     };
@@ -280,6 +330,8 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         let _g = crate::profile!("modules");
         build_module_data_maps(state)
     };
+    // Durable lane: the stamp is recorded as soon as the op is built.
+    durable.extend(module_file_ops(state, &dir));
 
     writes.extend(shared_config_op(state, global_modules, &dir));
     writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });
@@ -299,10 +351,10 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     writes.extend(worker_state_op(state, worker_modules, &dir));
 
     // Panels + history messages. NOTE: orphan pruning is deliberately NOT done
-    // here — a single-thread save only knows the RESIDENT's UIDs, so pruning
-    // would delete every OTHER thread's `panels/<uid>.json` (the dir is shared,
+    // here — a single-thread save only knows the EXECUTING thread's UIDs, so pruning
+    // would delete every OTHER agent's `panels/<uid>.json` (the dir is shared,
     // keyed by the fleet-global UID counter). Pruning runs once over the union
-    // of all threads' UIDs in `App::save_all_threads` (reload/quit).
+    // of all agents' UIDs in `App::save_all_agents` (reload/quit).
     let panels_dir = dir.join(crate::infra::constants::PANELS_DIR);
     let messages_dir = dir.join(crate::infra::constants::MESSAGES_DIR);
     let mut known_uids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -312,7 +364,7 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
     }
     {
         let _g = crate::profile!("history_msgs");
-        writes.extend(build_history_message_ops(state, &messages_dir));
+        durable.extend(build_history_message_ops(state, &messages_dir));
     }
 
     WriteBatch { writes, deletes: Vec::new(), ensure_dirs, durable }
@@ -340,7 +392,7 @@ pub(crate) fn exec_write_op(op: &WriteOp) {
 }
 
 /// Absolute path to the shared `panels/` directory — the dir
-/// [`save_all_threads`](crate::app::App::save_all_threads) scans for the union
+/// [`save_all_agents`](crate::app::App::save_all_agents) scans for the union
 /// orphan-prune.
 pub(crate) fn panels_dir() -> PathBuf {
     PathBuf::from(STORE_DIR).join(crate::infra::constants::PANELS_DIR)

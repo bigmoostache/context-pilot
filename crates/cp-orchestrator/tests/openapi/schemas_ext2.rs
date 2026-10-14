@@ -249,14 +249,14 @@ pub(super) fn deploy() -> Value {
         "ConvHit": {
             "type": "object",
             "properties": {
-                "thread_id": { "type": "string" },
-                "thread_name": { "type": "string" },
+                "agent_id": { "type": "string" },
+                "agent_name": { "type": "string" },
                 "author": { "type": "string" },
                 "text": { "type": "string" },
                 "ts_ms": { "type": "integer", "format": "int64" },
                 "score": { "type": "number", "format": "double" }
             },
-            "required": ["thread_id", "thread_name", "author", "text", "ts_ms", "score"]
+            "required": ["agent_id", "agent_name", "author", "text", "ts_ms", "score"]
         },
         "ConversationSearchResult": {
             "type": "object",

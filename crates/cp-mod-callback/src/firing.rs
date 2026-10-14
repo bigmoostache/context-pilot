@@ -25,25 +25,25 @@ pub struct FireResult {
     pub replaced: bool,
 }
 
-/// Dedup key for a callback's active session: `"<thread>\u{1f}<callback_id>"`.
+/// Dedup key for a callback's active session: `"<agent>\u{1f}<callback_id>"`.
 ///
-/// The thread component is the resident (executing) thread at fire time, so two
-/// threads firing the same callback get distinct keys and never kill each
+/// The agent component is the executing (executing) agent at fire time, so two
+/// agents firing the same callback get distinct keys and never kill each
 /// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
-/// appear in a thread id or callback id, so the join is collision-free. At N=1
-/// `resident_thread_id` is `None` → the key degrades to the old callback-id-only
+/// appear in an agent id or callback id, so the join is collision-free. At N=1
+/// `executing_agent_id()` is `None` → the key degrades to the old callback-id-only
 /// behaviour with a constant prefix.
 fn dedup_key(state: &State, callback_id: &str) -> String {
-    let tid = state.resident_thread_id.as_deref().unwrap_or(constants::DEFAULT_WORKER_ID);
+    let tid = state.executing_agent_id().unwrap_or(constants::DEFAULT_WORKER_ID);
     format!("{tid}\u{1f}{callback_id}")
 }
 
 /// Informational note (§13/H2) appended to a callback *failure* when another
-/// thread is concurrently running the same callback.
+/// agent is concurrently running the same callback.
 ///
-/// Scans `active_sessions` (keyed `"<thread>\u{1f}<callback_id>"`) for an entry
-/// with the *same* callback id but a *different* thread whose console session is
-/// still running. Returns `None` at N=1 (no other thread), when the callback is
+/// Scans `active_sessions` (keyed `"<agent>\u{1f}<callback_id>"`) for an entry
+/// with the *same* callback id but a *different* agent whose console session is
+/// still running. Returns `None` at N=1 (no other agent), when the callback is
 /// not `concurrency_friendly`, or when no concurrent run is live — so the note
 /// never appears in the single-thread case.
 fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>) -> Option<String> {
@@ -51,12 +51,12 @@ fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>)
     let console = ConsoleState::get(state);
     let suffix = format!("\u{1f}{callback_id}");
     let other_live = cs.active_sessions.iter().any(|(key, session)| {
-        // Same callback id, different executing thread.
+        // Same callback id, different executing agent.
         let Some(other_tid) = key.strip_suffix(&suffix) else { return false };
         if Some(other_tid) == fired_by {
             return false;
         }
-        // That thread's session must still be running to count as concurrent.
+        // That agent's session must still be running to count as concurrent.
         console.sessions.get(session).is_some_and(|h| !h.get_status().is_terminal())
     });
     other_live.then(|| {
@@ -68,7 +68,7 @@ fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>)
 
 /// Kill an existing session for the same callback definition (dedup).
 ///
-/// If the same callback already has an active session **for this thread**, kills
+/// If the same callback already has an active session **for this agent**, kills
 /// its process, removes its watcher, and cleans up the console entry. Returns
 /// `true` if a running session was replaced.
 fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
@@ -121,13 +121,11 @@ fn build_callback_command(
         ));
     }
 
+    // Scripts live in the shared root store, whatever the agent's workdir.
     let scripts_dir = std::path::PathBuf::from(constants::STORE_DIR).join("scripts");
-    let script_path = scripts_dir.join(format!("{}.sh", def.name));
-    let script_path_str = if script_path.is_absolute() {
-        script_path.to_string_lossy().to_string()
-    } else {
-        format!("{}/{}", project_root, script_path.to_string_lossy())
-    };
+    let script_rel = scripts_dir.join(format!("{}.sh", def.name));
+    let script_path = if script_rel.is_absolute() { script_rel } else { constants::project_root().join(script_rel) };
+    let script_path_str = script_path.to_string_lossy().to_string();
 
     if !script_path.exists() {
         return Err(format!("Callback '{}' script not found: {}", def.name, script_path.display()));
@@ -140,6 +138,12 @@ fn build_callback_command(
         name = shell_escape(&def.name),
         script = shell_escape(&script_path_str),
     ))
+}
+
+/// Script cwd: the editing agent's workdir (a worktree when entered), or the
+/// callback's own `cwd` resolved against it.
+fn callback_cwd(def: &crate::types::CallbackDefinition, state: &State, workdir: &str) -> String {
+    def.cwd.as_deref().map_or_else(|| workdir.to_owned(), |c| state.resolve_path(c).to_string_lossy().into_owned())
 }
 
 /// Fire a single callback by spawning its script via the console server.
@@ -167,10 +171,8 @@ pub fn fire_callback(
         || ("CP_CHANGED_FILES", build_changed_files_env(&matched.matched_files)),
         |file| ("CP_CHANGED_FILE", file.to_owned()),
     );
-    let project_root = std::env::current_dir().unwrap_or_default().to_string_lossy().to_string();
-
-    // Use the callback's cwd if set, otherwise project root
-    let cwd = def.cwd.clone().or_else(|| Some(project_root.clone()));
+    let project_root = state.workdir().to_string_lossy().to_string();
+    let cwd = Some(callback_cwd(def, state, &project_root));
 
     let command = build_callback_command(def, env_key, &env_val, &project_root)?;
 
@@ -178,12 +180,7 @@ pub fn fire_callback(
     let replaced = kill_existing_callback(state, &def.id);
 
     // Generate session key via console state
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("cb_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+    let session_key = ConsoleState::alloc_key(state, "cb");
 
     // Spawn the process off the main loop; a spawn error surfaces as a failed run.
     let handle = {
@@ -218,7 +215,7 @@ pub fn fire_callback(
         deadline_ms,
         desc: watcher_desc,
         matched_files: matched.matched_files.clone(),
-        fired_by_thread: state.resident_thread_id.clone(),
+        fired_by_agent: state.executing_agent_id().map(str::to_owned),
         concurrency_friendly: def.concurrency_friendly,
         deferred_panel: DeferredPanel::new(
             session_key.clone(),
@@ -233,7 +230,7 @@ pub fn fire_callback(
     let registry = WatcherRegistry::get_mut(state);
     registry.register(Box::new(watcher));
 
-    // Track this session for dedup, keyed per (executing thread, callback).
+    // Track this session for dedup, keyed per (executing agent, callback).
     let key = dedup_key(state, &def.id);
     drop(CallbackState::get_mut(state).active_sessions.insert(key, session_key.clone()));
 
@@ -338,12 +335,12 @@ pub struct CallbackWatcher {
     pub desc: String,
     /// Files that triggered this callback (for env var injection).
     pub matched_files: Vec<String>,
-    /// Resident (executing) thread id at fire time, or `None` at N=1.
+    /// Executing (executing) agent id at fire time, or `None` at N=1.
     ///
-    /// Used only to decide whether *another* thread is concurrently running the
+    /// Used only to decide whether *another* agent is concurrently running the
     /// same callback when this one fails, so a cross-thread note can be appended
     /// to the failure result (§13/H2, informational).
-    pub fired_by_thread: Option<String>,
+    pub fired_by_agent: Option<String>,
     /// Whether this callback is marked safe to run concurrently (§13/H2). Gates
     /// the informational cross-thread failure note; `false` suppresses it.
     pub concurrency_friendly: bool,
@@ -406,7 +403,7 @@ impl Watcher for CallbackWatcher {
             let mut msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
             if self.concurrency_friendly
                 && let Some(cbid) = self.callback_tag.strip_prefix("callback_")
-                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_thread.as_deref())
+                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_agent.as_deref())
             {
                 msg.push_str(&note);
             }
@@ -477,7 +474,7 @@ impl Watcher for CallbackWatcher {
         None
     }
 
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 

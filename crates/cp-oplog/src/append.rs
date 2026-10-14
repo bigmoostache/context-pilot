@@ -444,7 +444,7 @@ mod tests {
         let mut writer = OplogWriter::open(dir.path()).expect("open");
         let _r = writer
             .append(OpEntryKind::MessageCreated {
-                thread_id: "T1".to_owned(),
+                agent_id: "T1".to_owned(),
                 message_id: "m1".to_owned(),
                 head: cp_wire::types::ContentHash::new([0x77; 32]),
                 inline_body: None,

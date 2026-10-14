@@ -5,7 +5,7 @@
 // setData/poll/invalidate that fought itself — T123) is gone; freshness now
 // follows single-mechanism discipline (design doc §8.5):
 //
-//   • Delta-covered resources (threads, agent meta) ride the PUSH plane: the
+//   • Delta-covered resources (agents, agent meta) ride the PUSH plane: the
 //     per-agent SSE→cache bridge in `query/sync.ts` folds rev-numbered oplog
 //     deltas into the cache via `setQueryData`. No refetch on a delta.
 //   • Inspection resources (memory, todos, tree, …) have no oplog delta, so the
@@ -14,7 +14,7 @@
 //     for a dropped SSE event that reconnect-replay also missed.
 //
 // Hook signatures are unchanged (`LiveQueryResult<T>`) so every consumer
-// component is untouched. `ensureSync(agentId)` is invoked by each agent-scoped
+// component is untouched. `ensureSync(fleetId)` is invoked by each agent-scoped
 // hook so the push plane is guaranteed running whenever data is observed.
 //
 // The imperative finder/agent mutations live in ./mutations and are re-exported
@@ -22,14 +22,14 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
-import { mergeThreadLogs, qk } from "../query/sync"
+import { mergeAgentLogs, qk } from "../query/sync"
 import { getOrCreateSseClient } from "../query/sse"
-import { useRestartAgent } from "./mutations"
+import { useRestartFleet } from "./mutations"
 import { measure } from "../support/telemetry"
 import { useLive, type LiveQueryResult } from "./core"
 import * as api from "../api"
 
-import type { Agent, ThreadDetail, LibraryItem, FinderNode } from "../types"
+import type { Fleet, AgentDetail, LibraryItem, FinderNode } from "../types"
 
 export * from "./mutations"
 
@@ -49,7 +49,7 @@ export { useLive, type LiveQueryResult } from "./core"
  * unreachable. Subscribes to the shared per-agent SSE client's connection
  * callbacks so the component re-renders on open/error transitions.
  */
-export function useSseConnected(agentId: string): boolean {
+export function useSseConnected(fleetId: string): boolean {
   const [connected, setConnected] = useState(true)
   const [seededFor, setSeededFor] = useState<string | null>(null)
 
@@ -60,10 +60,10 @@ export function useSseConnected(agentId: string): boolean {
   // (es === null → connected === false); seeding from that would flash
   // "Disconnected" on every agent switch, so stay optimistic (true) until the
   // handshake settles unless the client has connected before.
-  if (seededFor !== agentId) {
-    setSeededFor(agentId)
-    if (agentId) {
-      const client = getOrCreateSseClient(agentId)
+  if (seededFor !== fleetId) {
+    setSeededFor(fleetId)
+    if (fleetId) {
+      const client = getOrCreateSseClient(fleetId)
       setConnected(client.hasEverConnected ? client.connected : true)
     } else {
       setConnected(true)
@@ -73,10 +73,10 @@ export function useSseConnected(agentId: string): boolean {
   // The effect ONLY subscribes to open/error transitions — no synchronous
   // setState in its body (the seed above owns the initial value).
   useEffect(() => {
-    if (!agentId) return
-    const client = getOrCreateSseClient(agentId)
+    if (!fleetId) return
+    const client = getOrCreateSseClient(fleetId)
     return client.subscribeConnection(setConnected)
-  }, [agentId])
+  }, [fleetId])
 
   return connected
 }
@@ -95,77 +95,77 @@ export function useSseConnected(agentId: string): boolean {
  * `foldLifecycle` guards `"waiting"` against the old agent's `Stopping` delta
  * (which would otherwise flash `"disconnected"` during a controlled restart).
  */
-export function useRestartFlow(agentId: string) {
-  const mutation = useRestartAgent()
+export function useRestartFlow(fleetId: string) {
+  const mutation = useRestartFleet()
   const client = useQueryClient()
-  const { data: agent } = useAgentMeta(agentId)
+  const { data: fleet } = useFleetMeta(fleetId)
 
   const restart = useCallback(() => {
-    if (!agentId || mutation.isPending || agent?.status === "waiting") return
-    mutation.mutate(agentId, {
+    if (!fleetId || mutation.isPending || fleet?.status === "waiting") return
+    mutation.mutate(fleetId, {
       onSuccess: () => {
-        client.setQueryData<Agent>(qk.agent(agentId), (prev) => {
+        client.setQueryData<Fleet>(qk.agent(fleetId), (prev) => {
           if (!prev) return prev
           return { ...prev, status: "waiting" as const, accent: "interactive" as const }
         })
       },
     })
-  }, [agentId, mutation, agent?.status, client])
+  }, [fleetId, mutation, fleet?.status, client])
 
   return {
     restart,
-    restarting: mutation.isPending || agent?.status === "waiting",
+    restarting: mutation.isPending || fleet?.status === "waiting",
     error: mutation.error instanceof Error ? mutation.error.message : null,
   }
 }
 
 // ── Fleet hooks ───────────────────────────────────────────────────────
 
-export function useFleet(): LiveQueryResult<Agent[]> {
+export function useFleet(): LiveQueryResult<Fleet[]> {
   return useLive(qk.fleet(), () => api.fetchFleet())
 }
 
 // ── Agent-scoped hooks ────────────────────────────────────────────────
 
-export function useAgentMeta(agentId: string): LiveQueryResult<Agent> {
-  // Delta-covered: phase + cost vitals fold in via the bridge (applyAgentDelta).
-  return useLive(qk.agent(agentId), () => api.fetchAgentMeta(agentId), {
-    agentId,
-    enabled: !!agentId,
+export function useFleetMeta(fleetId: string): LiveQueryResult<Fleet> {
+  // Delta-covered: phase + cost vitals fold in via the bridge (applyFleetDelta).
+  return useLive(qk.agent(fleetId), () => api.fetchFleetMeta(fleetId), {
+    fleetId,
+    enabled: !!fleetId,
   })
 }
 
-export function useThreads(agentId: string): LiveQueryResult<ThreadDetail[]> {
+export function useAgents(fleetId: string): LiveQueryResult<AgentDetail[]> {
   const client = useQueryClient()
   // Delta-covered: roster + message deltas fold in via the bridge. The backstop
-  // poll merges NON-DESTRUCTIVELY against the current cache (mergeThreadLogs) so
-  // a stale disk snapshot can never drop a delta-applied message/thread (T123).
+  // poll merges NON-DESTRUCTIVELY against the current cache (mergeAgentLogs) so
+  // a stale disk snapshot can never drop a delta-applied message/agent (T123).
   return useLive(
-    qk.threads(agentId),
+    qk.agents(fleetId),
     async () => {
-      const next = await api.fetchThreads(agentId)
-      const prev = client.getQueryData<ThreadDetail[]>(qk.threads(agentId))
-      // The poll reconcile is O(threads × messages) and runs on the main thread
+      const next = await api.fetchAgents(fleetId)
+      const prev = client.getQueryData<AgentDetail[]>(qk.agents(fleetId))
+      // The poll reconcile is O(agents × messages) and runs on the main agent
       // on every backstop tick — a prime periodic-freeze suspect on a huge
       // roster. Name it so the HUD attributes a stall landing here.
-      return measure("threads:merge", () => mergeThreadLogs(prev, next))
+      return measure("agents:merge", () => mergeAgentLogs(prev, next))
     },
-    { agentId, enabled: !!agentId },
+    { fleetId, enabled: !!fleetId },
   )
 }
 
 // ── Finder hooks ──────────────────────────────────────────────────────
 
-export function useFs(agentId: string, path: string): LiveQueryResult<FinderNode[]> {
+export function useFs(fleetId: string, path: string): LiveQueryResult<FinderNode[]> {
   // `fetchFs` is typed with the generated FinderNode (epoch `modified: number`);
   // the UI FinderNode is an enriched view over the same payload (relative
   // `modified` string, optional tags/created). Cast at this single seam.
   return useLive(
-    qk.fs(agentId, path),
-    () => api.fetchFs(agentId, path) as unknown as Promise<FinderNode[]>,
+    qk.fs(fleetId, path),
+    () => api.fetchFs(fleetId, path) as unknown as Promise<FinderNode[]>,
     {
-      agentId,
-      enabled: !!agentId,
+      fleetId,
+      enabled: !!fleetId,
     },
   )
 }
@@ -177,9 +177,9 @@ export function useFs(agentId: string, path: string): LiveQueryResult<FinderNode
  * and the backstop poll is disabled (`pollMs: 0`) — a fresh value lands on the
  * next Finder mount / agent switch, which is plenty for a static hint.
  */
-export function useFsDescriptions(agentId: string): LiveQueryResult<Record<string, string>> {
-  return useLive(qk.fsDescriptions(agentId), () => api.fetchDescriptions(agentId), {
-    enabled: !!agentId,
+export function useFsDescriptions(fleetId: string): LiveQueryResult<Record<string, string>> {
+  return useLive(qk.fsDescriptions(fleetId), () => api.fetchDescriptions(fleetId), {
+    enabled: !!fleetId,
     pollMs: 0,
   })
 }
@@ -196,12 +196,12 @@ export function useFsDescriptions(agentId: string): LiveQueryResult<Record<strin
  * the file is selected.
  */
 export function useFsPreview(
-  agentId: string,
+  fleetId: string,
   path: string,
   enabled: boolean,
 ): LiveQueryResult<api.FsPreview> {
-  return useLive(qk.fsPreview(agentId, path), () => api.fetchFsPreview(agentId, path), {
-    enabled: enabled && !!agentId && !!path,
+  return useLive(qk.fsPreview(fleetId, path), () => api.fetchFsPreview(fleetId, path), {
+    enabled: enabled && !!fleetId && !!path,
     pollMs: 0,
   })
 }
@@ -217,12 +217,12 @@ export function useFsPreview(
  * so there is no SSE bridge and the backstop poll is disabled (`pollMs: 0`).
  */
 export function useFsSheet(
-  agentId: string,
+  fleetId: string,
   path: string,
   enabled: boolean,
 ): LiveQueryResult<api.SheetData> {
-  return useLive(qk.fsSheet(agentId, path), () => api.fetchSheet(agentId, path), {
-    enabled: enabled && !!agentId && !!path,
+  return useLive(qk.fsSheet(fleetId, path), () => api.fetchSheet(fleetId, path), {
+    enabled: enabled && !!fleetId && !!path,
     pollMs: 0,
   })
 }
@@ -237,10 +237,10 @@ export function useFsSheet(
 
 const METRICS_POLL_MS = 4000
 
-export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
-  return useLive(qk.metrics(agentId), () => api.fetchMetrics(agentId), {
-    agentId,
-    enabled: !!agentId,
+export function useMetrics(fleetId: string): LiveQueryResult<api.FleetMetrics> {
+  return useLive(qk.metrics(fleetId), () => api.fetchMetrics(fleetId), {
+    fleetId,
+    enabled: !!fleetId,
     pollMs: METRICS_POLL_MS,
   })
 }
@@ -250,7 +250,7 @@ export function useMetrics(agentId: string): LiveQueryResult<api.AgentMetrics> {
  * Fleet scope has no single agent to subscribe to, so this rides the metrics
  * poll only (no SSE delta). Powers the Usage page's live per-agent totals.
  */
-export function useFleetMetrics(): LiveQueryResult<api.AgentMetrics[]> {
+export function useFleetMetrics(): LiveQueryResult<api.FleetMetrics[]> {
   return useLive(qk.fleetMetrics(), () => api.fetchFleetMetrics(), {
     pollMs: METRICS_POLL_MS,
   })
@@ -258,10 +258,10 @@ export function useFleetMetrics(): LiveQueryResult<api.AgentMetrics[]> {
 
 // ── Library (agent-scoped) ────────────────────────────────────────────
 
-export function useLibrary(agentId: string): LiveQueryResult<LibraryItem[]> {
-  return useLive(qk.library(agentId), () => api.fetchLibrary(agentId), {
-    agentId,
-    enabled: !!agentId,
+export function useLibrary(fleetId: string): LiveQueryResult<LibraryItem[]> {
+  return useLive(qk.library(fleetId), () => api.fetchLibrary(fleetId), {
+    fleetId,
+    enabled: !!fleetId,
   })
 }
 
@@ -283,8 +283,8 @@ export { downloadFile } from "../api"
  * these resources; the backstop poll remains only as a documented last resort.
  */
 export async function sendCommand(
-  agentId: string,
+  fleetId: string,
   kind: Record<string, unknown>,
 ): Promise<api.CommandReceipt> {
-  return api.sendCommand(agentId, kind)
+  return api.sendCommand(fleetId, kind)
 }

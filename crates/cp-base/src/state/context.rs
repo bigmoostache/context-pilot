@@ -140,14 +140,16 @@ impl Kind {
     pub const TOOLS: &str = "tools";
     /// Queue status panel.
     pub const QUEUE: &str = "queue";
+    /// Monitor panel (alive + recently ended console monitors).
+    pub const MONITOR: &str = "monitor";
     /// Chat dashboard panel (always-on room list, server status).
     pub const CHAT_DASHBOARD: &str = "chat-dashboard";
     /// Entity database panel.
     pub const ENTITIES: &str = "entities";
     /// Entity SQL query result panel (dynamic, for large results).
     pub const ENTITY_RESULT: &str = "entity_result";
-    /// Threads panel (parallel discussion topics).
-    pub const THREADS: &str = "threads";
+    /// Agents panel (one entry per agent).
+    pub const AGENTS: &str = "agents";
 
     /// Returns true if this is a fixed/system context type (looked up from registry).
     #[must_use]

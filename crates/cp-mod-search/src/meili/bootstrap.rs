@@ -44,7 +44,7 @@ pub(crate) fn ensure_indexes(port: u16, master_key: &str, project_hash: &str) ->
         log::info!("Created logs index: {logs_uid}");
     }
 
-    // Conversations index (T671) — one doc per thread message for hybrid
+    // Conversations index (T671) — one doc per agent message for hybrid
     // thread-content search.
     let conversations_uid = format!("cp_{project_hash}_conversations");
     if !meili.index_exists(&conversations_uid)? {
@@ -289,8 +289,8 @@ fn logs_embedder_settings(api_key: &str) -> serde_json::Value {
 /// Embedder settings for the conversations index (T671).
 ///
 /// Reuses voyage-code-3 (handles prose fine). The template surfaces author +
-/// thread name + message text so the embedding captures WHO said WHAT in WHICH
-/// thread — the same signal a user recalls when searching. `truncatewords`
+/// agent name + message text so the embedding captures WHO said WHAT in WHICH
+/// agent — the same signal a user recalls when searching. `truncatewords`
 /// caps very long messages so one giant message can't blow the byte budget.
 fn conversations_embedder_settings(api_key: &str) -> serde_json::Value {
     serde_json::json!({
@@ -308,7 +308,7 @@ fn conversations_embedder_settings(api_key: &str) -> serde_json::Value {
                     "{{..}}"
                 ]
             },
-            "documentTemplate": "[{{doc.author}}] {{doc.thread_name}}: {{doc.text | truncatewords: 100}}",
+            "documentTemplate": "[{{doc.author}}] {{doc.agent_name}}: {{doc.text | truncatewords: 100}}",
             "documentTemplateMaxBytes": 1024
         }
     })

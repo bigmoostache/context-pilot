@@ -22,17 +22,17 @@ import { CrossTabTable, TokenDistribution, ApiTokenDistribution } from "./tables
  * attribution, and spend breakdown.
  */
 export function CostsView({
-  agentId,
+  fleetId,
   disconnected,
   onReconnect,
 }: {
-  agentId: string
+  fleetId: string
   disconnected?: boolean
   onReconnect?: () => void
 }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["cost-tsv", agentId],
-    queryFn: () => fetchFsPreview(agentId, ".context-pilot/logs/cost-tracking.tsv"),
+    queryKey: ["cost-tsv", fleetId],
+    queryFn: () => fetchFsPreview(fleetId, ".context-pilot/logs/cost-tracking.tsv"),
     refetchInterval: 15_000,
     retry: 1,
   })
@@ -95,7 +95,7 @@ export function CostsView({
         <button
           onClick={onReconnect}
           className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-          aria-label="Reconnect to agent"
+          aria-label="Reconnect to fleet"
         />
       )}
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
@@ -213,7 +213,7 @@ function DisconnectOverlay({ onReconnect }: { onReconnect?: (() => void) | undef
     <button
       onClick={onReconnect}
       className="absolute inset-0 z-40 cursor-pointer bg-background/30"
-      aria-label="Reconnect to agent"
+      aria-label="Reconnect to fleet"
     />
   )
 }

@@ -14,7 +14,7 @@ mod tests {
     use tempfile as _;
 
     /// Files allowed to read the environment directly, with why.
-    const ALLOWED: [(&str, &str); 7] = [
+    const ALLOWED: [(&str, &str); 8] = [
         ("crates/cp-env/src/source.rs", "the process-environment Source: the single read point"),
         ("crates/cp-env/tests/no_raw_env_reads.rs", "this guard's own needle list"),
         ("crates/cp-vault/src/local.rs", "credential values belong to the vault, not the config layer"),
@@ -24,6 +24,10 @@ mod tests {
         (
             "crates/cp-oplog/tests/crash_replay.rs",
             "test harness: child-process parameters (registered as external names)",
+        ),
+        (
+            "crates/cp-orchestrator/src/transport/inspect/finder/univer/tests/save.rs",
+            "ignored test harness: local workbook paths (registered as external names)",
         ),
     ];
 

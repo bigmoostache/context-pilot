@@ -55,10 +55,12 @@ pub struct Notification {
     pub timestamp_ms: u64,
     /// Human-readable description
     pub content: String,
-    /// Thread this notification is bound to (if any). Set by thread-aware
-    /// sources so `Read`-ing that thread can clear it. `None` = global.
+    /// Agent this notification is bound to. Stamped at creation with the
+    /// executing agent (whose inbox holds it); `Read`-ing that agent clears
+    /// it. `None` only before any agent is placed.
     #[serde(default)]
-    pub thread_id: Option<String>,
+    #[serde(alias = "thread_id")]
+    pub agent_id: Option<String>,
 }
 
 impl Notification {
@@ -72,7 +74,7 @@ impl Notification {
             status: NotificationStatus::Unprocessed,
             timestamp_ms: cp_base::panels::now_ms(),
             content,
-            thread_id: None,
+            agent_id: None,
         }
     }
 
@@ -149,10 +151,10 @@ pub struct SpineState {
     /// Flushed by [`Self::flush_deferred_inject`] once the tool result lands;
     /// latest wins (T736: at most one live notification message).
     pub deferred_inject: Option<(String, String)>,
-    /// Coucous read from this thread's legacy `pending_coucous` save slot (they
-    /// lived per-thread before the fleet-shared registry). Drained once at boot
+    /// Coucous read from this agent's legacy `pending_coucous` save slot (they
+    /// lived per-agent before the fleet-shared registry). Drained once at boot
     /// by the app into [`CoucouRegistry`](crate::schedule::CoucouRegistry),
-    /// stamped with this thread as owner. Never re-saved.
+    /// stamped with this agent as owner. Never re-saved.
     pub legacy_coucous: Vec<crate::coucou::Record>,
 }
 
@@ -235,18 +237,30 @@ impl SpineState {
         // Only inject mid-stream: when idle, auto-continuation delivers the
         // content itself — injecting here too would create a doublon.
         let should_inject = !matches!(kind, NotificationType::UserMessage | NotificationType::ReloadResume)
-            && state.stream.phase.is_streaming();
+            && state.agent().stream.phase.is_streaming();
         let id = format!("N{}", Self::get(state).next_notification_id);
         if should_inject {
-            let safe_to_inject = state.messages.last().is_none_or(|last| {
+            let safe_to_inject = state.agent().messages.last().is_none_or(|last| {
                 // Unsafe if the last message is an assistant with pending tool calls
                 // (tool_result hasn't been appended yet).
                 last.role != "assistant" || last.tool_uses.is_empty()
             });
-            let msg = format!("/* Notification [{source}]: {content} */");
+            // Aggregate (T736): one live notification message carrying EVERY
+            // still-unprocessed one plus this. Replacing it with only the newest
+            // lost the earlier ones (later marked processed, never seen).
+            let mut lines: Vec<String> = Self::get(state)
+                .notifications
+                .iter()
+                .filter(|n| {
+                    n.is_unprocessed()
+                        && !matches!(n.kind, NotificationType::UserMessage | NotificationType::ReloadResume)
+                })
+                .map(|n| format!("/* Notification [{}]: {} */", n.source, n.content))
+                .collect();
+            lines.push(format!("/* Notification [{source}]: {content} */"));
+            let msg = lines.join("\n");
             if safe_to_inject {
-                // Aggregate (T736): keep at most one notification message live —
-                // drop any prior injected notification messages before adding this.
+                // Drop the previous aggregate before adding the new one.
                 let _stripped = state.strip_notification_messages();
                 let _idx = state.push_user_message(msg);
             } else {
@@ -256,11 +270,15 @@ impl SpineState {
             }
         }
 
+        // Owner = the executing agent, whose inbox this lands in (design §7.5:
+        // every notification names its agent). `set_notification_agent` can
+        // still re-address it afterwards.
+        let owner = state.executing_agent_id().map(str::to_owned);
         {
             let ss = Self::get_mut(state);
             ss.next_notification_id = ss.next_notification_id.saturating_add(1);
             let mut notification = Notification::new(id.clone(), kind, source, content);
-            notification.thread_id = None;
+            notification.agent_id = owner;
             ss.notifications.push(notification);
             // Inline gc: cap at 100
             if ss.notifications.len() > 100 {
@@ -300,15 +318,15 @@ impl SpineState {
         removed
     }
 
-    /// Delete all notifications bound to a thread (matching `thread_id`).
+    /// Delete all notifications bound to an agent (matching `agent_id`).
     ///
-    /// Called when a thread is `Read` — its pending notifications are moot once
-    /// the agent has focused the thread. Returns the number removed.
-    pub fn delete_notifications_by_thread(state: &mut State, thread_id: &str) -> usize {
+    /// Called when an agent is `Read` — its pending notifications are moot once
+    /// the agent has focused the agent. Returns the number removed.
+    pub fn delete_notifications_by_agent(state: &mut State, agent_id: &str) -> usize {
         let removed = {
             let ss = Self::get_mut(state);
             let before = ss.notifications.len();
-            ss.notifications.retain(|n| n.thread_id.as_deref() != Some(thread_id));
+            ss.notifications.retain(|n| n.agent_id.as_deref() != Some(agent_id));
             before.saturating_sub(ss.notifications.len())
         };
         if removed > 0 {
@@ -317,14 +335,14 @@ impl SpineState {
         removed
     }
 
-    /// Bind an existing notification (by ID) to a thread, so `Read`-ing that
-    /// thread clears it. No-op when `thread_id` is `None` or the ID is unknown.
+    /// Bind an existing notification (by ID) to an agent, so `Read`-ing that
+    /// agent clears it. No-op when `agent_id` is `None` or the ID is unknown.
     /// Used by the watcher chokepoint after `create_notification` returns.
-    pub fn set_notification_thread(state: &mut State, id: &str, thread_id: Option<String>) {
-        let Some(tid) = thread_id else { return };
+    pub fn set_notification_agent(state: &mut State, id: &str, agent_id: Option<String>) {
+        let Some(tid) = agent_id else { return };
         let ss = Self::get_mut(state);
         if let Some(n) = ss.notifications.iter_mut().find(|n| n.id == id) {
-            n.thread_id = Some(tid);
+            n.agent_id = Some(tid);
         }
     }
 

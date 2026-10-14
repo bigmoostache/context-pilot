@@ -20,11 +20,12 @@ pub(super) fn setup_file_watchers(app: &mut App) {
 /// Dynamic panels (File, Glob, Grep, Tmux, `GitResult`, `GithubResult`) will be
 /// populated gradually by `check_timer_based_deprecation` via its `needs_initial`
 /// path, staggered by the `cache_in_flight` guard — preventing a massive burst
-/// of concurrent background threads on startup when many panels are persisted.
+/// of concurrent background agents on startup when many panels are persisted.
 pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
     // Collect requests first (immutable borrow), then mark in-flight (mutable borrow).
     let requests: Vec<(usize, CacheRequest)> = app
         .state
+        .agent()
         .context
         .iter()
         .enumerate()
@@ -36,7 +37,7 @@ pub(super) fn schedule_initial_cache_refreshes(app: &mut App) {
         .collect();
     for (i, request) in requests {
         process_cache_request(request, app.cache_tx.clone());
-        if let Some(ctx) = app.state.context.get_mut(i) {
+        if let Some(ctx) = app.state.agent_mut().context.get_mut(i) {
             ctx.cache_in_flight = true;
         }
     }
@@ -51,7 +52,7 @@ pub(super) fn process_cache_updates(app: &mut App, cache_rx: &Receiver<CacheUpda
 /// Returns `true` when the update was of this kind (caller should skip on).
 fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
     let Some(context_id) = update.unchanged_context_id() else { return false };
-    if let Some(ctx) = state.context.iter_mut().find(|c| c.id == context_id) {
+    if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.id == context_id) {
         ctx.cache_in_flight = false;
         ctx.cache_deprecated = false;
     }
@@ -62,12 +63,12 @@ fn apply_unchanged_update(state: &mut State, update: &CacheUpdate) -> bool {
 /// mismatch, hands the update back via `Err` for the `Content` path.
 fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Result<(), CacheUpdate> {
     let Some(context_type) = update.module_specific_type().cloned() else { return Err(update) };
-    let Some(idx) = state.context.iter().position(|c| c.context_type == context_type) else { return Ok(()) };
-    let mut ctx = state.context.remove(idx);
+    let Some(idx) = state.agent().context.iter().position(|c| c.context_type == context_type) else { return Ok(()) };
+    let mut ctx = state.agent_mut().context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     let _changed = panel.apply_cache_update(update, &mut ctx, state);
     ctx.cache_in_flight = false;
-    state.context.insert(idx, ctx);
+    state.agent_mut().context.insert(idx, ctx);
     state.flags.ui.dirty = true;
     Ok(())
 }
@@ -75,13 +76,13 @@ fn apply_module_specific_update(state: &mut State, update: CacheUpdate) -> Resul
 /// Apply a `Content` cache update (matched by context id).
 fn apply_content_update(state: &mut State, update: CacheUpdate) {
     let Some(context_id) = update.content_context_id() else { return };
-    let Some(idx) = state.context.iter().position(|c| c.id == context_id) else { return };
-    let mut ctx = state.context.remove(idx);
+    let Some(idx) = state.agent().context.iter().position(|c| c.id == context_id) else { return };
+    let mut ctx = state.agent_mut().context.remove(idx);
     let panel = crate::app::panels::get_panel(&ctx.context_type);
     // apply_cache_update calls update_if_changed which sets last_refresh_ms on change
     let _changed = panel.apply_cache_update(update, &mut ctx, state);
     ctx.cache_in_flight = false;
-    state.context.insert(idx, ctx);
+    state.agent_mut().context.insert(idx, ctx);
     state.flags.ui.dirty = true;
 }
 
@@ -110,7 +111,7 @@ fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra:
     }
     let kind = update.module_specific_type().cloned().or_else(|| {
         let id = update.content_context_id()?;
-        state.context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
+        state.agent().context.iter().find(|c| c.id == id).map(|c| c.context_type.clone())
     })?;
     Some(crate::profile!(crate::infra::profiler::intern(format!("apply_{}", kind.as_str()))))
 }
@@ -120,7 +121,7 @@ fn apply_kind_guard(state: &State, update: &CacheUpdate) -> Option<crate::infra:
 fn invalidate_matching_panels(app: &mut App, path: &str, is_dir_event: bool) -> Vec<usize> {
     let modules = crate::modules::all_modules();
     let mut refresh_indices = Vec::new();
-    for (i, ctx) in app.state.resident.context.iter_mut().enumerate() {
+    for (i, ctx) in app.state.agent_store.current_mut().context.iter_mut().enumerate() {
         for module in &modules {
             if module.should_invalidate_on_fs_change(ctx, path, is_dir_event) {
                 ctx.cache_deprecated = true;
@@ -160,7 +161,7 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
     refresh_indices.sort_unstable();
     refresh_indices.dedup();
     for i in refresh_indices {
-        let Some(ctx) = app.state.context.get(i) else { continue };
+        let Some(ctx) = app.state.agent().context.get(i) else { continue };
         if ctx.cache_in_flight {
             continue;
         }
@@ -168,7 +169,7 @@ fn dispatch_refresh_requests(app: &mut App, mut refresh_indices: Vec<usize>) {
         let built = panel.build_cache_request(ctx, &app.state);
         if let Some(request) = built {
             process_cache_request(request, app.cache_tx.clone());
-            if let Some(ctx_mut) = app.state.context.get_mut(i) {
+            if let Some(ctx_mut) = app.state.agent_mut().context.get_mut(i) {
                 ctx_mut.cache_in_flight = true;
             }
         }
@@ -223,12 +224,17 @@ enum TimerOutcome {
 /// interval), or nothing. Pure read of `app` — no mutation.
 fn classify_timer_panel(app: &App, ctx: &crate::state::Entry, current_ms: u64) -> Option<TimerOutcome> {
     let panel = crate::app::panels::get_panel(&ctx.context_type);
-    if panel.suicide(ctx, &app.state) {
+    let suicide = {
+        let _g = crate::infra::profiler::dyn_guard("tr_suicide_", ctx.context_type.as_str());
+        panel.suicide(ctx, &app.state)
+    };
+    if suicide {
         return Some(TimerOutcome::Suicide);
     }
     if ctx.cache_in_flight {
         return None;
     }
+    let _g = crate::infra::profiler::dyn_guard("tr_req_", ctx.context_type.as_str());
     // Case 1: Initial load — panel has no content yet.
     // Case 2: Explicitly dirty (watcher event, tool, self-invalidation).
     let needs_initial = ctx.cached_content.is_none() && ctx.context_type.needs_cache();
@@ -250,7 +256,7 @@ fn collect_timer_requests(app: &App, current_ms: u64) -> TimerScan {
     let mut requests: Vec<(usize, CacheRequest)> = Vec::new();
     let mut suicide_indices: Vec<usize> = Vec::new();
 
-    for (i, ctx) in app.state.context.iter().enumerate() {
+    for (i, ctx) in app.state.agent().context.iter().enumerate() {
         match classify_timer_panel(app, ctx, current_ms) {
             Some(TimerOutcome::Suicide) => suicide_indices.push(i),
             Some(TimerOutcome::Refresh(req)) => requests.push((i, req)),
@@ -267,25 +273,27 @@ fn remove_suicided_panels(app: &mut App, suicide_indices: &[usize]) {
         return;
     }
     // Save current scroll state before removals (entry might shift or disappear)
-    if let Some(current) = app.state.resident.context.get_mut(app.state.resident.selected_context) {
-        current.scroll_state.offset = app.state.resident.scroll_offset;
-        current.scroll_state.user_scrolled = app.state.resident.stream.user_scrolled;
+    let rt = app.state.agent_store.current_mut();
+    if let Some(current) = rt.context.get_mut(rt.selected_context) {
+        current.scroll_state.offset = rt.scroll_offset;
+        current.scroll_state.user_scrolled = rt.stream.user_scrolled;
     }
     for &i in suicide_indices.iter().rev() {
         // Fix selected_context if it pointed at or past the removed panel
-        if app.state.selected_context >= app.state.context.len().saturating_sub(1) {
-            app.state.selected_context = app.state.context.len().saturating_sub(2);
-        } else if app.state.selected_context > i {
-            app.state.selected_context = app.state.selected_context.saturating_sub(1);
+        if app.state.agent().selected_context >= app.state.agent().context.len().saturating_sub(1) {
+            app.state.agent_mut().selected_context = app.state.agent_mut().context.len().saturating_sub(2);
+        } else if app.state.agent().selected_context > i {
+            app.state.agent_mut().selected_context = app.state.agent_mut().selected_context.saturating_sub(1);
         } else {
             // Selection is before the removed panel — index unaffected.
         }
-        drop(app.state.context.remove(i));
+        drop(app.state.agent_mut().context.remove(i));
     }
     // Restore scroll from the (possibly new) selected panel
-    if let Some(incoming) = app.state.resident.context.get(app.state.resident.selected_context) {
-        app.state.resident.scroll_offset = incoming.scroll_state.offset;
-        app.state.resident.stream.user_scrolled = incoming.scroll_state.user_scrolled;
+    let after = app.state.agent_store.current_mut();
+    if let Some(incoming) = after.context.get(after.selected_context) {
+        after.scroll_offset = incoming.scroll_state.offset;
+        after.stream.user_scrolled = incoming.scroll_state.user_scrolled;
     }
     app.state.flags.ui.dirty = true;
 }
@@ -322,105 +330,111 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     };
 
     // Mutable pass: send requests, mark in-flight, update poll timestamps
-    for (i, request) in requests {
-        process_cache_request(request, app.cache_tx.clone());
-        if let Some(ctx) = app.state.context.get_mut(i) {
-            ctx.cache_in_flight = true;
-            let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);
+    {
+        let _g = crate::profile!("dispatch_requests");
+        for (i, request) in requests {
+            process_cache_request(request, app.cache_tx.clone());
+            if let Some(ctx) = app.state.agent_mut().context.get_mut(i) {
+                ctx.cache_in_flight = true;
+                let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);
+            }
         }
     }
 
+    let _g = crate::profile!("remove_suicided");
     remove_suicided_panels(app, &suicide_indices);
 }
 
-/// Gather every path all modules currently want watched, split into files and
-/// dirs. `BTreeSet` (not `HashSet`) for deterministic iteration (dodges the
-/// `iter_over_hash_type` lint).
-fn collect_wanted_paths(app: &App) -> (std::collections::BTreeSet<String>, std::collections::BTreeSet<String>) {
+/// One watch request in comparable form: `(kind, path)` with kind 0 = file,
+/// 1 = dir, 2 = recursive dir (the recursion flag must survive the union).
+type SpecKey = (u8, String);
+
+/// Every watch the executing agent's modules want right now.
+fn executing_agent_specs(app: &App) -> std::collections::BTreeSet<SpecKey> {
     use cp_base::panels::WatchSpec;
-    let mut wanted_files = std::collections::BTreeSet::new();
-    let mut wanted_dirs = std::collections::BTreeSet::new();
+    let mut specs = std::collections::BTreeSet::new();
     for module in &crate::modules::all_modules() {
         for spec in module.watch_paths(&app.state) {
             // `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
             if let WatchSpec::File(path) = spec {
-                let _r = wanted_files.insert(path);
-            } else if let WatchSpec::Dir(path) | WatchSpec::DirRecursive(path) = spec {
-                let _r = wanted_dirs.insert(path);
+                let _r = specs.insert((0, path));
+            } else if let WatchSpec::Dir(path) = spec {
+                let _r = specs.insert((1, path));
+            } else if let WatchSpec::DirRecursive(path) = spec {
+                let _r = specs.insert((2, path));
             } else {
                 // Future non_exhaustive variants: ignored by the watcher sync.
             }
         }
     }
-    (wanted_files, wanted_dirs)
+    specs
 }
 
-/// Unwatch any file/dir no longer wanted (frees kqueue FDs on macOS, where each
-/// watched path costs one FD against the process limit).
-fn remove_stale_watches(
-    app: &mut App,
-    wanted_files: &std::collections::BTreeSet<String>,
-    wanted_dirs: &std::collections::BTreeSet<String>,
-) {
+/// Unwatch every file/dir no agent wants anymore.
+fn remove_stale_watches(app: &mut App, wanted: &std::collections::BTreeSet<SpecKey>) {
     let Some(watcher) = app.file_watcher.as_mut() else { return };
     let stale_files: Vec<String> =
-        app.watched_file_paths.iter().filter(|p| !wanted_files.contains(*p)).cloned().collect();
+        app.watched_file_paths.iter().filter(|p| !wanted.contains(&(0, (*p).clone()))).cloned().collect();
     for path in &stale_files {
         watcher.unwatch_file(path);
         let _r = app.watched_file_paths.remove(path);
     }
-    let stale_dirs: Vec<String> = app.watched_dir_paths.iter().filter(|p| !wanted_dirs.contains(*p)).cloned().collect();
+    let stale_dirs: Vec<String> = app
+        .watched_dir_paths
+        .iter()
+        .filter(|p| !wanted.contains(&(1, (*p).clone())) && !wanted.contains(&(2, (*p).clone())))
+        .cloned()
+        .collect();
     for path in &stale_dirs {
         watcher.unwatch_dir(path);
         let _r = app.watched_dir_paths.remove(path);
     }
 }
 
-/// Add file watches for newly-wanted files not already watched.
-fn add_file_watches(app: &mut App, wanted_files: std::collections::BTreeSet<String>) {
+/// Watch every wanted file/dir not already watched, honoring the recursion flag.
+fn add_new_watches(app: &mut App, wanted: std::collections::BTreeSet<SpecKey>) {
     let Some(watcher) = app.file_watcher.as_mut() else { return };
-    for path in wanted_files {
-        if !app.watched_file_paths.contains(&path) && watcher.watch_file(&path).is_ok() {
-            let _r = app.watched_file_paths.insert(path);
-        }
-    }
-}
-
-/// Add dir watches for newly-wanted dirs, honoring each spec's recursive flag
-/// (re-scans module specs since recursion isn't captured in the wanted set).
-fn add_dir_watches(app: &mut App) {
-    use cp_base::panels::WatchSpec;
-    let Some(watcher) = app.file_watcher.as_mut() else { return };
-    for module in &crate::modules::all_modules() {
-        for spec in module.watch_paths(&app.state) {
-            // File specs are handled by add_file_watches; here we only add dir
-            // watches. `if let` (not exhaustive match) so WatchSpec stays #[non_exhaustive].
-            if let WatchSpec::Dir(path) = spec {
-                if !app.watched_dir_paths.contains(&path) && watcher.watch_dir(&path).is_ok() {
-                    let _r = app.watched_dir_paths.insert(path);
-                }
-            } else if let WatchSpec::DirRecursive(path) = spec
-                && !app.watched_dir_paths.contains(&path)
-                && watcher.watch_dir_recursive(&path).is_ok()
-            {
-                let _r = app.watched_dir_paths.insert(path);
-            } else {
-                // File specs (handled by add_file_watches) + future non_exhaustive variants.
+    for (kind, path) in wanted {
+        let (tracked, result) = if kind == 0 {
+            if app.watched_file_paths.contains(&path) {
+                continue;
             }
+            (&mut app.watched_file_paths, watcher.watch_file(&path))
+        } else {
+            if app.watched_dir_paths.contains(&path) {
+                continue;
+            }
+            let result = if kind == 2 { watcher.watch_dir_recursive(&path) } else { watcher.watch_dir(&path) };
+            (&mut app.watched_dir_paths, result)
+        };
+        if result.is_ok() {
+            let _r = tracked.insert(path);
         }
     }
 }
 
-/// Sync file watchers from all modules' `watch_paths()`.
-/// Adds new watches and **removes stale ones** to prevent FD exhaustion.
-/// On macOS, kqueue uses 1 FD per watched path — without cleanup, opening
-/// hundreds of files over a session will hit the default 256 FD limit.
+/// Sync file watchers to the union of every agent's `watch_paths()`.
+///
+/// `watch_paths` only sees the executing agent, so each agent's last specs are
+/// cached in `watch_specs_by_agent` and refreshed while it executes. Watching
+/// the union (not just the focused agent) makes a focus switch free: on macOS
+/// each `FSEvents` `watch`/`unwatch` stops, joins and respawns the runloop
+/// thread, so swapping one agent's watch set for another's cost up to ~300ms.
+/// Stale watches are still dropped (paths no agent wants) to bound FD use.
 fn sync_file_watchers(app: &mut App) {
     if app.file_watcher.is_none() {
         return;
     }
-    let (wanted_files, wanted_dirs) = collect_wanted_paths(app);
-    remove_stale_watches(app, &wanted_files, &wanted_dirs);
-    add_file_watches(app, wanted_files);
-    add_dir_watches(app);
+    let specs = executing_agent_specs(app);
+    let owner = app.state.executing_agent_id().map(str::to_owned);
+    if app.watch_specs_by_agent.get(&owner) == Some(&specs) {
+        return;
+    }
+    let _miss = crate::profile!("watch_sync_miss");
+    let _r = app.watch_specs_by_agent.insert(owner, specs);
+    let store = &app.state.agent_store;
+    app.watch_specs_by_agent.retain(|id, _| id.as_deref().is_none_or(|i| store.contains(i)));
+    let wanted: std::collections::BTreeSet<SpecKey> = app.watch_specs_by_agent.values().flatten().cloned().collect();
+    remove_stale_watches(app, &wanted);
+    add_new_watches(app, wanted);
 }

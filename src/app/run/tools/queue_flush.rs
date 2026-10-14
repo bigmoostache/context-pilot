@@ -65,12 +65,12 @@ pub(crate) fn execute_queue_flush(
 /// "Queued as #N" message), this saves a lightweight `Tool_execution` stub with
 /// just the tool name, queue position, and parameter byte-size.
 pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse, queue_index: usize) {
-    // Leave an auto tool-activity trace in the focused thread (no-op unfocused).
-    crate::app::run::threads::maybe_append_tool_activity(&mut app.state, tool);
+    // Leave an auto tool-activity trace in the focused agent (no-op unfocused).
+    crate::app::run::agents::maybe_append_tool_activity(&mut app.state, tool);
 
-    let tool_id = format!("T{}", app.state.next_tool_id);
+    let tool_id = format!("T{}", app.state.agent().next_tool_id);
     let tool_global_uid = format!("UID_{}_T", app.state.global_next_uid);
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
+    app.state.agent_mut().next_tool_id = app.state.agent_mut().next_tool_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
 
     let params_size = serde_json::to_string(&tool.input).map_or(0, |s| s.len());
@@ -86,7 +86,7 @@ pub(crate) fn save_flushed_tool_call_message(app: &mut App, tool: &cp_base::tool
         vec![ToolUseRecord::new(tool.id.clone(), "Tool_execution".to_owned(), compact_input)],
     );
     app.save_message_async(&tool_msg);
-    app.state.messages.push(tool_msg);
+    app.state.agent_mut().messages.push(tool_msg);
 }
 
 /// Append "remaining history panels" info to `Close_conversation_history` results.
@@ -99,6 +99,7 @@ pub(crate) fn augment_remaining_history_panels(
     tool_results: &mut [crate::infra::tools::ToolResult],
 ) {
     let mut remaining: Vec<String> = state
+        .agent()
         .context
         .iter()
         .filter(|c| c.context_type.as_str() == Kind::CONVERSATION_HISTORY)

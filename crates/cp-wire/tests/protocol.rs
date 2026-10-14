@@ -52,7 +52,7 @@ mod tests {
         // One representative of *every* discriminant — the variants the inline
         // tests skip are the ones a regression would most quietly break.
         let mut snapshot = Snapshot::default();
-        snapshot.heads.set_thread_head("T1", ContentHash::of(b"head-body"));
+        snapshot.heads.set_agent_head("T1", ContentHash::of(b"head-body"));
         snapshot.seen.mark("dedup-in-snapshot", 4);
 
         let kinds = vec![
@@ -60,7 +60,7 @@ mod tests {
             OpEntryKind::SeenMark { dedup_token: "dt-2".to_owned() },
             OpEntryKind::PhaseTransition { phase: Phase::Tooling },
             OpEntryKind::MessageCreated {
-                thread_id: "T7".to_owned(),
+                agent_id: "T7".to_owned(),
                 message_id: "m-7".to_owned(),
                 head: ContentHash::of(b"the message body"),
                 inline_body: None,
@@ -87,8 +87,8 @@ mod tests {
         // the seen-set it carries must survive transport exactly, or a fast-path
         // replay would reseed from corrupt state.
         let mut snapshot = Snapshot::default();
-        snapshot.heads.set_thread_head("T1", ContentHash::of(b"a"));
-        snapshot.heads.set_thread_head("T2", ContentHash::of(b"b"));
+        snapshot.heads.set_agent_head("T1", ContentHash::of(b"a"));
+        snapshot.heads.set_agent_head("T2", ContentHash::of(b"b"));
         snapshot.seen.mark("tok-a", 1);
         snapshot.seen.mark("tok-b", 9);
 
@@ -167,17 +167,17 @@ mod tests {
     }
 
     #[test]
-    fn heads_upsert_is_last_write_wins_per_thread() {
-        // A thread's head is overwritten in place, never duplicated — the property
-        // that keeps the head set bounded at one entry per thread (I3).
+    fn heads_upsert_is_last_write_wins_per_agent() {
+        // An agent's head is overwritten in place, never duplicated — the property
+        // that keeps the head set bounded at one entry per agent (I3).
         let mut heads = Heads::default();
-        heads.set_thread_head("T1", ContentHash::of(b"first"));
-        heads.set_thread_head("T1", ContentHash::of(b"second"));
-        heads.set_thread_head("T2", ContentHash::of(b"other"));
+        heads.set_agent_head("T1", ContentHash::of(b"first"));
+        heads.set_agent_head("T1", ContentHash::of(b"second"));
+        heads.set_agent_head("T2", ContentHash::of(b"other"));
 
         let json = serde_json::to_string(&heads).expect("serialize");
         let back: Heads = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(back.threads.len(), 2, "T1 must be updated in place, not duplicated");
+        assert_eq!(back.agents.len(), 2, "T1 must be updated in place, not duplicated");
         assert_eq!(heads, back, "heads round-trip");
     }
 }

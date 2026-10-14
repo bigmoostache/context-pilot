@@ -3,7 +3,7 @@ import { fmtCost, fmtTokens } from "@/lib/support/panelMeta"
 import { Tip } from "@/components/ui/tip"
 import { BehaviourChip } from "./behaviour/BehaviourChip"
 import { ModelChip } from "./behaviour/ModelChip"
-import type { Agent, StreamPhase } from "@/lib/types"
+import type { Fleet, StreamPhase } from "@/lib/types"
 
 const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
   ready: { label: "Ready", color: "var(--ok)" },
@@ -19,28 +19,28 @@ const phaseMeta: Record<StreamPhase, { label: string; color: string }> = {
  *   agent — stream phase, agent name, and its running cost.
  * - **At fleet altitude** (`fleet=true`, no agent selected): per-agent vitals
  *   are meaningless, so we show fleet-wide aggregates instead — how many agents
- *   you run, how many threads are in flight across all of them, and the *total*
+ *   you run, how many agents are in flight across all of them, and the *total*
  *   spend (clearly labelled). A "Needs you" count surfaces how many agents are
  *   waiting on input, so the footer doubles as a glanceable fleet pulse.
  */
 export function StatusBar({
   fleet = false,
-  agents = [],
-  activeAgent,
-  activeAgentId = "",
+  fleets = [],
+  activeFleet,
+  activeFleetId = "",
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
   fleet?: boolean
-  agents?: Agent[]
-  activeAgent?: Agent | undefined
+  fleets?: Fleet[]
+  activeFleet?: Fleet | undefined
   /** The focused agent's id — drives the behaviour selector's library query + command. */
-  activeAgentId?: string
+  activeFleetId?: string
   /** False when the SSE push plane for this agent is down. */
   connected?: boolean
-  /** Fires the restart API + full reconnect lifecycle (same as AgentModal Restart). */
+  /** Fires the restart API + full reconnect lifecycle (same as FleetModal Restart). */
   onRestart?: () => void
   /** True while the restart lifecycle is in-flight (API call through SSE reconnect). */
   restarting?: boolean
@@ -48,11 +48,11 @@ export function StatusBar({
   loading?: boolean
 }) {
   return fleet ? (
-    <FleetStatus agents={agents} />
+    <FleetStatus fleets={fleets} />
   ) : (
-    <AgentStatus
-      agent={activeAgent}
-      agentId={activeAgentId}
+    <ActiveFleetStatus
+      fleet={activeFleet}
+      fleetId={activeFleetId}
       connected={connected}
       onRestart={onRestart}
       restarting={restarting}
@@ -62,10 +62,10 @@ export function StatusBar({
 }
 
 /** Fleet-wide aggregates — shown when no single agent is focused. */
-function FleetStatus({ agents }: { agents: Agent[] }) {
-  const totalSpend = agents.reduce((sum, a) => sum + a.costUsd, 0)
-  const needsYou = agents.filter((a) => a.status === "needs-you").length
-  const totalThreads = agents.reduce((sum, a) => sum + a.threads, 0)
+function FleetStatus({ fleets }: { fleets: Fleet[] }) {
+  const totalSpend = fleets.reduce((sum, a) => sum + a.costUsd, 0)
+  const needsYou = fleets.filter((a) => a.status === "needs-you").length
+  const totalAgents = fleets.reduce((sum, a) => sum + a.agents, 0)
 
   return (
     // Bare chrome, like the header rail: no fill, no `border-t`, no margin —
@@ -75,17 +75,17 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
     <footer className="flex h-8 shrink-0 items-center gap-4 px-2 text-[12px]">
       <Tip
         title="Fleet view"
-        body="Aggregates across every agent you run. Open an agent to see its own vitals here instead."
+        body="Aggregates across every fleet you run. Open a fleet to see its own vitals here instead."
         side="top"
       >
         <span className="font-medium text-foreground/70">Fleet</span>
       </Tip>
 
-      <Tip title="Agents" body="How many agents exist in the fleet." side="top">
-        <Metric icon={Boxes} label="Agents" value={String(agents.length)} />
+      <Tip title="Fleets" body="How many fleets you run." side="top">
+        <Metric icon={Boxes} label="Fleets" value={String(fleets.length)} />
       </Tip>
-      <Tip title="Threads" body="Open threads, summed across every agent." side="top">
-        <Metric icon={MessagesSquare} label="Threads" value={String(totalThreads)} />
+      <Tip title="Agents" body="Open agents, summed across every fleet." side="top">
+        <Metric icon={MessagesSquare} label="Agents" value={String(totalAgents)} />
       </Tip>
 
       {needsYou > 0 && (
@@ -121,38 +121,38 @@ function FleetStatus({ agents }: { agents: Agent[] }) {
  *  push-delta `phase` (streaming/tooling/idle), falling back to `status` before
  *  the first PhaseTransition has been observed. A flat if-chain, not a nested
  *  ternary. */
-function resolvePhase(agent?: Agent): StreamPhase {
-  if (agent?.phase === "streaming") return "streaming"
-  if (agent?.phase === "tooling") return "tooling"
-  if (agent?.phase === "idle") return "ready"
-  if (agent?.status === "working") return "streaming"
+function resolvePhase(fleet?: Fleet): StreamPhase {
+  if (fleet?.phase === "streaming") return "streaming"
+  if (fleet?.phase === "tooling") return "tooling"
+  if (fleet?.phase === "idle") return "ready"
+  if (fleet?.status === "working") return "streaming"
   return "ready"
 }
 
 /** Pull the footer's numeric vitals off the agent with safe fallbacks, so the
  *  host component's branch count stays under the complexity budget. */
-function agentVitals(agent?: Agent) {
+function fleetVitals(fleet?: Fleet) {
   return {
-    costUsd: agent?.costUsd ?? 0,
-    used: agent?.contextUsed ?? 0,
-    budget: agent?.contextBudget ?? 200_000,
-    threshold: agent?.contextThreshold ?? 0,
-    hit: agent?.contextHit ?? 0,
-    miss: agent?.contextMiss ?? 0,
+    costUsd: fleet?.costUsd ?? 0,
+    used: fleet?.contextUsed ?? 0,
+    budget: fleet?.contextBudget ?? 200_000,
+    threshold: fleet?.contextThreshold ?? 0,
+    hit: fleet?.contextHit ?? 0,
+    miss: fleet?.contextMiss ?? 0,
   }
 }
 
 /** Single-agent session vitals — shown while an agent is focused. */
-function AgentStatus({
-  agent,
-  agentId,
+function ActiveFleetStatus({
+  fleet,
+  fleetId,
   connected = true,
   onRestart,
   restarting = false,
   loading = false,
 }: {
-  agent?: Agent | undefined
-  agentId?: string
+  fleet?: Fleet | undefined
+  fleetId?: string
   connected?: boolean
   onRestart?: (() => void) | undefined
   restarting?: boolean
@@ -162,20 +162,20 @@ function AgentStatus({
   // so the footer distinguishes streaming · tooling · ready instead of the old
   // 2-state projection of `status`. Falls back to `status` only before the
   // first phase transition has been observed (phase still undefined).
-  const phase: StreamPhase = resolvePhase(agent)
+  const phase: StreamPhase = resolvePhase(fleet)
   const p = phaseMeta[phase]
   // Context-window meter figures — the agent's OWN authoritative occupancy +
   // cache split, folded from the ContextUsage push delta (T297), byte-identical
   // to the ratatui sidebar.
-  const { costUsd, used, budget, threshold, hit, miss } = agentVitals(agent)
+  const { costUsd, used, budget, threshold, hit, miss } = fleetVitals(fleet)
 
   return (
     // Same bare treatment as the fleet footer above and the header rail: no
     // fill, no top border, no margin, 0.5rem of horizontal padding.
     <footer className="flex h-8 shrink-0 items-center gap-3 px-2 text-[12px]">
       <Tip
-        title="Agent status"
-        body="Live execution phase — Ready, Streaming, Working or Blocked. When it reads Disconnected, click to restart the agent."
+        title="Fleet status"
+        body="Live execution phase — Ready, Streaming, Working or Blocked. When it reads Disconnected, click to restart the fleet."
         side="top"
       >
         <StatusIndicator
@@ -187,23 +187,23 @@ function AgentStatus({
         />
       </Tip>
 
-      {agentId ? (
+      {fleetId ? (
         <Tip
           title="Model"
-          body="The LLM provider and model this agent runs on. Switch it here — applies immediately."
+          body="The LLM provider and model this fleet runs on. Switch it here — applies immediately."
           side="top"
         >
-          <ModelChip agentId={agentId} agent={agent} />
+          <ModelChip fleetId={fleetId} fleet={fleet} />
         </Tip>
       ) : null}
 
-      {agentId ? (
+      {fleetId ? (
         <Tip
           title="System prompt"
           body="The behaviour agent driving this one. Switch, edit, create or import one."
           side="top"
         >
-          <BehaviourChip agentId={agentId} />
+          <BehaviourChip fleetId={fleetId} />
         </Tip>
       ) : null}
 
@@ -212,7 +212,7 @@ function AgentStatus({
             (per-segment hit/miss/threshold/free token figures), and a second
             tooltip on the same element would fight it. */}
         <ContextBar used={used} threshold={threshold} budget={budget} hit={hit} miss={miss} />
-        <Tip title="Session cost" body="API spend for this agent since it started." side="top">
+        <Tip title="Session cost" body="API spend for this fleet since it started." side="top">
           <span className="text-muted-foreground tabular-nums">{fmtCost(costUsd)}</span>
         </Tip>
       </span>
@@ -222,7 +222,7 @@ function AgentStatus({
 
 /** The footer's left indicator: a loading / restarting / connected phase dot, or
  *  a clickable "Disconnected" restart button when the push plane is down.
- *  Extracted from {@link AgentStatus} so its host stays under the complexity
+ *  Extracted from {@link ActiveFleetStatus} so its host stays under the complexity
  *  budget — this is where the four-way state cascade lives. */
 function StatusIndicator({
   phase,

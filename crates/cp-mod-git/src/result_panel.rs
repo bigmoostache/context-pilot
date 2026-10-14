@@ -24,11 +24,12 @@ impl Panel for GitResultPanel {
         None
     }
 
-    fn build_cache_request(&self, ctx: &Entry, _state: &State) -> Option<CacheRequest> {
+    fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?;
+        let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GIT_RESULT),
-            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned() }),
+            Box::new(GitResultRequest { context_id: ctx.id.clone(), command: command.to_owned(), cwd }),
         ))
     }
 
@@ -58,13 +59,25 @@ impl Panel for GitResultPanel {
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<GitResultRequest>().ok()?;
-        let GitResultRequest { context_id, command } = *req;
+        let GitResultRequest { context_id, command, cwd } = *req;
 
         // Parse and execute the command with timeout
         let args = super::classify::validate_git_command(&command).ok()?;
 
+        // A vanished worktree makes git report every file as deleted: say so instead.
+        if !cwd.is_dir() {
+            let content = format!("Error: workdir {} no longer exists (worktree removed?).", cwd.display());
+            let token_count = estimate_tokens(&content);
+            return Some(CacheUpdate::Content { context_id, content, token_count });
+        }
+
         let mut cmd = std::process::Command::new("git");
-        let _c = cmd.args(&args).env("GIT_TERMINAL_PROMPT", "0");
+        let _c = cmd
+            .args(&args)
+            .current_dir(&cwd)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env("GIT_TERMINAL_PROMPT", "0");
         let output = run_with_timeout(cmd, GIT_CMD_TIMEOUT_SECS);
 
         match output {
@@ -97,7 +110,11 @@ impl Panel for GitResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx_opt = state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
+        let ctx_opt = state
+            .agent()
+            .context
+            .get(state.agent().selected_context)
+            .filter(|c| c.context_type.as_str() == Kind::GIT_RESULT);
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No git result panel".into(), Semantic::Muted)];
@@ -129,7 +146,7 @@ impl Panel for GitResultPanel {
             .collect()
     }
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.get(state.selected_context)
+        if let Some(ctx) = state.agent().context.get(state.agent().selected_context)
             && ctx.context_type.as_str() == Kind::GIT_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
@@ -149,7 +166,7 @@ impl Panel for GitResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
-        for ctx in &state.context {
+        for ctx in &state.agent().context {
             if ctx.context_type.as_str() != Kind::GIT_RESULT {
                 continue;
             }

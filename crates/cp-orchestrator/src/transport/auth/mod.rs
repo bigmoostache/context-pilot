@@ -16,7 +16,7 @@ mod dispatch_rbac;
 mod users;
 
 pub(crate) use acl::{
-    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_agent, extract_agent_id, filter_fleet,
+    acl_grant, acl_list, acl_revoke, acl_update_role, authorize_fleet, extract_fleet_id, filter_fleet,
 };
 pub(crate) use users::{create_user, delete_user, force_logout_user, list_users};
 
@@ -96,7 +96,7 @@ fn is_public_route(segments: &[&str]) -> bool {
         segments,
         ["api", "health" | "stream" | "features"]
             | ["api", "auth", "login" | "register" | "status"]
-            | ["api", "agent", _, "avatar"]
+            | ["api", "fleet", _, "avatar"]
     )
 }
 
@@ -437,7 +437,7 @@ mod tests {
     #[test]
     fn flag_off_is_god_mode() {
         let (state, _dir) = backend(false);
-        let outcome = authenticate(&state, &["api", "agent", "some-agent"], None);
+        let outcome = authenticate(&state, &["api", "fleet", "some-agent"], None);
         assert!(matches!(outcome, Ok(None)), "flag off \u{21d2} no authenticated user (god mode)");
     }
 
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn flag_on_enforces() {
         let (state, _dir) = backend(true);
-        let protected = authenticate(&state, &["api", "agent", "some-agent"], None);
+        let protected = authenticate(&state, &["api", "fleet", "some-agent"], None);
         assert!(matches!(protected, Err(reply) if reply.status == 401), "flag on + no token \u{21d2} 401");
         let public = authenticate(&state, &["api", "health"], None);
         assert!(matches!(public, Ok(None)), "public route bypasses the gate");

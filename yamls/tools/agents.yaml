@@ -1,0 +1,208 @@
+tools:
+  Send:
+    description: |
+      Posts a message into a group you belong to (you are an agent). Your
+      conversation with the user is your human group (human_group_id in the
+      Agents panel). To attach files, embed ```file-upload``` blocks in markdown
+      (see below).
+
+      Send is the ONLY way to reach anyone. Your conversation is STRICTLY
+      CONFIDENTIAL: plain assistant text, thinking, tool calls and tool results
+      never reach the user or other agents, and never can. Whenever you want to
+      tell, answer or ask anything, call Send.
+
+      `next` says who acts next in that group:
+        STILL_MY_TURN               you keep working (progress update)
+        GIVE_TALKING_STICK_TO <id>  hand the turn to one member; HUMAN hands
+                                    it back to the user (group owner only)
+        GATHER <id>, <id>...        wait for every listed member, then you resume
+        DISPATCH <id>, <id>...      the first idle listed member takes it
+        OWNER_DONE                  owner closes the exchange (not in human groups)
+        GIVE_RECURRING_TASK(<id>, <cron>, <message>)
+                                    <id> (you or a member) gets <message> here on
+                                    every match of a 5-field POSIX cron (local
+                                    time); same as Coucou(cron=...), stop it with
+                                    Coucou_delete
+      Sending replaces your own pending turn in that group with what `next` says.
+      Focus never moves.
+
+      Messages to other agents (non-human groups) land in their context: keep
+      them as compact and synthetic as possible, no pleasantries or recaps.
+
+      WRITING STYLE (read before composing any reply):
+      Je passe mes journées à lire des réponses d'agents LLM, verbeuses, lourdes et illisibles.
+      Ne fais pas ça. Réduis au minimum la charge cognitive de tes messages : réponds à ma
+      question, et donne-moi uniquement l'information dont j'ai besoin, de façon synthétique.
+      Écris en français ou en anglais courant, sans charabia ni fioritures.
+
+      Concrètement :
+      - Si la question est fermée, la première phrase est la réponse. Souvent elle suffit.
+      - N'ajoute ni contexte, ni mises en garde, ni « points à surveiller », ni suites possibles.
+        Si tu juges un élément indispensable, une ligne maximum, à la fin.
+      - Ne détaille pas ta démarche ni tes vérifications, sauf si je les demande.
+      - Pas de listes ni de titres pour une réponse tenant en trois phrases.
+      - Pas de métaphores, pas d'emphase, pas de formules d'accroche.
+
+      PREFER RICH PRESENTATIONS OVER PLAIN PROSE:
+      A message is not limited to text. Two embeddable widgets — file cards
+      (```file-upload```) and interactive forms (```form```) — make your replies
+      far more useful than raw prose, and you should reach for them whenever the
+      situation fits. They are clickable, they render inline, they cut the
+      user's typing, and they collapse multi-turn back-and-forth into a single
+      exchange. Reserve plain prose for when there is genuinely no artifact to
+      show and no decision to collect.
+
+      Use a FILE CARD (```file-upload```) whenever you produce, modify, or want
+      the user to open/review/download a file — a generated report, a diff, a
+      screenshot, a spreadsheet, a config, a log. Show the card, do NOT paste a
+      bare path string: the card opens a rich preview in a drawer, a bare path
+      does nothing. If you just wrote or touched a file the user cares about,
+      present it.
+
+      Use a FORM (```form```) whenever you need the user to choose, decide,
+      confirm, or supply structured input — instead of asking in prose and
+      making them hand-type the answer. Concretely:
+        - a decision between options → a `single` (or `multi`) field, not
+          "reply with 1, 2 or 3".
+        - a destructive or irreversible action → a `confirm` field (add a
+          `confirm-word` to force a deliberate type-to-arm) rather than a
+          free-text "are you sure?".
+        - several parameters at once → ONE form with several fields, not a
+          sequence of question messages.
+        - a date, a number, a toggle, a file to hand over → the matching field
+          type, so the answer comes back clean and machine-readable in the
+          ```form-answer``` block.
+      When in doubt between prose and a form/card, prefer the widget — it is
+      almost always the higher-signal, lower-friction choice.
+
+      PRESENTING A FILE TO THE USER:
+      To show the user a clickable file card (which opens a rich preview —
+      image / PDF / spreadsheet / code / markdown — in a drawer), embed a
+      ```file-upload``` fenced block inside your `markdown`, at the exact spot
+      you want the card to appear (it renders inline, interleaved with your
+      prose). The frontend parses every such block and replaces it with the
+      card; you can include several blocks (one card each) in one message.
+
+      Format (YAML body under a `file:` key):
+
+        ```file-upload
+        file:
+          path: relative/path/within/the/realm.pdf
+          name: report.pdf
+          size: 48213
+          note: generated by the build step
+        ```
+
+      Fields: `path` (REQUIRED — realm-relative path to an EXISTING file; the
+      card greys out with a "file not found" warning if it doesn't exist),
+      `name` (optional display name, defaults to the path's basename), `size`
+      (optional bytes, for the size label), `note` (optional one-line caption).
+      Only reference files that actually exist in the agent's folder — e.g. one
+      you just wrote, or an upload under `.uploads/`.
+
+      ASKING THE USER A STRUCTURED QUESTION (```form``` block):
+      To ask the user structured questions — a single/multi choice, a
+      confirmation before a destructive action, a date, a file upload, free
+      text — embed a ```form``` fenced block inside your `markdown`, at the exact
+      spot you want the form to appear (it renders inline as an interactive
+      widget, like a file card). You may include several form blocks in one
+      message. Author the form ONCE; you never track its status — the frontend
+      derives "answered" from a matching ```form-answer``` message the user's
+      submit creates, and you read that block to learn the answers.
+
+      Format (YAML body). Pick a `form-id` that is UNIQUE WITHIN THE AGENT
+      (a short slug or UUID):
+
+        ```form
+        form-id: deploy-v0-3-0
+        title: Deploy release v0.3.0
+        submit: Confirm
+        fields:
+          - id: target
+            label: Which machine?
+            type: single
+            allow-other: true
+            options:
+              - label: gilbert
+                detail: Mac Mini arm64, prod
+              - label: asterix
+                detail: server x86_64, staging
+          - id: agents
+            label: Which agents to restart?
+            type: multi
+            options:
+              - label: opio-1
+                detail: main agent
+              - label: general-config
+                detail: config agent
+          - id: note
+            label: Deploy note
+            type: text
+          - id: count
+            label: Max attempts
+            type: number
+          - id: when
+            label: Deploy date
+            type: date
+          - id: dry-run
+            label: Dry-run mode
+            type: toggle
+          - id: artifacts
+            label: Attach build logs
+            type: files
+          - id: go
+            label: Confirm production deploy
+            type: confirm
+            confirm-word: DEPLOY
+        ```
+
+      Global keys: `form-id` (REQUIRED, agent-unique), `title` (optional),
+      `submit` (optional button label), `fields` (REQUIRED, ordered list).
+      Every field has `id` (unique in the form) + `label` + `type`. ALL fields
+      are mandatory for the user — there is no "required" flag.
+
+      Field `type` values (v1):
+        single  — radio choice; `options` list of {label, detail}. Add
+                  `allow-other: true` for a free-text "Other…" choice.
+        multi   — checkbox choice; `options` list of {label, detail}.
+        text    — free text.
+        number  — numeric.
+        date    — date picker (answer is ISO YYYY-MM-DD).
+        toggle  — neutral on/off boolean switch.
+        confirm — danger-accented button for destructive confirmations;
+                  optional `confirm-word` the user must type to arm it.
+        files   — the user answers by uploading file(s); the answer is a list
+                  of realm-relative paths.
+
+      When the user submits, a user message carrying a ```form-answer``` block
+      (same `form-id`, an `answers` list of {id, answer}) appears in your conversation.
+      Read it to learn the choices (scalar for single/text/number/date/toggle/
+      confirm; list for multi/files). A malformed ```form``` block (missing
+      `form-id` or `fields`) is rejected — the Send fails with an error.
+
+      MERMAID DIAGRAMS (great way to convey information visually):
+      A ```mermaid``` fenced code block is RENDERED as an actual diagram in the
+      UI — not shown as raw code. Reach for it whenever a picture beats prose:
+      flowcharts, sequence diagrams, state machines, class/ER diagrams, gantt
+      charts, pie charts, mindmaps, git graphs. Just embed the fence in your
+      `markdown` at the spot you want the diagram; the frontend lazy-loads
+      mermaid, renders sanitised SVG (light/dark themed), and falls back to the
+      raw code block only if the diagram fails to parse. Example:
+
+        ```mermaid
+        flowchart TD
+            A[Start] --> B{Decision}
+            B -->|yes| C[Do the thing]
+            B -->|no| D[Skip]
+        ```
+
+      MATH RENDERING:
+      Single `$` is treated as a literal dollar sign (NOT inline math).
+      For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
+    parameters:
+      markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
+
+      group_id: "Group to post into (G<n>). Your human group for the user."
+
+      next: "Who acts next: STILL_MY_TURN | GIVE_TALKING_STICK_TO <id> | GATHER <id>, <id>... | DISPATCH <id>, <id>... | OWNER_DONE | GIVE_RECURRING_TASK(<id>, <cron>, <message>). Use GIVE_TALKING_STICK_TO HUMAN when you are done and the user should answer."
+

@@ -49,7 +49,7 @@ pub(super) fn transport() -> Value {
             },
             "required": ["cmd_id", "dedup_token", "status"]
         },
-        "CreateAgentReceipt": {
+        "CreateFleetReceipt": {
             "type": "object",
             "properties": {
                 "status": { "type": "string" },
@@ -94,7 +94,7 @@ pub(super) fn transport() -> Value {
             },
             "required": ["id", "status"]
         },
-        "LibraryAgentRaw": {
+        "LibrarySystemRaw": {
             "type": "object",
             "properties": {
                 "name": { "type": "string" },
@@ -181,7 +181,7 @@ pub(super) fn transport() -> Value {
         "AclEntry": {
             "type": "object",
             "properties": {
-                "agent_id": { "type": "string" },
+                "fleet_id": { "type": "string" },
                 "user_id": { "type": "string" },
                 "role": { "type": "string", "enum": ["agent-admin", "agent-user"] },
                 "granted_at": { "type": "integer" },
@@ -189,7 +189,7 @@ pub(super) fn transport() -> Value {
                 "user_email": { "type": "string" },
                 "user_name": { "type": "string" }
             },
-            "required": ["agent_id", "user_id", "role", "user_email", "user_name"]
+            "required": ["fleet_id", "user_id", "role", "user_email", "user_name"]
         },
         // ── Env-keys ────────────────────────────────────────────────
         "EnvKeyStatus": {
@@ -336,7 +336,16 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": {
                 "sheets": arr(r("SheetTab")),
-                "truncated": { "type": "boolean" }
+                "truncated": { "type": "boolean" },
+                "workbook": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Full Univer IWorkbookData snapshot (xlsx/xlsm only); `sheets` is empty when set."
+                },
+                "activeSheet": {
+                    "type": "string",
+                    "description": "Univer sheet id the workbook opens on (xlsx/xlsm only)."
+                }
             },
             "required": ["sheets", "truncated"]
         },
@@ -344,6 +353,15 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": { "written": { "type": "integer" }, "path": { "type": "string" } },
             "required": ["written", "path"]
+        },
+        "SheetSaveResult": {
+            "type": "object",
+            "properties": {
+                "written": { "type": "integer", "description": "Saved file size in bytes." },
+                "path": { "type": "string" },
+                "patched": { "type": "integer", "description": "Cells changed in the original file." }
+            },
+            "required": ["written", "path", "patched"]
         },
         "MkdirResult": {
             "type": "object",
@@ -403,12 +421,12 @@ pub(super) fn transport() -> Value {
             "description": "Discriminated-union payload of a single oplog delta, keyed by `kind`.",
             "properties": {
                 "kind": { "type": "string" },
-                "thread_id": { "type": "string" },
+                "agent_id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string" },
                 "timestamp_ms": { "type": "integer" },
-                // thread_created delta payload: the parent thread id when the new
-                // thread was branched out of another one (absent otherwise).
+                // agent_created delta payload: the parent agent id when the new
+                // agent was branched out of another one (absent otherwise).
                 "branched_from": { "type": "string" },
                 "phase": { "type": "string" },
                 // Lifecycle delta payload: the agent's new process state
@@ -426,15 +444,17 @@ pub(super) fn transport() -> Value {
                 "head": { "type": "string" },
                 "inline_body": { "type": "string" },
                 "message_ts": { "type": "integer" },
-                // behaviour_changed delta payload: the newly-active behaviour-agent
+                // behaviour_changed delta payload: the newly-active behaviour-system
                 // id (absent on a revert-to-default), carried by a `kind:"behaviour_changed"` entry.
+                "system_id": { "type": "string" },
+                // Legacy (pre-T860) name of `system_id`, still emitted by older agents.
                 "agent_id": { "type": "string" },
-                // task_list_changed delta payload: the thread's complete current
+                // task_list_changed delta payload: the agent's complete current
                 // (cancelled-excluded) task list, carried by a `kind:"task_list_changed"` entry.
-                "tasks": arr(r("ThreadTask")),
-                // notes_changed delta payload: the thread's complete current
+                "tasks": arr(r("AgentTask")),
+                // notes_changed delta payload: the agent's complete current
                 // scratchpad-note list, carried by a `kind:"notes_changed"` entry.
-                "notes": arr(r("ThreadNote"))
+                "notes": arr(r("AgentNote"))
             },
             "required": ["kind"]
         },

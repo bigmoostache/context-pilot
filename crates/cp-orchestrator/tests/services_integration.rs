@@ -34,6 +34,7 @@ use cp_mod_utilities as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use flate2 as _;
 use minisign_verify as _;
 use nix as _;
 use notify as _;
@@ -46,6 +47,7 @@ use serde_json as _;
 use serde_yaml as _;
 use sha2 as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use std::path::Path;
@@ -66,10 +68,10 @@ use tempfile::tempdir;
 mod tests {
     use super::*;
 
-    /// A `MessageCreated` head for `thread` keyed by `byte`.
-    fn message(thread: &str, byte: u8) -> OpEntryKind {
+    /// A `MessageCreated` head for `agent` keyed by `byte`.
+    fn message(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -85,9 +87,9 @@ mod tests {
     fn token(agent: &str, seq: u64) -> Frame {
         Frame {
             schema_version: 1,
-            agent_id: agent.to_owned(),
+            fleet_id: agent.to_owned(),
             worker_id: "w0".to_owned(),
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
             seq,
             kind: StreamKind::Token { text: "x".to_owned() },
@@ -126,9 +128,9 @@ mod tests {
 
         let agent = view.get("a1").expect("agent projected");
         assert_eq!(agent.phase, Some(Phase::Streaming), "latest phase survives replay");
-        let t1 = agent.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head");
+        let t1 = agent.heads.agents.iter().find(|h| h.agent_id == "T1").expect("T1 head");
         assert_eq!(t1.last_message_hash, ContentHash::new([0x12; 32]), "newest T1 head wins");
-        assert!(agent.heads.threads.iter().any(|h| h.thread_id == "T2"), "T2 head present");
+        assert!(agent.heads.agents.iter().any(|h| h.agent_id == "T2"), "T2 head present");
         assert!((agent.cost.cost_usd - 9.0).abs() < f64::EPSILON, "latest cumulative cost");
     }
 
@@ -162,7 +164,7 @@ mod tests {
         // Despite the authoritative mid-stream checkpoint resets, the folded head is
         // the last message written — the view layer's I5 reset is correct.
         let agent = view.get("a1").expect("agent");
-        let t1 = agent.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head");
+        let t1 = agent.heads.agents.iter().find(|h| h.agent_id == "T1").expect("T1 head");
         assert_eq!(
             t1.last_message_hash,
             ContentHash::new([last_byte; 32]),
@@ -186,7 +188,7 @@ mod tests {
         let mut view = MaterializedView::new();
         view.apply_batch("a1", &tail_all(dir.path()));
         let authoritative_head =
-            view.get("a1").expect("agent").heads.threads.first().expect("T1 head").last_message_hash;
+            view.get("a1").expect("agent").heads.agents.first().expect("T1 head").last_message_hash;
         assert_eq!(authoritative_head, ContentHash::new([0x33; 32]));
 
         // A tiny-capacity subscriber overflows and goes degraded.

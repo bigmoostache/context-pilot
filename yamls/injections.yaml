@@ -23,11 +23,11 @@ editor_warnings:
 # Console guardrail redirects — returned as tool results when blocked commands are detected
 console_guardrails:
   git: |
-    Blocked: use the `git_execute` tool instead of running git through console.
-    Example: git_execute with command="git status"
+    Blocked: use the `Git` tool instead of running git through console.
+    Example: Git with command="git status"
   gh: |
-    Blocked: use the `gh_execute` tool instead of running gh through console.
-    Example: gh_execute with command="gh pr list"
+    Blocked: use the `Gh` tool instead of running gh through console.
+    Example: Gh with command="gh pr list"
 
 # History cleanup trap — forces the AI to close old conversation history panels
 # before executing a queued batch when too many accumulate.

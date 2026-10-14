@@ -1,7 +1,7 @@
 //! Global (fleet-shared) module owning the [`CoucouRegistry`].
 //!
-//! Split from [`SpineModule`](crate::SpineModule), which is per-thread: the
-//! registry must persist ONCE in the shared config, not in every thread's
+//! Split from [`SpineModule`](crate::SpineModule), which is per-agent: the
+//! registry must persist ONCE in the shared config, not in every agent's
 //! worker file. No tools or panels — the `coucou` tool stays on the spine
 //! module and writes here through the shared `State` extension.
 
@@ -57,6 +57,7 @@ impl Module for CoucouModule {
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         let mut registry: CoucouRegistry = serde_json::from_value(data.clone()).unwrap_or_default();
         registry.reseed_counter();
+        registry.migrate_legacy_recurrences();
         state.set_ext_global(registry);
     }
 

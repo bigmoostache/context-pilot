@@ -11,7 +11,7 @@ import {
 import { usePickerProviders, priceTag, type ModelDef, type ProviderDef } from "@/lib/support/models"
 import { sendCommand } from "@/lib/live"
 import { Tip } from "@/components/ui/tip"
-import type { Agent } from "@/lib/types"
+import type { Fleet } from "@/lib/types"
 
 /** Text-only row highlight (mirrors {@link BehaviourChip}'s ROW_HILITE): brighten
  *  the ink on hover/focus, never wash the background. */
@@ -46,12 +46,12 @@ function groupBySubprovider(models: ModelDef[]): [string, ModelDef[]][] {
  *  from the agent's authoritative provider id + model apiName. */
 function activeSelection(
   providers: ProviderDef[],
-  agent: Agent | undefined,
+  fleet: Fleet | undefined,
 ): { provider: ProviderDef | undefined; model: ModelDef | undefined } {
   const provider =
-    providers.find((p) => p.id === agent?.provider) ??
-    providers.find((p) => p.models.some((m) => m.apiName === agent?.model))
-  const model = provider?.models.find((m) => m.apiName === agent?.model) ?? provider?.models[0]
+    providers.find((p) => p.id === fleet?.provider) ??
+    providers.find((p) => p.models.some((m) => m.apiName === fleet?.model))
+  const model = provider?.models.find((m) => m.apiName === fleet?.model) ?? provider?.models[0]
   return { provider, model }
 }
 
@@ -72,14 +72,14 @@ function activeSelection(
  * applies immediately, no save step. The active provider/model comes back
  * through the agent-meta fold, so the chip re-labels on the next delta.
  */
-export function ModelChip({ agentId, agent }: { agentId: string; agent: Agent | undefined }) {
+export function ModelChip({ fleetId, fleet }: { fleetId: string; fleet: Fleet | undefined }) {
   const { data: providers = [] } = usePickerProviders()
-  const { provider: activeProv, model: activeModel } = activeSelection(providers, agent)
+  const { provider: activeProv, model: activeModel } = activeSelection(providers, fleet)
   const label = activeModel?.displayName ?? "model"
 
   const select = (providerId: string, modelId: string) => {
     if (providerId === activeProv?.id && modelId === activeModel?.id) return
-    void sendCommand(agentId, { kind: "configure", provider: providerId, model: modelId }).catch(
+    void sendCommand(fleetId, { kind: "configure", provider: providerId, model: modelId }).catch(
       () => {
         // Fire-and-forget: a failed switch keeps the current model; the agent-meta
         // fold re-reports ground truth on its next delta/poll.

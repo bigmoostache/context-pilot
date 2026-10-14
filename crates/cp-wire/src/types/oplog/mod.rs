@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::snapshot::Snapshot;
 use super::snapshot::notes::WireNote;
 use super::snapshot::todo::WireTask;
-use super::{ContentHash, LifecycleState, Phase, ThreadTurn};
+use super::{AgentTurn, ContentHash, LifecycleState, Phase};
 
 /// A single oplog record.
 ///
@@ -84,8 +84,9 @@ pub enum OpEntryKind {
     /// A new message was created (finalised by the agent).
     #[serde(rename = "message_created")]
     MessageCreated {
-        /// Thread the message belongs to.
-        thread_id: String,
+        /// Agent the message belongs to.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
         /// Unique message identifier.
         message_id: String,
         /// Content-addressed hash of the message body (I3/I13).
@@ -107,128 +108,142 @@ pub enum OpEntryKind {
         inline_body: Option<String>,
     },
 
-    /// A message was deleted from a thread by the user.
+    /// A message was deleted from an agent by the user.
     #[serde(rename = "message_deleted")]
     MessageDeleted {
-        /// Thread the message was in.
-        thread_id: String,
+        /// Agent the message was in.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
         /// Epoch-ms timestamp identifying the deleted message.
         message_ts: u64,
     },
 
-    /// A new thread was opened.
+    /// A new agent was opened.
     ///
     /// Carries enough to materialise the roster entry without a disk read: the
-    /// roster is the lightweight per-thread metadata the `/threads` endpoint
-    /// serves from the in-memory view (design doc §16 lists thread
+    /// roster is the lightweight per-agent metadata the `/agents` endpoint
+    /// serves from the in-memory view (design doc §16 lists agent
     /// create/archive/restore as oplog-journaled actions; I8). Message count
     /// and last-activity are *derived* by folding subsequent
     /// [`MessageCreated`](Self::MessageCreated) entries — they are not repeated
     /// here.
-    #[serde(rename = "thread_created")]
-    ThreadCreated {
-        /// Identifier of the new thread (e.g. `"T7"`).
-        thread_id: String,
-        /// User-chosen thread label.
+    #[serde(rename = "agent_created", alias = "thread_created")]
+    AgentCreated {
+        /// Identifier of the new agent (e.g. `"T7"`).
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
+        /// User-chosen agent label.
         name: String,
         /// Initial turn ownership at creation.
-        status: ThreadTurn,
+        status: AgentTurn,
         /// Wall-clock creation time (epoch ms) — seeds the roster's
         /// last-activity until the first message lands.
         timestamp_ms: u64,
-        /// Parent thread id when the thread was branched out of another one
-        /// (`BranchThread`); absent for a thread created from scratch.
+        /// Parent agent id when the agent was branched out of another one
+        /// (`BranchAgent`); absent for an agent created from scratch.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         branched_from: Option<String>,
+        /// Parent agent id of a sub-agent (created by another agent's `Agent`
+        /// tool); absent for a root. Lets observers nest it immediately.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parent_agent_id: Option<String>,
     },
 
-    /// A thread was archived (soft-delete — hidden from the active list, kept
+    /// An agent was archived (soft-delete — hidden from the active list, kept
     /// for restore).
-    #[serde(rename = "thread_archived")]
-    ThreadArchived {
-        /// The archived thread.
-        thread_id: String,
+    #[serde(rename = "agent_archived", alias = "thread_archived")]
+    AgentArchived {
+        /// The archived agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// A previously-archived thread was restored to the active list.
-    #[serde(rename = "thread_restored")]
-    ThreadRestored {
-        /// The restored thread.
-        thread_id: String,
+    /// A previously-archived agent was restored to the active list.
+    #[serde(rename = "agent_restored", alias = "thread_restored")]
+    AgentRestored {
+        /// The restored agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// A thread was paused — its `MY_TURN` status no longer fires idle
+    /// An agent was paused — its `MY_TURN` status no longer fires idle
     /// notifications, but it remains visible and fully functional.
-    #[serde(rename = "thread_paused")]
-    ThreadPaused {
-        /// The paused thread.
-        thread_id: String,
+    #[serde(rename = "agent_paused", alias = "thread_paused")]
+    AgentPaused {
+        /// The paused agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// A previously-paused thread was resumed — its `MY_TURN` status fires
+    /// A previously-paused agent was resumed — its `MY_TURN` status fires
     /// idle notifications again.
-    #[serde(rename = "thread_resumed")]
-    ThreadResumed {
-        /// The resumed thread.
-        thread_id: String,
+    #[serde(rename = "agent_resumed", alias = "thread_resumed")]
+    AgentResumed {
+        /// The resumed agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// A thread was permanently deleted — removed from the roster and all
+    /// An agent was permanently deleted — removed from the roster and all
     /// its messages discarded. Irreversible.
-    #[serde(rename = "thread_deleted")]
-    ThreadDeleted {
-        /// The deleted thread.
-        thread_id: String,
+    #[serde(rename = "agent_deleted", alias = "thread_deleted")]
+    AgentDeleted {
+        /// The deleted agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// A thread's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
-    #[serde(rename = "thread_status_changed")]
-    ThreadStatusChanged {
-        /// The affected thread.
-        thread_id: String,
-        /// The thread's new turn ownership.
-        status: ThreadTurn,
+    /// An agent's turn ownership changed (`MyTurn` ↔ `TheirTurn`).
+    #[serde(rename = "agent_status_changed", alias = "thread_status_changed")]
+    AgentStatusChanged {
+        /// The affected agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
+        /// The agent's new turn ownership.
+        status: AgentTurn,
     },
 
-    /// A thread's projected task list changed — the read-only todo items the
-    /// web thread view renders. Carries the thread's **complete** current
+    /// An agent's projected task list changed — the read-only todo items the
+    /// web agent view renders. Carries the agent's **complete** current
     /// (cancelled-excluded) task list as a whole-list snapshot, so an observer
-    /// folds it by replacing [`RosterThread::tasks`](super::snapshot::RosterThread::tasks)
-    /// wholesale (see [`RosterThread::fold_tasks`](super::snapshot::RosterThread::fold_tasks)).
+    /// folds it by replacing [`RosterAgent::tasks`](super::snapshot::RosterAgent::tasks)
+    /// wholesale (see [`RosterAgent::fold_tasks`](super::snapshot::RosterAgent::fold_tasks)).
     ///
     /// Durable roster state (carried in the [`Checkpoint`](Self::Checkpoint)
-    /// snapshot via the roster), emitted whenever the agent observes a thread's
+    /// snapshot via the roster), emitted whenever the agent observes an agent's
     /// tasks change. The tasks themselves are also re-derivable from the
     /// agent's tier-② persistence, so a dropped delta self-heals on the next
     /// change.
     #[serde(rename = "task_list_changed")]
     TaskListChanged {
-        /// The thread whose task list changed.
-        thread_id: String,
-        /// The thread's complete current task list (cancelled excluded).
+        /// The agent whose task list changed.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
+        /// The agent's complete current task list (cancelled excluded).
         tasks: Vec<WireTask>,
     },
 
-    /// A thread's projected scratchpad-note list changed — the read-only cells
-    /// the web thread view renders in its Notes aside. Carries the thread's
+    /// An agent's projected scratchpad-note list changed — the read-only cells
+    /// the web agent view renders in its Notes aside. Carries the agent's
     /// **complete** current note list as a whole-list snapshot, so an observer
-    /// folds it by replacing [`RosterThread::notes`](super::snapshot::RosterThread::notes)
-    /// wholesale (see [`RosterThread::fold_notes`](super::snapshot::RosterThread::fold_notes)).
+    /// folds it by replacing [`RosterAgent::notes`](super::snapshot::RosterAgent::notes)
+    /// wholesale (see [`RosterAgent::fold_notes`](super::snapshot::RosterAgent::fold_notes)).
     ///
     /// Durable roster state (carried in the [`Checkpoint`](Self::Checkpoint)
-    /// snapshot via the roster), emitted whenever the agent observes a thread's
+    /// snapshot via the roster), emitted whenever the agent observes an agent's
     /// scratchpad cells change. The notes themselves are also re-derivable from
     /// the agent's tier-② persistence, so a dropped delta self-heals on the next
     /// change. The twin of [`TaskListChanged`](Self::TaskListChanged).
     #[serde(rename = "notes_changed")]
     NotesChanged {
-        /// The thread whose note list changed.
-        thread_id: String,
-        /// The thread's complete current scratchpad-note list.
+        /// The agent whose note list changed.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
+        /// The agent's complete current scratchpad-note list.
         notes: Vec<WireNote>,
     },
 
-    /// The agent's *focused* thread changed — which thread it is actively
+    /// The agent's *focused* agent changed — which agent it is actively
     /// working right now (the UI highlights it). This is ephemeral, disposable
     /// UI state in the same class as [`PhaseTransition`](Self::PhaseTransition):
     /// it rides the **best-effort** durability path
@@ -237,12 +252,13 @@ pub enum OpEntryKind {
     /// self-heals — a dropped or post-restart-missing focus is re-served from
     /// the agent's tier-② `FocusState` on the next disk read and re-emitted on
     /// the next focus change.
-    #[serde(rename = "thread_focus_changed")]
-    ThreadFocusChanged {
-        /// The newly-focused thread, or `None` when focus was released (the
-        /// agent is no longer actively working any single thread).
+    #[serde(rename = "agent_focus_changed", alias = "thread_focus_changed")]
+    AgentFocusChanged {
+        /// The newly-focused agent, or `None` when focus was released (the
+        /// agent is no longer actively working any single agent).
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        thread_id: Option<String>,
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: Option<String>,
     },
 
     /// Agent lifecycle state changed (boot, shutdown, etc.).
@@ -301,8 +317,8 @@ pub enum OpEntryKind {
         miss_tokens: u64,
     },
 
-    /// The agent's active **behaviour agent** (system prompt) changed — a new
-    /// library agent was loaded (or reverted to default) via the `agent_load`
+    /// The agent's active **system** (persona prompt) changed — a new
+    /// library system was loaded (or reverted to default) via the `system_load`
     /// tool or the web footer's `LoadBehaviour` command.
     ///
     /// Ephemeral, disposable UI signal in the same class as
@@ -312,15 +328,15 @@ pub enum OpEntryKind {
     /// `config.json` mtime backstop. Observers do **not** fold it (the active
     /// behaviour is a tier-② `config.json` read, not view state); they use it to
     /// **invalidate** their cached library/behaviour view so the next read
-    /// surfaces the fresh active agent — the event-driven twin of the mtime
+    /// surfaces the fresh active system — the event-driven twin of the mtime
     /// backstop, matching the thread-roster push discipline (T581).
     #[serde(rename = "behaviour_changed")]
     BehaviourChanged {
-        /// The newly-active behaviour agent id, or `None` on revert-to-default.
+        /// The newly-active system (persona) id, or `None` on revert-to-default.
         /// Informational — an observer may simply refetch the library on any
         /// `behaviour_changed`, ignoring the payload.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        agent_id: Option<String>,
+        #[serde(default, alias = "agent_id", skip_serializing_if = "Option::is_none")]
+        system_id: Option<String>,
     },
 
     /// State checkpoint — bounds replay length on restart (GAP 1 / I5).

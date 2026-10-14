@@ -1,7 +1,7 @@
 //! Worker state persistence module
 //!
-//! Handles loading and saving worker state files. One file per thread, named
-//! `states/<thread_id>.json`; an agent with no focused thread keeps the legacy
+//! Handles loading and saving worker state files. One file per agent, named
+//! `states/<agent_id>.json`; an agent with no focused agent keeps the legacy
 //! `states/main_worker.json` (see [`focused_worker_id`]).
 use std::fs;
 use std::path::PathBuf;
@@ -31,14 +31,14 @@ pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
     serde_json::from_str(&json).ok()
 }
 
-/// The state-file id boot must load: the thread whose context was last saved
+/// The state-file id boot must load: the agent whose context was last saved
 /// focused.
 ///
 /// This is the read half of the write half
-/// ([`resident_worker_id`](super::save::resident_worker_id)), and the two must
+/// ([`executing_worker_id`](super::save::executing_worker_id)), and the two must
 /// agree or a reload silently restores the wrong conversation. `focus_file` is
 /// the pointer that save records in the shared config, because the focused
-/// thread's own id lives *inside* the file this function chooses — boot cannot
+/// agent's own id lives *inside* the file this function chooses — boot cannot
 /// read it without already knowing it.
 ///
 /// `exists` is injected rather than calling [`exists`] directly so the rule can
@@ -46,7 +46,7 @@ pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
 ///
 /// The fallback to [`DEFAULT_WORKER_ID`] covers two cases, both one-shot:
 /// - no pointer at all — an install saved before pointers existed, or an
-///   unfocused agent (boot before any `Read`) which has no thread to name;
+///   unfocused agent (boot before any `Read`) which has no agent to name;
 /// - a pointer whose file is missing — the save that recorded the pointer
 ///   crashed before its keyed write landed, so the legacy file is still the
 ///   only complete copy.

@@ -1,15 +1,17 @@
 //! Fleet-shared coucou registry.
 //!
-//! Coucous used to live as `CoucouWatcher`s in each thread's own
-//! `WatcherRegistry`, which is only polled while that thread is stepped — so a
-//! background thread idle on THEIR_TURN never fired its reminders. They now
+//! Coucous used to live as `CoucouWatcher`s in each agent's own
+//! `WatcherRegistry`, which is only polled while that agent is stepped — so a
+//! background agent idle on THEIR_TURN never fired its reminders. They now
 //! live here, ONE instance for the whole fleet (in `shared_module_data`),
 //! polled once per tick by the app loop and delivered into each coucou's
-//! target thread inbox.
+//! target agent inbox.
 
 use serde::{Deserialize, Serialize};
 
 use cp_base::state::runtime::State;
+use cp_mod_utilities::cron::Cron;
+use cp_mod_utilities::time;
 
 use crate::coucou::Record;
 
@@ -21,6 +23,10 @@ pub struct CoucouRegistry {
     /// Next numeric suffix for `coucou_<n>` ids. Persisted, so ids stay unique
     /// across reloads (a process-local counter restarted at 0 and collided).
     pub next_id: u64,
+    /// Immediate notices (e.g. "your coucou was deleted"), delivered with the
+    /// next [`Self::take_due`]. Transient.
+    #[serde(skip)]
+    pub notices: Vec<FiredCoucou>,
 }
 
 /// A coucou that came due this tick, ready for delivery.
@@ -28,10 +34,29 @@ pub struct CoucouRegistry {
 pub struct FiredCoucou {
     /// Coucou id (`coucou_<n>`), used as the notification source for dedup.
     pub id: String,
-    /// Target thread; `None` = whichever thread is focused.
-    pub thread_id: Option<String>,
+    /// Target agent; `None` = whichever agent is focused.
+    pub agent_id: Option<String>,
+    /// Group in which the target gets the turn; `None` = its human group.
+    pub group_id: Option<String>,
     /// Notification text.
     pub description: String,
+}
+
+/// Cron equivalent of a legacy `hourly`/`daily`/`weekly` recurrence, anchored
+/// on the local time of `fire_at_ms`.
+fn legacy_cron(label: &str, fire_at_ms: u64) -> Option<String> {
+    let secs = i64::try_from(fire_at_ms.checked_div(1000)?).ok()?;
+    let local = secs.saturating_add(i64::from(time::local_utc_offset_secs()));
+    let minute = local.rem_euclid(3600).div_euclid(60);
+    let hour = local.rem_euclid(86_400).div_euclid(3600);
+    // 1970-01-01 was a Thursday (4).
+    let weekday = local.div_euclid(86_400).saturating_add(4).rem_euclid(7);
+    match label {
+        "hourly" => Some(format!("{minute} * * * *")),
+        "daily" => Some(format!("{minute} {hour} * * *")),
+        "weekly" => Some(format!("{minute} {hour} * * {weekday}")),
+        _ => None,
+    }
 }
 
 impl CoucouRegistry {
@@ -65,6 +90,20 @@ impl CoucouRegistry {
         self.next_id = self.next_id.max(max_seen);
     }
 
+    /// Rewrite legacy `hourly`/`daily`/`weekly` recurrences as cron (idempotent).
+    /// `custom` intervals have no cron equivalent and keep `interval_ms`.
+    pub fn migrate_legacy_recurrences(&mut self) {
+        for c in &mut self.pending {
+            if c.cron.is_none()
+                && let Some(cron) = c.recurrence_label.as_deref().and_then(|l| legacy_cron(l, c.fire_at_ms))
+            {
+                c.cron = Some(cron);
+                c.interval_ms = 0;
+                c.recurrence_label = None;
+            }
+        }
+    }
+
     /// Remove the coucou with `id`. Returns whether one was removed.
     pub fn cancel(&mut self, id: &str) -> bool {
         let before = self.pending.len();
@@ -72,35 +111,28 @@ impl CoucouRegistry {
         self.pending.len() < before
     }
 
-    /// Whether any coucou targets `thread_id` (or is unscoped). Drives the
-    /// WAITING badge of the focused thread.
+    /// Whether any coucou targets `agent_id` (or is unscoped). Drives the
+    /// WAITING badge of the focused agent.
     #[must_use]
-    pub fn has_pending_for(&self, thread_id: Option<&str>) -> bool {
-        self.pending.iter().any(|c| c.thread_id.is_none() || c.thread_id.as_deref() == thread_id)
+    pub fn has_pending_for(&self, agent_id: Option<&str>) -> bool {
+        self.pending.iter().any(|c| c.agent_id.is_none() || c.agent_id.as_deref() == agent_id)
     }
 
-    /// Pop every coucou due at `now`: one-shots are removed, recurrent ones are
-    /// re-armed at `now + interval`.
+    /// Pop every notice plus every coucou due at `now`: one-shots are removed,
+    /// cron ones re-armed at their next match, legacy intervals at `now + interval`.
     pub fn take_due(&mut self, now: u64) -> Vec<FiredCoucou> {
-        let mut fired = Vec::new();
+        let mut fired = std::mem::take(&mut self.notices);
+        let offset = time::local_utc_offset_secs();
         self.pending.retain_mut(|c| {
             if now < c.fire_at_ms {
                 return true;
             }
-            fired.push(FiredCoucou {
-                id: c.watcher_id.clone(),
-                thread_id: c.thread_id.clone(),
-                description: c.thread_id.as_ref().map_or_else(
-                    || format!("⏰ Coucou! {}", c.message),
-                    |tid| format!("⏰ Coucou (thread {tid})! {}", c.message),
-                ),
-            });
-            if c.interval_ms > 0 {
-                c.fire_at_ms = now.saturating_add(c.interval_ms);
-                true
-            } else {
-                false
-            }
+            fired.push(c.fired());
+            let next = match c.cron.as_deref() {
+                Some(expr) => Cron::parse(expr).ok().and_then(|cron| cron.next_after(now, offset)),
+                None => (c.interval_ms > 0).then(|| now.saturating_add(c.interval_ms)),
+            };
+            next.inspect(|at| c.fire_at_ms = *at).is_some()
         });
         fired
     }
@@ -114,27 +146,43 @@ mod tests {
         Record {
             watcher_id: id.to_owned(),
             message: "m".to_owned(),
-            registered_at_ms: 0,
             fire_at_ms,
-            thread_id: Some("T1".to_owned()),
+            agent_id: Some("A1".to_owned()),
             interval_ms,
-            recurrence_label: None,
+            ..Record::default()
         }
     }
 
     #[test]
     fn take_due_drops_one_shot_and_rearms_recurrent() {
-        let mut reg = CoucouRegistry { pending: vec![data("coucou_0", 10, 0), data("coucou_1", 10, 100)], next_id: 2 };
+        let mut cron = data("coucou_2", 10, 0);
+        cron.cron = Some("* * * * *".to_owned());
+        let mut reg = CoucouRegistry {
+            pending: vec![data("coucou_0", 10, 0), data("coucou_1", 10, 100), cron],
+            next_id: 3,
+            notices: Vec::new(),
+        };
         assert!(reg.take_due(5).is_empty());
-        let fired = reg.take_due(10);
-        assert_eq!(fired.len(), 2);
-        assert_eq!(reg.pending.len(), 1);
-        assert_eq!(reg.pending.first().map(|c| c.fire_at_ms), Some(110));
+        let fired = reg.take_due(120_000);
+        assert_eq!(fired.len(), 3);
+        let next: Vec<u64> = reg.pending.iter().map(|c| c.fire_at_ms).collect();
+        assert_eq!(next, vec![120_100, 180_000]);
+    }
+
+    #[test]
+    fn legacy_labels_become_cron() {
+        let mut daily = data("coucou_0", 3_600_000 * 9 + 60_000 * 5, 86_400_000);
+        daily.recurrence_label = Some("daily".to_owned());
+        let mut reg = CoucouRegistry { pending: vec![daily], next_id: 1, notices: Vec::new() };
+        reg.migrate_legacy_recurrences();
+        let first = reg.pending.first();
+        assert_eq!(first.map(|c| c.interval_ms), Some(0));
+        assert!(first.and_then(|c| c.cron.as_deref()).is_some_and(|e| e.ends_with(" * * *")));
     }
 
     #[test]
     fn reseed_avoids_collisions() {
-        let mut reg = CoucouRegistry { pending: vec![data("coucou_7", 0, 0)], next_id: 0 };
+        let mut reg = CoucouRegistry { pending: vec![data("coucou_7", 0, 0)], next_id: 0, notices: Vec::new() };
         reg.reseed_counter();
         assert_eq!(reg.alloc_id(), "coucou_8");
     }

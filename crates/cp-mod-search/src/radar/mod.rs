@@ -205,7 +205,7 @@ pub(crate) fn refresh(state: &State) {
     };
 
     // Spawn background thread — fire-and-forget.
-    // The thread does the expensive Meilisearch queries and writes the
+    // The agent does the expensive Meilisearch queries and writes the
     // result to the shared RadarCache when done.
     let _handle = std::thread::Builder::new().name("radar-refresh".into()).spawn(move || {
         refresh_inner(&job);
@@ -426,7 +426,7 @@ impl Panel for ContextRadarPanel {
     fn refresh(&self, state: &mut State) {
         let yaml = get_radar_yaml(state);
         let token_count = cp_base::state::context::estimate_tokens(&yaml);
-        if let Some(ctx) = state.context.iter_mut().find(|c| c.context_type.as_str() == RADAR_PANEL_TYPE) {
+        if let Some(ctx) = state.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == RADAR_PANEL_TYPE) {
             ctx.token_count = token_count;
             ctx.full_token_count = token_count;
         }
@@ -456,6 +456,7 @@ impl Panel for ContextRadarPanel {
         let yaml = get_radar_yaml(state);
 
         let (id, last_ms) = state
+            .agent()
             .context
             .iter()
             .find(|e| e.context_type.as_str() == RADAR_PANEL_TYPE)

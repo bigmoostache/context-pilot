@@ -49,7 +49,7 @@ pub(super) fn ensure_history_nav(state: &mut State) {
 pub(super) fn handle_history_prev(state: &mut State) {
     ensure_history_nav(state);
     // Clone input before mutable borrow of TypeMap
-    let current_input = state.composer.text.clone();
+    let current_input = state.agent().composer.text.clone();
     let nav = state.ext_mut::<PromptHistoryNav>();
     if nav.entries.is_empty() {
         return;
@@ -75,9 +75,9 @@ pub(super) fn handle_history_prev(state: &mut State) {
         }
         Some(_) => return, // Already at oldest entry
     };
-    state.composer.text = new_text;
-    state.composer.cursor = state.composer.text.len();
-    state.composer.anchor = None;
+    state.agent_mut().composer.text = new_text;
+    state.agent_mut().composer.cursor = state.agent_mut().composer.text.len();
+    state.agent_mut().composer.anchor = None;
 }
 
 /// Navigate to the next (newer) prompt in history (Ctrl+D).
@@ -94,22 +94,21 @@ pub(super) fn handle_history_next(state: &mut State) {
             Some(entry) => entry.clone(),
             None => return,
         };
-        state.composer.text = text;
+        state.agent_mut().composer.text = text;
     } else {
         // Back to the draft (current unsaved input)
         let draft = nav.draft.clone();
         nav.index = None;
-        state.composer.text = draft;
+        state.agent_mut().composer.text = draft;
     }
-    state.composer.cursor = state.composer.text.len();
-    state.composer.anchor = None;
+    state.agent_mut().composer.cursor = state.agent_mut().composer.text.len();
+    state.agent_mut().composer.anchor = None;
 }
 
 /// Copy the current panel's content to the system clipboard (Ctrl+C).
 pub(super) fn handle_copy_panel_content(state: &mut State) {
-    use std::io::Write as _;
-
-    let Some(context_type) = state.context.get(state.selected_context).map(|c| c.context_type.clone()) else {
+    let Some(context_type) = state.agent().context.get(state.agent().selected_context).map(|c| c.context_type.clone())
+    else {
         return;
     };
     let is_conversation = context_type.as_str() == Kind::CONVERSATION;
@@ -118,24 +117,19 @@ pub(super) fn handle_copy_panel_content(state: &mut State) {
     let mut text: String = items.iter().map(|i| i.content.as_str()).collect::<Vec<_>>().join("\n\n");
 
     // If on conversation panel, append the pending input
-    if is_conversation && !state.composer.text.is_empty() {
+    if is_conversation && !state.agent().composer.text.is_empty() {
         if !text.is_empty() {
             text.push_str("\n\n");
         }
-        text.push_str(&state.composer.text);
+        text.push_str(&state.agent().composer.text);
     }
 
     if text.is_empty() {
         return;
     }
 
-    // Copy via pbcopy (macOS)
-    if let Ok(mut child) = std::process::Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
-        if let Some(mut stdin) = child.stdin.take() {
-            let _r = stdin.write_all(text.as_bytes());
-        }
-        let _r = child.wait();
-    }
+    // Copy off the main loop (pbcopy can stall for seconds).
+    let _started = cp_base::state::runtime::textarea::copy_to_clipboard(&text);
     // Visual feedback via status bar flash
     state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
     state.flags.ui.dirty = true;
@@ -145,7 +139,7 @@ pub(super) fn handle_copy_panel_content(state: &mut State) {
 /// selection is active). Wins over [`handle_copy_panel_content`] per the
 /// selection-priority rule. No-op when there is no selection.
 pub(super) fn handle_copy_selection(state: &mut State) {
-    if state.composer.copy_selection_to_clipboard() {
+    if state.agent().composer.copy_selection_to_clipboard() {
         state.flags.overlays.copied_flash_ms = crate::app::panels::now_ms();
         state.flags.ui.dirty = true;
     }

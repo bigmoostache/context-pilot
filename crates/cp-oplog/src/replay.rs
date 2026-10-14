@@ -25,7 +25,7 @@
 //! applies.
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::snapshot::{Heads, RosterThread, SeenSet};
+use cp_wire::types::snapshot::{Heads, RosterAgent, SeenSet};
 
 use crate::error::OplogResult;
 use crate::segment;
@@ -38,29 +38,29 @@ pub struct Recovered {
     /// The highest durable `rev` in the log, or `None` if the log is empty.
     pub rev_head: Option<u64>,
 
-    /// The bounded head set (per-thread last-message hash, per-panel hash) as
+    /// The bounded head set (per-agent last-message hash, per-panel hash) as
     /// of `rev_head`.
     pub heads: Heads,
 
     /// The dedup-tokens of durable command effects as of `rev_head` (I4).
     pub seen: SeenSet,
 
-    /// The thread roster as of `rev_head` — one entry per live thread, folded
+    /// The agent roster as of `rev_head` — one entry per live agent, folded
     /// from the thread-roster deltas so the writer can stamp it into each
     /// segment's leading checkpoint (design doc I5 / §16). The agent does not
-    /// read this for its own recovery (it reloads threads from tier-② state);
+    /// read this for its own recovery (it reloads agents from tier-② state);
     /// it exists so the **backend** can rebuild the roster from a checkpoint
     /// after oplog compaction, exactly as it rebuilds heads.
-    pub roster: Vec<RosterThread>,
+    pub roster: Vec<RosterAgent>,
 }
 
 /// Fold one entry into a running [`Recovered`].
 ///
 /// A `Checkpoint` is **authoritative**: it replaces the running snapshot
 /// wholesale (heads, seen-set, and roster — it is a full snapshot, not a
-/// delta). A `MessageCreated` advances its thread's head and bumps that
-/// thread's roster activity. The thread-roster deltas
-/// (`ThreadCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the roster
+/// delta). A `MessageCreated` advances its agent's head and bumps that
+/// agent's roster activity. The thread-roster deltas
+/// (`AgentCreated`/`Archived`/`Restored`/`StatusChanged`) maintain the roster
 /// idempotently. A `CommandEffect` or `SeenMark` marks its dedup token as seen
 /// at this entry's `rev` (I4). The remaining variants carry no recoverable
 /// state and are no-ops here.
@@ -75,42 +75,43 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
             state.seen.clone_from(&snapshot.seen);
             state.roster.clone_from(&snapshot.roster);
         }
-        OpEntryKind::MessageCreated { ref thread_id, head, .. } => {
-            state.heads.set_thread_head(thread_id, head);
-            RosterThread::fold_message(&mut state.roster, thread_id, entry.timestamp_ms);
+        OpEntryKind::MessageCreated { ref agent_id, head, .. } => {
+            state.heads.set_agent_head(agent_id, head);
+            RosterAgent::fold_message(&mut state.roster, agent_id, entry.timestamp_ms);
         }
         OpEntryKind::CommandEffect { ref dedup_token, .. } | OpEntryKind::SeenMark { ref dedup_token } => {
             state.seen.mark(dedup_token, entry.rev);
         }
-        OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms, .. } => {
-            RosterThread::fold_created(
+        OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, ref parent_agent_id, .. } => {
+            RosterAgent::fold_created(
                 &mut state.roster,
-                cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
+                cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms)
+                    .with_parent(parent_agent_id.as_deref()),
             );
         }
-        OpEntryKind::ThreadArchived { ref thread_id } => {
-            RosterThread::fold_archived(&mut state.roster, thread_id, true);
+        OpEntryKind::AgentArchived { ref agent_id } => {
+            RosterAgent::fold_archived(&mut state.roster, agent_id, true);
         }
-        OpEntryKind::ThreadRestored { ref thread_id } => {
-            RosterThread::fold_archived(&mut state.roster, thread_id, false);
+        OpEntryKind::AgentRestored { ref agent_id } => {
+            RosterAgent::fold_archived(&mut state.roster, agent_id, false);
         }
-        OpEntryKind::ThreadPaused { ref thread_id } => {
-            RosterThread::fold_paused(&mut state.roster, thread_id, true);
+        OpEntryKind::AgentPaused { ref agent_id } => {
+            RosterAgent::fold_paused(&mut state.roster, agent_id, true);
         }
-        OpEntryKind::ThreadResumed { ref thread_id } => {
-            RosterThread::fold_paused(&mut state.roster, thread_id, false);
+        OpEntryKind::AgentResumed { ref agent_id } => {
+            RosterAgent::fold_paused(&mut state.roster, agent_id, false);
         }
-        OpEntryKind::ThreadDeleted { ref thread_id } => {
-            RosterThread::fold_deleted(&mut state.roster, thread_id);
+        OpEntryKind::AgentDeleted { ref agent_id } => {
+            RosterAgent::fold_deleted(&mut state.roster, agent_id);
         }
-        OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
-            RosterThread::fold_status(&mut state.roster, thread_id, status);
+        OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
+            RosterAgent::fold_status(&mut state.roster, agent_id, status);
         }
-        OpEntryKind::TaskListChanged { ref thread_id, ref tasks } => {
-            RosterThread::fold_tasks(&mut state.roster, thread_id, tasks.clone());
+        OpEntryKind::TaskListChanged { ref agent_id, ref tasks } => {
+            RosterAgent::fold_tasks(&mut state.roster, agent_id, tasks.clone());
         }
-        OpEntryKind::NotesChanged { ref thread_id, ref notes } => {
-            RosterThread::fold_notes(&mut state.roster, thread_id, notes.clone());
+        OpEntryKind::NotesChanged { ref agent_id, ref notes } => {
+            RosterAgent::fold_notes(&mut state.roster, agent_id, notes.clone());
         }
         // Phase, lifecycle, cost, focus, behaviour, and message-delete carry no
         // head/seen/roster state; an `Unknown` variant from a newer schema is
@@ -119,7 +120,7 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         | OpEntryKind::Lifecycle { .. }
         | OpEntryKind::CostAggregate { .. }
         | OpEntryKind::ContextUsage { .. }
-        | OpEntryKind::ThreadFocusChanged { .. }
+        | OpEntryKind::AgentFocusChanged { .. }
         | OpEntryKind::BehaviourChanged { .. }
         | OpEntryKind::MessageDeleted { .. }
         | OpEntryKind::Unknown => {}
@@ -207,9 +208,9 @@ mod tests {
     use cp_wire::types::{ContentHash, Phase};
     use tempfile::tempdir;
 
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -226,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_rebuilds_latest_thread_heads() {
+    fn replay_rebuilds_latest_agent_heads() {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open(dir.path()).expect("open");
         let _a = writer.append(msg("T1", 0x11)).expect("append");
@@ -239,8 +240,8 @@ mod tests {
         // insertion order the fold produces (T1 first — inserted then updated
         // in place — then T2).
         let mut expected = Heads::default();
-        expected.set_thread_head("T1", ContentHash::new([0x33; 32]));
-        expected.set_thread_head("T2", ContentHash::new([0x22; 32]));
+        expected.set_agent_head("T1", ContentHash::new([0x33; 32]));
+        expected.set_agent_head("T2", ContentHash::new([0x22; 32]));
         assert_eq!(state.heads, expected);
     }
 
@@ -254,7 +255,7 @@ mod tests {
         let state = replay(dir.path()).expect("replay");
         assert_eq!(state.rev_head, Some(last));
         let mut expected = Heads::default();
-        expected.set_thread_head("T1", ContentHash::new([0x44; 32]));
+        expected.set_agent_head("T1", ContentHash::new([0x44; 32]));
         assert_eq!(state.heads, expected);
     }
 
@@ -275,8 +276,8 @@ mod tests {
         assert_eq!(fast, full, "fast path must equal full replay");
         assert_eq!(fast.rev_head, Some(extra));
         let mut expected = Heads::default();
-        expected.set_thread_head("T1", ContentHash::new([11; 32]));
-        expected.set_thread_head("T2", ContentHash::new([0xEE; 32]));
+        expected.set_agent_head("T1", ContentHash::new([11; 32]));
+        expected.set_agent_head("T2", ContentHash::new([0xEE; 32]));
         assert_eq!(fast.heads, expected);
     }
 
@@ -314,7 +315,7 @@ mod tests {
         let state = replay(dir.path()).expect("replay");
         assert_eq!(state.rev_head, Some(last));
         let mut expected = Heads::default();
-        expected.set_thread_head("T1", ContentHash::new([0x66; 32]));
+        expected.set_agent_head("T1", ContentHash::new([0x66; 32]));
         assert_eq!(state.heads, expected);
     }
 
@@ -338,25 +339,26 @@ mod tests {
     }
 
     #[test]
-    fn replay_rebuilds_roster_from_thread_deltas() {
+    fn replay_rebuilds_roster_from_agent_deltas() {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open(dir.path()).expect("open");
         let _c = writer
-            .append(OpEntryKind::ThreadCreated {
-                thread_id: "T1".to_owned(),
+            .append(OpEntryKind::AgentCreated {
+                agent_id: "T1".to_owned(),
                 name: "Plan".to_owned(),
-                status: cp_wire::types::ThreadTurn::TheirTurn,
+                status: cp_wire::types::AgentTurn::TheirTurn,
                 timestamp_ms: 100,
                 branched_from: None,
+                parent_agent_id: None,
             })
             .expect("create");
         let _m = writer.append(msg("T1", 0x01)).expect("message");
-        let _a = writer.append(OpEntryKind::ThreadArchived { thread_id: "T1".to_owned() }).expect("archive");
+        let _a = writer.append(OpEntryKind::AgentArchived { agent_id: "T1".to_owned() }).expect("archive");
 
         let state = replay(dir.path()).expect("replay");
         assert_eq!(state.roster.len(), 1);
         let e = state.roster.first().expect("entry");
-        assert_eq!(e.thread_id, "T1");
+        assert_eq!(e.agent_id, "T1");
         assert_eq!(e.name, "Plan");
         assert_eq!(e.msg_count, 1, "the message bumped the count");
         assert!(e.archived, "the archive delta folded");
@@ -370,12 +372,13 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
         let _c = writer
-            .append(OpEntryKind::ThreadCreated {
-                thread_id: "T-early".to_owned(),
+            .append(OpEntryKind::AgentCreated {
+                agent_id: "T-early".to_owned(),
                 name: "Early".to_owned(),
-                status: cp_wire::types::ThreadTurn::MyTurn,
+                status: cp_wire::types::AgentTurn::MyTurn,
                 timestamp_ms: 1,
                 branched_from: None,
+                parent_agent_id: None,
             })
             .expect("create");
         // Force several rolls so the roster is carried only by a checkpoint.
@@ -389,8 +392,8 @@ mod tests {
         let full = replay_full(dir.path(), &indices).expect("full");
         assert_eq!(fast, full, "fast path (checkpoint-seeded) equals full replay");
         assert!(
-            fast.roster.iter().any(|e| e.thread_id == "T-early"),
-            "the early thread survives via the checkpoint roster",
+            fast.roster.iter().any(|e| e.agent_id == "T-early"),
+            "the early agent survives via the checkpoint roster",
         );
     }
 

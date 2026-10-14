@@ -1,10 +1,10 @@
 //! Enriched **agent meta** endpoints — maquette-compatible `Agent` objects
-//! combining registry records, oplog-projected state, thread inspection, and
+//! combining registry records, oplog-projected state, agent inspection, and
 //! git branch info.
 //!
-//! * [`agent_meta`] — one agent's enriched info (`GET /api/agent/{id}/meta`).
+//! * [`fleet_meta`] — one agent's enriched info (`GET /api/fleet/{id}/meta`).
 //! * [`fleet_meta`] — all known agents as an enriched array
-//!   (`GET /api/fleet/meta`).
+//!   (`GET /api/fleets/meta`).
 
 use std::sync::Mutex;
 
@@ -14,21 +14,21 @@ use crate::services::materialized_view::ContextSnapshot;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-/// `GET /api/agent/{id}/meta` — enriched agent info for the fleet/agent views.
+/// `GET /api/fleet/{id}/meta` — enriched agent info for the fleet/agent views.
 ///
 /// Combines registry record (name, folder, model), oplog-projected state
-/// (phase, cost), thread inspection (count, any-MY_TURN → "needs-you"), and
+/// (phase, cost), agent inspection (count, any-MY_TURN → "needs-you"), and
 /// `git` branch. Returns a JSON object matching the maquette `Agent` shape.
-pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
+pub fn agent(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match crate::transport::rest::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
-    let enriched = build_agent_meta(state, agent_id, &entry);
+    let enriched = build_fleet_meta(state, fleet_id, &entry);
     HttpReply::ok(&enriched)
 }
 
-/// `GET /api/fleet/meta` — enriched agent list for the fleet dashboard.
+/// `GET /api/fleets/meta` — enriched agent list for the fleet dashboard.
 ///
 /// Returns an array of maquette-compatible `Agent` objects, one per known
 /// agent in the registry directory. Each is built the same way as the
@@ -62,11 +62,11 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     let visible: std::collections::HashSet<&str> = visible_ids.iter().map(String::as_str).collect();
 
     let agents: Vec<serde_json::Value> =
-        active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_agent_meta(state, &e.id, e)).collect();
+        active.iter().filter(|e| visible.contains(e.id.as_str())).map(|e| build_fleet_meta(state, &e.id, e)).collect();
     HttpReply::ok(&agents)
 }
 
-/// `GET /api/fleet/retired` — the dashboard's Retired (archived) section.
+/// `GET /api/fleets/retired` — the dashboard's Retired (archived) section.
 ///
 /// Returns one maquette-`Agent`-shaped object per retired agent, built from the
 /// orchestrator's [`RetiredStore`](crate::services::retire::RetiredStore) snapshot rather
@@ -107,7 +107,7 @@ pub(crate) fn fleet_retired(
                 "status": "retired",
                 "costUsd": 0.0f64,
                 "task": "",
-                "threads": 0u64,
+                "agents": 0u64,
                 "lastActivity": r.retired_at_ms,
                 "retiredAt": r.retired_at_ms,
                 "accent": "interactive",
@@ -120,10 +120,10 @@ pub(crate) fn fleet_retired(
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /// Build the enriched agent JSON for one agent.
-fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
+fn build_fleet_meta(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> serde_json::Value {
     let folder = &entry.folder;
-    let name_override = state.lock().ok().and_then(|b| b.names.get(agent_id).map(str::to_owned));
-    let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id);
+    let name_override = state.lock().ok().and_then(|b| b.names.get(fleet_id).map(str::to_owned));
+    let default_name = std::path::Path::new(folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(fleet_id);
     let name = name_override.as_deref().unwrap_or(default_name);
 
     // Phase + lifecycle + cost + cumulative tokens from the materialized view
@@ -134,16 +134,16 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
     let (phase, lifecycle, cost_usd, input_tokens, output_tokens, context, is_stale) = state.lock().map_or_else(
         |_| (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), false),
         |b| {
-            let dead = b.liveness.get(agent_id).is_some_and(|l| !l.is_live());
-            b.view.get(agent_id).map_or_else(
+            let dead = b.liveness.get(fleet_id).is_some_and(|l| !l.is_live());
+            b.view.get(fleet_id).map_or_else(
                 || (None, None, 0.0f64, 0u64, 0u64, ContextSnapshot::default(), dead),
                 |v| (v.phase, v.lifecycle, v.cost.cost_usd, v.cost.input_tokens, v.cost.output_tokens, v.context, dead),
             )
         },
     );
 
-    // Thread count + any-MY_TURN + last activity from config.json.
-    let (threads_count, has_my_turn, last_activity_ms, task) = inspect_threads(state, folder);
+    // Agent count + any-MY_TURN + last activity from config.json.
+    let (agents_count, has_my_turn, last_activity_ms, task) = inspect_agents(state, folder);
 
     let branch = git_branch(folder);
     // The agent's configured LLM provider id (e.g. "claudecodev2", "claudecode")
@@ -162,10 +162,10 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
 
     let status = derive_status(phase, lifecycle, has_my_turn, is_stale);
     let accent = derive_accent(&status);
-    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(agent_id));
+    let has_avatar = state.lock().is_ok_and(|b| b.avatars.has(fleet_id));
 
     serde_json::json!({
-        "id": agent_id,
+        "id": fleet_id,
         "name": name,
         "folder": folder,
         "branch": branch,
@@ -198,16 +198,16 @@ fn build_agent_meta(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> se
         "contextHit": context.hit,
         "contextMiss": context.miss,
         "task": task,
-        "threads": threads_count,
+        "agents": agents_count,
         "lastActivity": last_activity_ms,
         "accent": accent,
         "hasAvatar": has_avatar,
     })
 }
 
-/// Inspect an agent's threads from config.json for count, `MY_TURN` status,
-/// last activity, and current task (focused thread name).
-fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
+/// Inspect an agent's agents from config.json for count, `MY_TURN` status,
+/// last activity, and current task (focused agent name).
+fn inspect_agents(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, String) {
     let folder_path = std::path::Path::new(folder);
     let cfg = {
         let Ok(mut b) = state.lock() else {
@@ -219,16 +219,16 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
         return (0, false, 0, String::new());
     };
     let empty_arr = Vec::new();
-    let threads = config
+    let agents = config
         .get("modules")
-        .and_then(|m| m.get("threads"))
-        .and_then(|t| t.get("threads"))
+        .and_then(|m| m.get("agents"))
+        .and_then(|t| t.get("agents"))
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty_arr);
 
-    let count = threads.len();
-    let has_my_turn = threads.iter().any(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"));
-    let last_activity = threads
+    let count = agents.len();
+    let has_my_turn = agents.iter().any(is_my_turn);
+    let last_activity = agents
         .iter()
         .filter_map(|t| {
             t.get("messages")
@@ -240,16 +240,23 @@ fn inspect_threads(state: &Mutex<Backend>, folder: &str) -> (usize, bool, u64, S
         .max()
         .unwrap_or(0);
 
-    // Task = name of the first MY_TURN thread, or empty.
-    let task = threads
+    // Task = name of the first MY_TURN agent, or empty.
+    let task = agents
         .iter()
-        .find(|t| t.get("status").and_then(serde_json::Value::as_str) == Some("MyTurn"))
+        .find(|t| is_my_turn(t))
         .and_then(|t| t.get("name"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or("")
         .to_owned();
 
     (count, has_my_turn, last_activity, task)
+}
+
+/// Whether a `config.json` agent entry is `MY_TURN`: the derived `turn` key
+/// (T860 D, turn lives in group social state) or the legacy stored `status`
+/// written by agents still on an older binary.
+fn is_my_turn(agent: &serde_json::Value) -> bool {
+    ["turn", "status"].iter().any(|k| agent.get(*k).and_then(serde_json::Value::as_str) == Some("MyTurn"))
 }
 
 /// Read the agent's configured LLM provider id from `config.json`
@@ -324,7 +331,7 @@ fn git_branch(folder: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Derive the maquette `AgentStatus` from lifecycle, phase, thread state, and
+/// Derive the maquette `FleetStatus` from lifecycle, phase, agent state, and
 /// registry liveness.
 ///
 /// A **stale** agent (dead PID / stale heartbeat, detected by the registry
@@ -333,7 +340,7 @@ fn git_branch(folder: &str) -> String {
 /// a graceful-shutdown lifecycle (`Stopping`/`Stopped`, I8) can never be
 /// "working": the authoritative oplog signal wins over a stale phase that a
 /// torn shutdown might have left behind. Otherwise the live `phase` decides
-/// "working", falling back to "needs-you" (any `MY_TURN` thread) or "idle".
+/// "working", falling back to "needs-you" (any `MY_TURN` agent) or "idle".
 fn derive_status(
     phase: Option<cp_wire::types::Phase>,
     lifecycle: Option<cp_wire::types::LifecycleState>,

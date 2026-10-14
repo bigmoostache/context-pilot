@@ -1,14 +1,16 @@
 //! Console module — spawn and manage child processes via a background Unix socket server.
 //!
 //! Provides 5 tools: `console_create`, `console_send_keys`, `console_wait`,
-//! `console_watch`, and `console_easy_bash`. Each session gets a panel showing
+//! `console_easy_bash`, and `Monitor`. Each session gets a panel showing
 //! its ring-buffered output, and survives TUI reloads via server reconnection.
 
 /// Session management: spawn/reconnect via Unix socket server, kill, orphan cleanup.
 pub mod manager;
+/// `Monitor` tool: labelled async notifications from console output.
+pub mod monitor;
 /// Panel rendering for console session output.
 mod panel;
-/// Background polling threads for log tailing and process status.
+/// Background polling agents for log tailing and process status.
 mod pollers;
 /// Thread-safe ring buffer for capturing process output.
 pub mod ring_buffer;
@@ -154,12 +156,12 @@ impl Module for ConsoleModule {
         }
 
         // NOTE: orphan cleanup is deliberately NOT done here. `load_module_data`
-        // runs once PER THREAD at boot, but the console server's session map is
-        // fleet-wide; killing "orphans" relative to a single thread's keys would
-        // kill every OTHER thread's live sessions (same class as the F1c
-        // per-thread panel prune). The orphan-kill runs exactly once over the
-        // UNION of all threads' session keys in
-        // `App::prune_orphaned_console_sessions` after every thread is loaded.
+        // runs once PER AGENT at boot, but the console server's session map is
+        // fleet-wide; killing "orphans" relative to a single agent's keys would
+        // kill every OTHER agent's live sessions (same class as the F1c
+        // per-agent panel prune). The orphan-kill runs exactly once over the
+        // UNION of all agents' session keys in
+        // `App::prune_orphaned_console_sessions` after every agent is loaded.
 
         // Phase 1: Reconnect sessions (no &mut State needed)
         let mut reconnected: Vec<(String, SessionHandle)> = Vec::new();
@@ -185,7 +187,9 @@ impl Module for ConsoleModule {
             drop(cs.sessions.insert(name.clone(), handle));
 
             // Update panel metadata if panel was persisted
-            if let Some(ctx) = state.context.iter_mut().find(|c| c.get_meta_str("console_name") == Some(&name)) {
+            if let Some(ctx) =
+                state.agent_mut().context.iter_mut().find(|c| c.get_meta_str("console_name") == Some(&name))
+            {
                 ctx.set_meta("console_status", &status_label);
                 ctx.cache_deprecated = true;
             }
@@ -197,7 +201,7 @@ impl Module for ConsoleModule {
             let cs = ConsoleState::get(state);
             cs.sessions.keys().cloned().collect()
         };
-        state.context.retain(|c| {
+        state.agent_mut().context.retain(|c| {
             if c.context_type.as_str() != Kind::CONSOLE {
                 return true; // keep non-console panels
             }
@@ -212,21 +216,34 @@ impl Module for ConsoleModule {
     fn create_panel(&self, context_type: &Kind) -> Option<Box<dyn Panel>> {
         match context_type.as_str() {
             Kind::CONSOLE => Some(Box::new(ConsolePanel)),
+            Kind::MONITOR => Some(Box::new(monitor::panel::MonitorPanel)),
             _ => None,
         }
     }
 
     fn context_type_metadata(&self) -> Vec<TypeMeta> {
-        vec![TypeMeta {
-            context_type: "console",
-            icon_id: "tmux", // Reuse tmux icon for now
-            is_fixed: false,
-            needs_cache: true,
-            fixed_order: None,
-            display_name: "console",
-            short_name: "console",
-            needs_async_wait: true,
-        }]
+        vec![
+            TypeMeta {
+                context_type: "console",
+                icon_id: "tmux", // Reuse tmux icon for now
+                is_fixed: false,
+                needs_cache: true,
+                fixed_order: None,
+                display_name: "console",
+                short_name: "console",
+                needs_async_wait: true,
+            },
+            TypeMeta {
+                context_type: "monitor",
+                icon_id: "tmux",
+                is_fixed: true,
+                needs_cache: false,
+                fixed_order: Some(11),
+                display_name: "monitor",
+                short_name: "monitor",
+                needs_async_wait: false,
+            },
+        ]
     }
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
@@ -256,13 +273,20 @@ impl Module for ConsoleModule {
                 .param("pattern", ParamType::String, false)
                 .param_with_default("max_wait", ParamType::Integer, "60")
                 .build(),
-            ToolDefinition::from_yaml("console_watch", t)
+            ToolDefinition::from_yaml("Monitor", t)
                 .declares_task()
-                .short_desc("Async watch for process event")
+                .short_desc("Async notifications from console output")
                 .category("Console")
-                .param("id", ParamType::String, true)
-                .param_enum("mode", &["exit", "pattern"], true)
+                .param_enum("type", &["console", "command", "ws"], true)
+                .param("description", ParamType::String, true)
+                .param_enum("mode", &["exit", "pattern", "line"], true)
+                .param_enum("frequency", &["once", "ongoing"], true)
                 .param("pattern", ParamType::String, false)
+                .param("id", ParamType::String, false)
+                .param("command", ParamType::String, false)
+                .param("cwd", ParamType::String, false)
+                .param("ws_url", ParamType::String, false)
+                .param("ws_send", ParamType::String, false)
                 .build(),
             ToolDefinition::from_yaml("console_easy_bash", t)
                 .declares_task()
@@ -276,10 +300,10 @@ impl Module for ConsoleModule {
 
     fn pre_flight(&self, tool: &ToolUse, state: &State) -> Option<Verdict> {
         match tool.name.as_str() {
-            "console_send_keys" | "console_wait" | "console_watch" => {
+            "console_send_keys" | "console_wait" | "Monitor" => {
                 let mut pf = Verdict::new();
                 if let Some(panel_id) = tool.input.get("id").and_then(|v| v.as_str()) {
-                    match state.context.iter().find(|c| c.id == panel_id) {
+                    match state.agent().context.iter().find(|c| c.id == panel_id) {
                         None => pf.errors.push(format!("Panel '{panel_id}' not found")),
                         Some(ctx) if ctx.context_type.as_str() != Kind::CONSOLE => {
                             pf.errors.push(format!("Panel '{panel_id}' is not a console panel"));
@@ -308,7 +332,7 @@ impl Module for ConsoleModule {
             "console_create" => Some(tools::execute_create(tool, state)),
             "console_send_keys" => Some(tools::execute_send_keys(tool, state)),
             "console_wait" => Some(tools::execute_wait(tool, state)),
-            "console_watch" => Some(tools::execute_watch(tool, state)),
+            "Monitor" => Some(monitor::execute(tool, state)),
             "console_easy_bash" => Some(tools::execute_debug_bash(tool, state)),
             _ => None,
         }
@@ -319,7 +343,7 @@ impl Module for ConsoleModule {
             ("console_create", visualize_console_output),
             ("console_send_keys", visualize_console_output),
             ("console_wait", visualize_console_output),
-            ("console_watch", visualize_console_output),
+            ("Monitor", visualize_console_output),
         ]
     }
 
@@ -381,11 +405,11 @@ impl Module for ConsoleModule {
     fn load_worker_data(&self, _data: &serde_json::Value, _state: &mut State) {}
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
-        vec![]
+        vec![Kind::new(Kind::MONITOR)]
     }
 
     fn fixed_panel_defaults(&self) -> Vec<(Kind, &'static str, bool)> {
-        vec![]
+        vec![(Kind::new(Kind::MONITOR), "Monitor", false)]
     }
 
     fn context_display_name(&self, _context_type: &str) -> Option<&'static str> {

@@ -16,7 +16,7 @@
 // own branch count (cyclomatic complexity) and statement count stay within the
 // P8 budgets and each concern is independently readable.
 
-import type { Agent, ThreadDetail } from "../types"
+import type { Fleet, AgentDetail } from "../types"
 import { foldTaskList } from "./taskReducer"
 import { foldNoteList } from "./notesReducer"
 
@@ -36,13 +36,13 @@ type Kind = OpEntry["kind"]
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/** Map a wire ThreadTurn to the web ThreadStatus (MY_TURN = agent's turn). */
-function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
+/** Map a wire AgentTurn to the web AgentStatus (MY_TURN = agent's turn). */
+function turnToStatus(turn: string | undefined): AgentDetail["status"] {
   return turn === "my_turn" ? "MY_TURN" : "THEIR_TURN"
 }
 
 /**
- * Stable content signature for a thread message — used to dedup the SAME
+ * Stable content signature for a agent message — used to dedup the SAME
  * logical message across the two freshness planes when their positional
  * `msg_{n}` ids drift (T360).
  *
@@ -53,7 +53,7 @@ function turnToStatus(turn: string | undefined): ThreadDetail["status"] {
  * and the id-only dedup keeps BOTH, rendering the message (notably the user's
  * just-sent one) twice. A signature over `author|ts|text` collapses them
  * regardless of index: both planes derive these three from the same stored
- * `ThreadMessage`, so the strings are identical, while two genuinely distinct
+ * `AgentMessage`, so the strings are identical, while two genuinely distinct
  * messages can't share an exact-millisecond `ts` AND identical text AND author.
  */
 function msgSignature(m: {
@@ -76,92 +76,78 @@ function ago(epochMs: number): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
-// ── Thread-delta fold helpers (one per `kind`, pure) ──────────────────
+// ── Agent-delta fold helpers (one per `kind`, pure) ──────────────────
 //
 // Each takes the previous roster + the narrowed delta discriminant and returns
 // the next roster, the SAME reference when the delta is a no-op (structural
 // sharing collapses it), or `null` when the target is unknown and a hydrate is
-// needed. Extracted from applyThreadDelta so the dispatcher stays within budget.
+// needed. Extracted from applyAgentDelta so the dispatcher stays within budget.
 
-/** thread_created — prepend a synthesized thread (idempotent on id). */
-function foldThreadCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): ThreadDetail[] {
-  if (!k.thread_id) return prev
-  if (prev.some((t) => t.id === k.thread_id)) return prev // idempotent
-  const ts = k.timestamp_ms ?? entry.timestamp_ms ?? Date.now()
-  const created: ThreadDetail = {
-    id: k.thread_id,
-    name: k.name ?? "Untitled thread",
-    status: turnToStatus(k.status),
-    agentId: "",
-    agent: "",
-    createdAt: new Date(ts).toISOString(),
-    lastActivity: ago(ts),
-    lastActivityMs: ts,
-    unread: 0,
-    archived: false,
-    paused: false,
-    focused: false,
-    log: [],
-    // A branched thread names its parent (the branch-out lineage marker).
-    ...(k.branched_from && { branchedFrom: k.branched_from }),
-  }
-  return [created, ...prev]
+/**
+ * agent_created — a known id is a no-op (idempotent); an unknown one returns
+ * `null` so the bridge refetches `/agents`. The backend owns the row's place in
+ * the tree (parent, depth, order); synthesizing it here put sub-agents at the
+ * top as roots until the next poll.
+ */
+function foldAgentCreated(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
+  if (!k.agent_id) return prev
+  return prev.some((t) => t.id === k.agent_id) ? prev : null
 }
 
 /**
- * Patch a single thread's boolean flag (archived / paused). Returns `null` when
- * the thread is unknown (→ hydrate). Shared by the archived/restored and
+ * Patch a single agent's boolean flag (archived / paused). Returns `null` when
+ * the agent is unknown (→ hydrate). Shared by the archived/restored and
  * paused/resumed case pairs, which differ only in which field they set.
  */
-function foldThreadFlag(
-  prev: ThreadDetail[],
-  threadId: string | undefined,
-  patch: Partial<ThreadDetail>,
-): ThreadDetail[] | null {
-  if (prev.every((t) => t.id !== threadId)) return null
-  return prev.map((t) => (t.id === threadId ? { ...t, ...patch } : t))
+function foldAgentFlag(
+  prev: AgentDetail[],
+  agentId: string | undefined,
+  patch: Partial<AgentDetail>,
+): AgentDetail[] | null {
+  if (prev.every((t) => t.id !== agentId)) return null
+  return prev.map((t) => (t.id === agentId ? { ...t, ...patch } : t))
 }
 
-/** thread_deleted — drop the thread (idempotent: absent → unchanged). */
-function foldThreadDeleted(prev: ThreadDetail[], k: Kind): ThreadDetail[] {
-  if (prev.every((t) => t.id !== k.thread_id)) return prev
-  return prev.filter((t) => t.id !== k.thread_id)
+/** agent_deleted — drop the agent (idempotent: absent → unchanged). */
+function foldAgentDeleted(prev: AgentDetail[], k: Kind): AgentDetail[] {
+  if (prev.every((t) => t.id !== k.agent_id)) return prev
+  return prev.filter((t) => t.id !== k.agent_id)
 }
 
-/** message_deleted — remove the message at `message_ts` from its thread's log. */
-function foldMessageDeleted(prev: ThreadDetail[], k: Kind): ThreadDetail[] | null {
-  const thread = prev.find((t) => t.id === k.thread_id)
-  if (!thread) return null // unknown thread → hydrate
+/** message_deleted — remove the message at `message_ts` from its agent's log. */
+function foldMessageDeleted(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
+  const agent = prev.find((t) => t.id === k.agent_id)
+  if (!agent) return null // unknown agent → hydrate
   const target = k.message_ts
   if (target === undefined) return prev
   // The log's `ts` is epoch-ms (number from REST) or ISO string (from an
   // SSE-appended message). Normalise both to number for comparison.
-  const filtered = thread.log.filter((m) => {
+  const filtered = agent.log.filter((m) => {
     const mTs = typeof m.ts === "number" ? m.ts : new Date(m.ts ?? "").getTime()
     return mTs !== target
   })
-  if (filtered.length === thread.log.length) return prev // no match
-  return prev.map((t) => (t.id === k.thread_id ? { ...t, log: filtered } : t))
+  if (filtered.length === agent.log.length) return prev // no match
+  return prev.map((t) => (t.id === k.agent_id ? { ...t, log: filtered } : t))
 }
 
 /**
- * thread_focus_changed — set `focused` on the target thread and clear it
- * everywhere else, so the UI's focused-thread highlight tracks the agent in
+ * agent_focus_changed — set `focused` on the target agent and clear it
+ * everywhere else, so the UI's focused-agent highlight tracks the agent in
  * real time instead of waiting on the disk-fed backstop poll. A no-op fold
  * (same flags) returns the SAME refs via map, which structural sharing collapses.
  */
-function foldThreadFocus(prev: ThreadDetail[], k: Kind): ThreadDetail[] {
+function foldAgentFocus(prev: AgentDetail[], k: Kind): AgentDetail[] {
   return prev.map((t) => {
-    const focused = t.id === k.thread_id
+    const focused = t.id === k.agent_id
     return t.focused === focused ? t : { ...t, focused }
   })
 }
 
 /**
- * Parse an SSE `inline_body` into the raw ThreadMessage shape, or `null` on
- * malformed JSON. The inline body carries the TUI agent's ThreadMessage
- * (`content`/`timestamp`/`file_path`); the REST /threads endpoint reshapes
- * these to `text`/`ts`/`fileRef` (thread_shape.rs B8). Accept BOTH variants so
+ * Parse an SSE `inline_body` into the raw AgentMessage shape, or `null` on
+ * malformed JSON. The inline body carries the TUI agent's AgentMessage
+ * (`content`/`timestamp`/`file_path`); the REST /agents endpoint reshapes
+ * these to `text`/`ts`/`fileRef` (agent_shape.rs B8). Accept BOTH variants so
  * the delta reducer works regardless of source.
  */
 interface RawMessage {
@@ -196,7 +182,7 @@ function buildLogRow(
   raw: RawMessage,
   msgId: string,
   fallbackTs: number,
-): ThreadDetail["log"][number] {
+): AgentDetail["log"][number] {
   const msgTs =
     typeof raw.ts === "number"
       ? raw.ts
@@ -216,41 +202,41 @@ function buildLogRow(
 }
 
 /**
- * message_created — append the pushed message to its thread's log (deduped),
- * bumping the thread's activity. Returns `null` when the thread is unknown or
+ * message_created — append the pushed message to its agent's log (deduped),
+ * bumping the agent's activity. Returns `null` when the agent is unknown or
  * the inline body is malformed (→ hydrate), the SAME roster when the message is
  * already present (dedup no-op) or is a spilled/large body (activity-only bump).
  */
-function foldMessageCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): ThreadDetail[] | null {
-  const thread = prev.find((t) => t.id === k.thread_id)
-  if (!thread) return null // unknown thread → hydrate
+function foldMessageCreated(prev: AgentDetail[], k: Kind, entry: OpEntry): AgentDetail[] | null {
+  const agent = prev.find((t) => t.id === k.agent_id)
+  if (!agent) return null // unknown agent → hydrate
   const ts = entry.timestamp_ms ?? Date.now()
   // A spilled (large) body has no inline payload — bump activity and let a
   // hydrate fetch the full log (rare for chat).
   if (!k.inline_body) {
     return prev.map((t) =>
-      t.id === k.thread_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
+      t.id === k.agent_id ? { ...t, lastActivityMs: ts, lastActivity: ago(ts) } : t,
     )
   }
   const raw = parseInlineBody(k.inline_body)
   if (!raw) return null // malformed → ground-truth hydrate
   // CRITICAL: id MUST match the disk-poll id so the backstop poll dedups this
-  // message instead of rendering it twice. The backend `/threads` reshape ids
-  // each message positionally as `msg_{index}` (thread_shape.rs reshape_message).
+  // message instead of rendering it twice. The backend `/agents` reshape ids
+  // each message positionally as `msg_{index}` (agent_shape.rs reshape_message).
   // The delta folds the message at the end of the log, so its disk index == the
   // current log length. Deriving the id from that position — NOT from raw.id
-  // (`{thread}-m{n}`) or k.message_id — keeps the two planes' ids identical, so
-  // mergeThreadLogs collapses them to one.
-  const appended = buildLogRow(raw, `msg_${thread.log.length}`, ts)
+  // (`{agent}-m{n}`) or k.message_id — keeps the two planes' ids identical, so
+  // mergeAgentLogs collapses them to one.
+  const appended = buildLogRow(raw, `msg_${agent.log.length}`, ts)
   // Dedup by positional id OR content signature (T360). The id guard alone
   // misses a message that already landed via the backstop poll under a DIFFERENT
   // positional index (the push plane runs ahead of disk, so the two planes can
   // index the same message differently) — the signature closes that gap so a
   // just-sent message can't be appended a second time.
   const sig = msgSignature(appended)
-  if (thread.log.some((m) => m.id === appended.id || msgSignature(m) === sig)) return prev
+  if (agent.log.some((m) => m.id === appended.id || msgSignature(m) === sig)) return prev
   return prev.map((t) =>
-    t.id === k.thread_id
+    t.id === k.agent_id
       ? { ...t, log: [...t.log, appended], lastActivityMs: ts, lastActivity: ago(ts) }
       : t,
   )
@@ -259,43 +245,43 @@ function foldMessageCreated(prev: ThreadDetail[], k: Kind, entry: OpEntry): Thre
 // ── Reducers ──────────────────────────────────────────────────────────
 
 /**
- * Fold one oplog delta into the live thread roster (the threads cache).
+ * Fold one oplog delta into the live agent roster (the agents cache).
  *
  * A thin dispatcher over the delta `kind` — each case delegates to a
  * single-purpose fold helper above. Returns the next roster, the SAME reference
  * on an irrelevant/no-op delta, or `null` when the fold can't proceed
  * confidently (unknown id / malformed body) so the bridge hydrates ground truth.
  */
-export function applyThreadDelta(
-  prev: ThreadDetail[] | undefined,
+export function applyAgentDelta(
+  prev: AgentDetail[] | undefined,
   entry: OpEntry,
-): ThreadDetail[] | null {
+): AgentDetail[] | null {
   if (!prev) return null // not loaded yet → invalidate/hydrate
   const k = entry.kind
   switch (k.kind) {
-    case "thread_created": {
-      return foldThreadCreated(prev, k, entry)
+    case "agent_created": {
+      return foldAgentCreated(prev, k)
     }
-    case "thread_archived": {
-      return foldThreadFlag(prev, k.thread_id, { archived: true })
+    case "agent_archived": {
+      return foldAgentFlag(prev, k.agent_id, { archived: true })
     }
-    case "thread_restored": {
-      return foldThreadFlag(prev, k.thread_id, { archived: false })
+    case "agent_restored": {
+      return foldAgentFlag(prev, k.agent_id, { archived: false })
     }
-    case "thread_paused": {
-      return foldThreadFlag(prev, k.thread_id, { paused: true })
+    case "agent_paused": {
+      return foldAgentFlag(prev, k.agent_id, { paused: true })
     }
-    case "thread_resumed": {
-      return foldThreadFlag(prev, k.thread_id, { paused: false })
+    case "agent_resumed": {
+      return foldAgentFlag(prev, k.agent_id, { paused: false })
     }
-    case "thread_deleted": {
-      return foldThreadDeleted(prev, k)
+    case "agent_deleted": {
+      return foldAgentDeleted(prev, k)
     }
     case "message_deleted": {
       return foldMessageDeleted(prev, k)
     }
-    case "thread_status_changed": {
-      return foldThreadFlag(prev, k.thread_id, { status: turnToStatus(k.status) })
+    case "agent_status_changed": {
+      return foldAgentFlag(prev, k.agent_id, { status: turnToStatus(k.status) })
     }
     case "task_list_changed": {
       return foldTaskList(prev, k)
@@ -303,14 +289,14 @@ export function applyThreadDelta(
     case "notes_changed": {
       return foldNoteList(prev, k)
     }
-    case "thread_focus_changed": {
-      return foldThreadFocus(prev, k)
+    case "agent_focus_changed": {
+      return foldAgentFocus(prev, k)
     }
     case "message_created": {
       return foldMessageCreated(prev, k, entry)
     }
     default: {
-      return prev // phase / cost / lifecycle → irrelevant to threads
+      return prev // phase / cost / lifecycle → irrelevant to agents
     }
   }
 }
@@ -323,15 +309,15 @@ export function applyThreadDelta(
  * hydrate on the most common transition, going idle). The coarse `status` the
  * fleet dot renders is kept in sync without a refetch: streaming/tooling →
  * "working"; idle drops a stale "working" back to "idle" (needs-you vs idle is a
- * thread-state decision the next /meta backstop reconciles — we never know it
+ * agent-state decision the next /meta backstop reconciles — we never know it
  * from the phase delta alone).
  */
-function foldPhase(prev: Agent, k: Kind): Agent {
+function foldPhase(prev: Fleet, k: Kind): Fleet {
   const phase = k.phase
   if (phase !== "idle" && phase !== "streaming" && phase !== "tooling") {
     return prev // unknown phase → ignore
   }
-  let next: Agent = prev
+  let next: Fleet = prev
   if (prev.phase !== phase) next = { ...next, phase }
   if (phase === "streaming" || phase === "tooling") {
     if (next.status !== "working") next = { ...next, status: "working", accent: "ok" }
@@ -346,8 +332,8 @@ function foldPhase(prev: Agent, k: Kind): Agent {
  * counters so the HUD's token display rides the push plane, not the 15s poll
  * (T297).
  */
-function foldCost(prev: Agent, k: Kind): Agent {
-  let next: Agent = prev
+function foldCost(prev: Fleet, k: Kind): Fleet {
+  let next: Fleet = prev
   if (typeof k.cost_usd === "number" && prev.costUsd !== k.cost_usd) {
     next = { ...next, costUsd: k.cost_usd }
   }
@@ -367,8 +353,8 @@ function foldCost(prev: Agent, k: Kind): Agent {
  * the HUD can render `Used (hit)` / `Used (miss)` matching ratatui's green/amber
  * segments (T297).
  */
-function foldContextUsage(prev: Agent, k: Kind): Agent {
-  let next: Agent = prev
+function foldContextUsage(prev: Fleet, k: Kind): Fleet {
+  let next: Fleet = prev
   if (typeof k.used_tokens === "number" && prev.contextUsed !== k.used_tokens) {
     next = { ...next, contextUsed: k.used_tokens }
   }
@@ -398,7 +384,7 @@ function foldContextUsage(prev: Agent, k: Kind): Agent {
  * Running  → status "idle" (fresh boot, clears both "disconnected" and the
  *   client-only "waiting" restart status).
  */
-function foldLifecycle(prev: Agent, k: Kind): Agent {
+function foldLifecycle(prev: Fleet, k: Kind): Fleet {
   const state = k.state
   if (state === "stopping" || state === "stopped") {
     if (prev.status === "disconnected" || prev.status === "waiting") return prev
@@ -421,7 +407,7 @@ function foldLifecycle(prev: Agent, k: Kind): Agent {
  * and NEVER returns `null` for a known agent, so a phase change (notably going
  * idle when a stream ends) never costs a REST hydrate.
  */
-export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent | null {
+export function applyFleetDelta(prev: Fleet | undefined, entry: OpEntry): Fleet | null {
   if (!prev) return null // not loaded yet → hydrate
   const k = entry.kind
   switch (k.kind) {
@@ -438,30 +424,28 @@ export function applyAgentDelta(prev: Agent | undefined, entry: OpEntry): Agent 
       return foldLifecycle(prev, k)
     }
     default: {
-      return prev // thread deltas → irrelevant to meta
+      return prev // agent deltas → irrelevant to meta
     }
   }
 }
 
 // ── Non-destructive poll reconcile (the backstop merge, T123) ────────
 //
-// The backstop poll (`refetchInterval`) refetches `/threads`, whose per-thread
+// The backstop poll (`refetchInterval`) refetches `/agents`, whose per-agent
 // `log` is sourced from the tier-② disk cache (config.json) the agent flushes
 // on a debounce. A just-sent message rides the FAST push plane (a delta folded
 // in ~14–60 ms), but the disk cache lags. If the poll REPLACED the cache
 // wholesale, a poll firing inside that lag window would serve a stale log
 // without the message and erase the delta-applied bubble — the T123 flicker.
 //
-// `mergeThreadLogs` converges state UPWARD: every message the local cache has
-// that the poll lacks is preserved, and delta-created threads not yet on disk
-// are kept. Once the disk flush lands, the poll's log already contains the
-// message (deduped by id) and the two planes agree. The threads queryFn calls
+// message (deduped by id) and the two planes agree. Agent membership and order
+// always follow the poll. The agents queryFn calls
 // this against the current cache (`getQueryData`) so the poll can never drop a
 // delta-applied message.
-export function mergeThreadLogs(
-  prev: ThreadDetail[] | undefined,
-  next: ThreadDetail[],
-): ThreadDetail[] {
+export function mergeAgentLogs(
+  prev: AgentDetail[] | undefined,
+  next: AgentDetail[],
+): AgentDetail[] {
   if (!prev) return next // cold load — nothing to preserve yet
   const prevById = new Map(prev.map((t) => [t.id, t]))
   const merged = next.map((t) => {
@@ -478,7 +462,8 @@ export function mergeThreadLogs(
     const extra = p.log.filter((m) => !haveIds.has(m.id) && !haveSigs.has(msgSignature(m)))
     return extra.length > 0 ? { ...t, log: [...t.log, ...extra] } : t
   })
-  const nextIds = new Set(next.map((t) => t.id))
-  const missing = prev.filter((t) => !nextIds.has(t.id))
-  return missing.length > 0 ? [...missing, ...merged] : merged
+  // Membership and order are the poll's: the backend already serves agents
+  // not yet flushed to disk and drops hard-deleted ones, so re-adding agents
+  // the poll lacks only resurrected deleted agents.
+  return merged
 }

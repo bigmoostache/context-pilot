@@ -2,14 +2,14 @@ import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
-import { rawUrl } from "@/lib/api"
+import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited.
  *  Points at the MOBILE MarkdownEditor twin (@/mobile-components) — the leak
  *  guard forbids reaching back into @/components from a hand-authored mobile
  *  file, and the mobile editor is the touch-sized toolbar variant. */
 const LazyMarkdownEditor = lazy(() =>
-  import("@/mobile-components/agents/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
+  import("@/mobile-components/fleets/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
@@ -24,14 +24,14 @@ const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m
  * identical to desktop; the touch divergence lives in the leaf renderers below
  * (zoom / copy / save buttons become thumb-sized).
  */
-export function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsPreview(agentId, node.path, true)
+export function LivePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsPreview(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading preview…" />
   if (error || !data) return <Generic node={node} />
   if (node.kind === "markdown")
     return (
       <EditableMarkdown
-        agentId={agentId}
+        fleetId={fleetId}
         path={node.path}
         content={data.content}
         truncated={data.truncated}
@@ -48,11 +48,11 @@ export function LivePreview({ agentId, node }: { agentId: string; node: FinderNo
  * as desktop; the zoom control is the divergence — desktop uses 20px (size-5)
  * hover buttons, here they are 36px (size-9) `active:`-press touch targets.
  */
-export function LiveImagePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+export function LiveImagePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
   const [zoom, setZoom] = useState(100)
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
   const [failed, setFailed] = useState(false)
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   if (failed) return <Generic node={node} />
   return (
     <div className="flex flex-col gap-2 p-2">
@@ -105,8 +105,8 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
  * (a full-width "Open PDF" button) matters more here; it's sized as a real
  * touch target.
  */
-export function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+export function LivePdfPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <object data={src} type="application/pdf" className="min-h-0 w-full flex-1 bg-card">
@@ -135,24 +135,54 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
  * ships its own touch handling (pan/select/scroll), so the engine is shared;
  * only the surrounding truncation note is mobile-sized here.
  */
-export function LiveSheetPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSheet(agentId, node.path, true)
+export function LiveSheetPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSheet(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error || !data || data.sheets.length === 0) return <Generic node={node} />
+  if (error && isTooLarge(error)) return <SheetTooLarge fleetId={fleetId} path={node.path} />
+  if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<PreviewStatus label="Loading spreadsheet…" />}>
-        <LazySheetGrid sheets={data.sheets} path={node.path} agentId={agentId} />
+        <LazySheetGrid
+          sheets={data.sheets}
+          workbook={data.workbook}
+          activeSheet={data.activeSheet}
+          path={node.path}
+          fleetId={fleetId}
+        />
       </Suspense>
 
       {data.truncated && (
         <div className="flex items-center border-t border-border bg-muted/20 px-3 py-1.5">
           <span className="text-[11px] text-muted-foreground/50 italic">
-            Preview clipped — large sheet capped at 1 000 rows × 50 columns
+            Preview truncated — sheets are capped at 100 000 rows × 500 columns
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+/** The backend refuses workbooks over its size cap with a 413 "too large". */
+function isTooLarge(error: Error): boolean {
+  return error.message.includes("too large")
+}
+
+/** "Too large to preview" state with a download fallback. */
+function SheetTooLarge({ fleetId, path }: { fleetId: string; path: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+      <span className="text-[13px] text-muted-foreground">
+        Workbook too large to preview (over 25 MB)
+      </span>
+      <button
+        type="button"
+        className="rounded-md bg-muted px-4 py-2 text-[13px] font-medium hover:bg-muted/70"
+        onClick={() => void downloadFile(fleetId, path)}
+      >
+        Download
+      </button>
     </div>
   )
 }
@@ -207,19 +237,19 @@ function HighlightedCode({
  * files fall back to the read-only mobile {@link MarkdownPreview}.
  */
 function EditableMarkdown({
-  agentId,
+  fleetId,
   path,
   content,
   truncated,
 }: {
-  agentId: string
+  fleetId: string
   path: string
   content: string
   truncated?: boolean
 }) {
   const draftRef = useRef(content)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const write = useWriteFile(agentId)
+  const write = useWriteFile(fleetId)
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [err, setErr] = useState<string | null>(null)
 

@@ -22,7 +22,7 @@ use cp_wire::types::command::Command;
 use cp_wire::types::registry::Entry;
 use serde::Serialize;
 
-use crate::channel::AgentHandle;
+use crate::channel::FleetHandle;
 
 // `pub mod` (not private `mod`) so `Backend`/`Paths` are reachable at
 // a fully-public path (`transport::rest::backend::Backend`) for external test
@@ -33,12 +33,14 @@ pub mod backend;
 // `pub` (not private `mod`) so the `pub` `Backend::pkce_session` field's type
 // `PkceSession` is nameable through a public path (`rest::claude_oauth::PkceSession`),
 // satisfying `unnameable_types` without a forbidden `pub use` item re-export.
+mod agents;
 pub mod claude_oauth;
 mod config;
 mod create;
 mod lifecycle;
 mod releases;
-mod threads;
+pub(crate) use agents::conversations::search_conversations;
+use agents::{attach_disk_notes, attach_disk_tasks, order_tree, overlay_roster, reshape_agent};
 pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};
 pub(crate) use claude_oauth::sweep::spawn as spawn_oauth_refresh;
@@ -51,16 +53,14 @@ pub(crate) use config::settings::{allowed_models, onboarding_completed};
 pub(crate) use config::settings::{get_settings, update_settings};
 pub(crate) use config::update::{APPLY_IN_FLIGHT, update_apply, update_check, update_set_mode, update_status};
 pub(crate) use create::{
-    create_agent, create_command, delete_library_agent, read_library_agent, upsert_library_agent,
-    upsert_library_command,
+    create_command, create_fleet, delete_library_system, read_library_system, upsert_library_command,
+    upsert_library_system,
 };
-pub(crate) use lifecycle::{restart_agent, retire_agent, unretire_agent};
+pub(crate) use lifecycle::{restart_fleet, retire_fleet, unretire_fleet};
 pub(crate) use releases::{
     delete_release, deploy_fleet, download_release, list_releases, releases_break_glass, restart_orchestrator,
     select_release, set_arch,
 };
-pub(crate) use threads::conversations::search_conversations;
-use threads::{attach_disk_notes, attach_disk_tasks, overlay_roster, reshape_thread};
 
 /// A transport-agnostic reply: an HTTP status and a JSON body.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,7 +118,7 @@ pub struct CommandReceipt {
     pub status: String,
 }
 
-/// `GET /api/fleet` — every known agent's projected view.
+/// `GET /api/fleets` — every known agent's projected view.
 ///
 /// The envelope `rev` is the maximum `rev` across all agents, so a client can
 /// open one fleet-wide stream from that point.
@@ -129,7 +129,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
     };
-    let all_ids: Vec<String> = backend.view.agent_ids().map(str::to_owned).collect();
+    let all_ids: Vec<String> = backend.view.fleet_ids().map(str::to_owned).collect();
     drop(backend);
 
     // Filter by ACL when auth is enabled (FR-12).
@@ -151,7 +151,7 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
     HttpReply::ok(&Envelope { rev: max_rev, data: agents })
 }
 
-/// `GET /api/agent/{id}` — one agent's projected view, or `404`.
+/// `GET /api/fleet/{id}` — one agent's projected view, or `404`.
 pub fn agent(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(backend) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -174,7 +174,7 @@ pub fn mint_ticket(state: &Mutex<Backend>, auth_user: Option<&crate::services::a
     HttpReply { status: 200, body: format!("{{\"ticket\":{}}}", json_string(&token)) }
 }
 
-/// `GET /api/agent/{id}/body/{hash}` — hydrate a content-addressed body.
+/// `GET /api/fleet/{id}/body/{hash}` — hydrate a content-addressed body.
 ///
 /// Returns the raw bytes as a JSON string-free octet payload on success, `400`
 /// for a malformed hash, `404` for an unknown agent or absent/inlined body, and
@@ -188,7 +188,7 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
         Err(reply) => return reply,
     };
     // Hydrate is blocking agent I/O — performed with no lock held.
-    match AgentHandle::from_entry(&entry).hydrate(hash) {
+    match FleetHandle::from_entry(&entry).hydrate(hash) {
         Ok(Some(bytes)) => {
             HttpReply { status: 200, body: serde_json::to_string(&BodyPayload { bytes: &bytes }).unwrap_or_default() }
         }
@@ -197,7 +197,7 @@ pub fn body(state: &Mutex<Backend>, id: &str, hash_hex: &str) -> HttpReply {
     }
 }
 
-/// `POST /api/agent/{id}/command` — submit a command to an agent.
+/// `POST /api/fleet/{id}/command` — submit a command to an agent.
 ///
 /// Returns `400` for a malformed command, `404` for an unknown agent, and `502`
 /// if the agent is unreachable.
@@ -211,7 +211,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
         Err(reply) => return reply,
     };
     let dedup_token = command.dedup_token.clone();
-    match AgentHandle::from_entry(&entry).send(command) {
+    match FleetHandle::from_entry(&entry).send(command) {
         Ok(ack) => {
             // Mark state dirty so SSE producers emit an `invalidate` event,
             // prompting connected frontends to refetch tier-② data.
@@ -232,7 +232,7 @@ pub fn command(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply
     }
 }
 
-/// `POST /api/agent/{id}/rename` — set or clear a custom display name.
+/// `POST /api/fleet/{id}/rename` — set or clear a custom display name.
 ///
 /// Body: `{ "name": "My Custom Name" }`.  An empty or whitespace-only name
 /// reverts to the folder-derived default.  The override is persisted in the
@@ -252,11 +252,11 @@ pub fn rename_agent(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Http
     HttpReply::ok(&serde_json::json!({ "ok": true }))
 }
 
-/// `POST /api/agent/{id}/avatar` — upload or replace an agent's profile picture.
+/// `POST /api/fleet/{id}/avatar` — upload or replace an agent's profile picture.
 ///
 /// Body: raw image bytes (PNG/JPEG/GIF/WebP/SVG). Content type is sniffed from
 /// magic bytes — the `Content-Type` header is not required. Max 2 MiB
-/// ([`MAX_AVATAR_BYTES`](crate::services::agent_meta::MAX_AVATAR_BYTES)).
+/// ([`MAX_AVATAR_BYTES`](crate::services::fleet_meta::MAX_AVATAR_BYTES)).
 pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> HttpReply {
     if body_bytes.is_empty() {
         return HttpReply::error(400, "empty body");
@@ -270,7 +270,7 @@ pub fn upload_avatar(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> Htt
     }
 }
 
-/// `DELETE /api/agent/{id}/avatar` — remove an agent's profile picture.
+/// `DELETE /api/fleet/{id}/avatar` — remove an agent's profile picture.
 pub fn delete_avatar(state: &Mutex<Backend>, id: &str) -> HttpReply {
     let Ok(mut b) = state.lock() else {
         return HttpReply::error(500, "backend lock poisoned");
@@ -309,93 +309,109 @@ fn ack_status(status: &cp_wire::types::ack::Status) -> String {
     }
 }
 
-/// `GET /api/agent/{id}/threads` — the thread list, served roster-first.
+/// `GET /api/fleet/{id}/agents` — the agent list, served roster-first.
 ///
-/// The thread **roster** (which threads exist, their turn status, archived
+/// The agent **roster** (which agents exist, their turn status, archived
 /// flag, and last activity) comes from the in-memory
 /// [`MaterializedView`](crate::services::materialized_view::MaterializedView) — folded live from
-/// the agent's oplog, so a just-created/archived/restored thread is reflected
+/// the agent's oplog, so a just-created/archived/restored agent is reflected
 /// in milliseconds, never waiting on the debounced tier-② disk write (design
 /// doc I5: live reads ride the view, not disk).
 ///
-/// The per-thread **message log** is hydrated best-effort from the agent's
+/// The per-agent **message log** is hydrated best-effort from the agent's
 /// `config.json` (via [`StateReader`](crate::inspect::StateReader)): the view
 /// roster carries message *counts* but not bodies, and the conversation log is
-/// only needed once a thread is opened. The two are merged by thread id:
+/// only needed once an agent is opened. The two are merged by agent id:
 ///
-/// * a thread present in both — disk supplies its `log`, the view supplies the
+/// * an agent present in both — disk supplies its `log`, the view supplies the
 ///   fresher `status` / `archived` / `lastActivity` (the disk copy may lag);
-/// * a thread only in the view (created after the last disk flush) — synthesised
+/// * an agent only in the view (created after the last disk flush) — synthesised
 ///   from the roster alone with an empty log (it gains its log on the next disk
 ///   flush, and later via live `MessageCreated` deltas);
-/// * a thread only on disk (created before roster journaling began) — kept
+/// * an agent only on disk (created before roster journaling began) — kept
 ///   verbatim from disk.
 ///
-/// This makes thread *appearance* instant (the user's latency complaint) while
+/// This makes agent *appearance* instant (the user's latency complaint) while
 /// keeping conversations intact during the migration to a fully delta-driven
 /// read path.
-pub fn threads(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match resolve_entry(state, agent_id) {
+pub fn agents(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
     let folder = std::path::Path::new(&entry.folder);
-    let (config, focused_thread_id, roster) = {
+    let (config, focused_agent_id, (roster, deleted)) = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
         let reader = b.inspect_mut();
         let cfg = reader.read_config(folder).ok();
 
-        // Read focused_thread_id from the first worker's FocusState.
+        // Read focused_agent_id from the first worker's FocusState.
         let disk_focus =
             crate::inspect::StateReader::list_workers(folder).unwrap_or_default().into_iter().find_map(|wid| {
                 let w = reader.read_worker(folder, &wid).ok()?;
                 w.get("modules")
-                    .and_then(|m| m.get("threads_worker"))
-                    .and_then(|tw| tw.get("focused_thread_id"))
+                    .and_then(|m| m.get("agents_worker").or_else(|| m.get("threads_worker")))
+                    .and_then(|tw| tw.get("focused_agent_id").or_else(|| tw.get("focused_thread_id")))
                     .and_then(serde_json::Value::as_str)
                     .map(String::from)
             });
         // The `reader` borrow ends with `cfg`/`focused` (both owned); now read
-        // the live roster + focused thread from the view under the same lock.
-        // The view's focus (push-fed via `ThreadFocusChanged`) is the fresher
+        // the live roster + focused agent from the view under the same lock.
+        // The view's focus (push-fed via `AgentFocusChanged`) is the fresher
         // authority; fall back to the disk `FocusState` only when the view has
         // none yet (a backend cold start before the agent's first focus
         // emission — design doc I5: live reads ride the view, disk is the
         // bounded backstop).
-        let (roster, view_focus) =
-            b.view.get(agent_id).map(|v| (v.roster.clone(), v.focused_thread_id.clone())).unwrap_or_default();
-        let focused = view_focus.or(disk_focus);
-        (cfg, focused, roster)
+        let (roster, view_focus, deleted) = b
+            .view
+            .get(fleet_id)
+            .map(|v| (v.roster.clone(), v.focused_agent_id.clone(), v.deleted.clone()))
+            .unwrap_or_default();
+        // A pre-T860 view focus `T<n>` yields to its migrated disk twin `A<n>`.
+        let focused = match (view_focus, disk_focus) {
+            (Some(view), Some(disk)) if agents::same_agent(&view, &disk) => Some(disk),
+            (view, disk) => view.or(disk),
+        };
+        (cfg, focused, (roster, deleted))
     };
 
-    // Disk threads (full logs). Absent config is tolerated: the view roster
-    // alone can still render newly-created threads.
+    // Disk agents (full logs). Absent config is tolerated: the view roster
+    // alone can still render newly-created agents.
     let empty: Vec<serde_json::Value> = Vec::new();
-    let raw_threads = config
+    let raw_agents = config
         .as_ref()
         .and_then(|c| c.get("modules"))
-        .and_then(|m| m.get("threads"))
-        .and_then(|t| t.get("threads"))
+        .and_then(|m| m.get("agents"))
+        .and_then(|t| t.get("agents"))
         .and_then(serde_json::Value::as_array)
         .unwrap_or(&empty);
 
-    let mut details: Vec<serde_json::Value> = raw_threads.iter().map(|t| reshape_thread(t, agent_id)).collect();
+    let mut details: Vec<serde_json::Value> = raw_agents.iter().map(|t| reshape_agent(t, fleet_id)).collect();
 
     // First-paint tasks from the agent's `config.json` todo module (thread-owned
-    // todos live separately from the thread record). The live roster overlay
+    // todos live separately from the agent record). The live roster overlay
     // below overrides these with the fresher delta-fed task lists where present.
     attach_disk_tasks(&mut details, config.as_ref());
     attach_disk_notes(&mut details, config.as_ref());
 
-    // Overlay the view's fresher roster onto matching disk threads, then append
-    // any view-only threads the disk has not yet flushed.
-    overlay_roster(&mut details, &roster, agent_id);
+    // Overlay the view's fresher roster onto matching disk agents, then append
+    // any view-only agents the disk has not yet flushed.
+    overlay_roster(&mut details, &roster, fleet_id);
+    // The disk config lags a hard delete (debounced flush): never re-serve an
+    // agent the view saw deleted.
+    details.retain(|d| {
+        d.get("id")
+            .and_then(serde_json::Value::as_str)
+            .is_none_or(|id| !deleted.iter().any(|g| agents::same_agent(id, g)))
+    });
+    // Sidebar tree order: the frontend renders the list as received.
+    order_tree(&mut details);
 
     HttpReply::ok(&serde_json::json!({
-        "focusedThreadId": focused_thread_id,
-        "threads": details,
+        "focusedAgentId": focused_agent_id,
+        "agents": details,
     }))
 }
 
@@ -423,7 +439,7 @@ mod tests {
         OpEntry::new(1, rev, 0, OpEntryKind::PhaseTransition { phase })
     }
 
-    fn backend_with_agent() -> Mutex<Backend> {
+    fn backend_with_fleet() -> Mutex<Backend> {
         let mut view = MaterializedView::new();
         view.apply("a1", &phase_entry(7, Phase::Streaming));
         Mutex::new(Backend::for_test(PathBuf::from("/tmp/cp-test-agents"), view))
@@ -431,7 +447,7 @@ mod tests {
 
     #[test]
     fn fleet_lists_agents_with_max_rev() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = fleet(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"rev\":7"), "envelope carries the max rev");
@@ -440,7 +456,7 @@ mod tests {
 
     #[test]
     fn agent_returns_view_with_rev() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = agent(&state, "a1");
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"rev\":7"));
@@ -448,13 +464,13 @@ mod tests {
 
     #[test]
     fn agent_unknown_is_404() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(agent(&state, "ghost").status, 404);
     }
 
     #[test]
     fn mint_ticket_returns_token() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         let reply = mint_ticket(&state, None);
         assert_eq!(reply.status, 200);
         assert!(reply.body.contains("\"ticket\""));
@@ -462,13 +478,13 @@ mod tests {
 
     #[test]
     fn body_rejects_malformed_hash() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(body(&state, "a1", "not-a-hash").status, 400);
     }
 
     #[test]
     fn command_rejects_malformed_body() {
-        let state = backend_with_agent();
+        let state = backend_with_fleet();
         assert_eq!(command(&state, "a1", b"{not json").status, 400);
     }
 }

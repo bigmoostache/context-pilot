@@ -116,38 +116,14 @@ fn index_map(client: &MeiliClient, files_uid: &str) -> Result<HashMap<String, Fi
 /// gate as the live indexer, via [`types::is_indexable`]).
 fn disk_map(project_root: &Path) -> HashMap<String, FilePrint> {
     let mut map: HashMap<String, FilePrint> = HashMap::new();
-    walk(project_root, project_root, &mut map);
+    crate::index::filters::walk_files(project_root, |path, meta| {
+        if !types::is_indexable(path, project_root, meta) {
+            return;
+        }
+        let rel = path.strip_prefix(project_root).unwrap_or(path).to_string_lossy().to_string();
+        let _prev = map.insert(rel, FilePrint { mtime: mtime_ms(meta), size: meta.len() });
+    });
     map
-}
-
-/// Recursive helper for [`disk_map`], mirroring the indexer's directory filter.
-fn walk(root: &Path, dir: &Path, map: &mut HashMap<String, FilePrint>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_symlink() {
-            continue;
-        }
-        if path.is_dir() {
-            let name = entry.file_name();
-            if !types::is_excluded_dir(name.to_str().unwrap_or("")) {
-                walk(root, &path, map);
-            }
-        } else if path.is_file() {
-            let Ok(meta) = std::fs::metadata(&path) else {
-                continue;
-            };
-            if !types::is_indexable(&path, root, &meta) {
-                continue;
-            }
-            let rel = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().to_string();
-            let _prev = map.insert(rel, FilePrint { mtime: mtime_ms(&meta), size: meta.len() });
-        } else {
-            // Neither a regular file nor a directory (socket, fifo, …) — skip.
-        }
-    }
 }
 
 /// Compute the offline delta between the files index and the current disk.

@@ -44,7 +44,7 @@ mod tests {
             rev,
             1_718_000_000_000u64.wrapping_add(rev),
             OpEntryKind::MessageCreated {
-                thread_id: format!("T{rev}"),
+                agent_id: format!("T{rev}"),
                 message_id: format!("m{rev}-body"),
                 head: ContentHash::new([tag; 32]),
                 inline_body: None,

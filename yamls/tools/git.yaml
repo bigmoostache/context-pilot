@@ -1,6 +1,13 @@
 tools:
-  git_execute:
+  Git:
     description: |
       Executes a git command. Read-only commands (log, diff, show, status, blame, etc.) create a dynamic result panel that auto-refreshes. Mutating commands (commit, push, pull, merge, rebase, etc.) execute directly and return output. Shell operators (|, ;, &&) are not allowed.
     parameters:
       command: "Full git command string (e.g., 'git log --oneline -10', 'git commit -m \"message\"')"
+  Worktree:
+    description: |
+      Moves THIS agent into a git worktree so it can work on a branch without disturbing other agents. Worktrees live in .worktrees/<branch> under the project root ('/' in the branch becomes '+'). While inside one, relative file paths, git, gh, consoles and callbacks run in the worktree. Memories, todos, logs and other .context-pilot state stay shared with the root. Search still indexes the project root only.
+      Actions: enter (creates the worktree if missing, plus the branch if it doesn't exist), leave (back to the project root; refused when this agent is the last one in the worktree, use remove instead), list (all worktrees + where this agent works), remove (deletes a clean worktree, keeps the branch; refuses on uncommitted changes; cleans up a worktree whose folder was already deleted). Archiving an agent removes its worktree when no other agent uses it.
+    parameters:
+      action: "enter | leave | list | remove"
+      branch: "Branch name (required for enter and remove), e.g. 'feat/login'"

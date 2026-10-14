@@ -12,7 +12,7 @@ import type {
 } from "@univerjs/presets"
 import { BooleanNumber } from "@univerjs/presets"
 import ExcelJS from "exceljs"
-import { uploadFile } from "@/lib/api"
+import { saveSheet, uploadFile } from "@/lib/api"
 
 /** Backend sheet shape from the calamine `/fs/sheet` endpoint. */
 export interface SheetPayload {
@@ -196,15 +196,24 @@ export async function generateXlsxBlob(univerAPI: FUniver): Promise<Blob | null>
 }
 
 /**
- * Generate a modified XLSX from Univer state and upload it back to the agent
- * realm, overwriting the original file. The realm's file becomes the new
- * source of truth.
+ * Write Univer edits back to the agent realm file.
+ *
+ * xlsx/xlsm: the snapshot goes to the backend, which patches only the changed
+ * cells into the original file, so its formatting survives. Other formats are
+ * rebuilt from Univer state via ExcelJS and uploaded over the original.
  */
 export async function saveToRealm(
   univerAPI: FUniver,
-  agentId: string,
+  fleetId: string,
   realmPath: string,
+  edits: SheetEdits,
 ): Promise<void> {
+  if (/\.xls[xm]$/i.test(realmPath)) {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) throw new Error("No active workbook")
+    await saveSheet(fleetId, realmPath, partialSnapshot(workbook.save(), edits))
+    return
+  }
   const blob = await generateXlsxBlob(univerAPI)
   if (!blob) throw new Error("No active workbook")
 
@@ -214,7 +223,150 @@ export async function saveToRealm(
   const name = hasSlash ? realmPath.slice(lastSlash + 1) : realmPath
 
   const file = new File([blob], name, { type: blob.type })
-  await uploadFile(agentId, dir, file)
+  await uploadFile(fleetId, dir, file)
+}
+
+// ── Partial save ────────────────────────────────────────────────────
+
+/** Mutations Univer runs on its own (measuring rows), not user edits. */
+const SELF_MUTATIONS = new Set([
+  "sheet.mutation.set-worksheet-row-auto-height",
+  "sheet.mutation.set-worksheet-row-is-auto-height",
+])
+
+/**
+ * Sheet id a user mutation changed, if any (fed from `CommandExecuted`).
+ * Mutations flagged `onlyLocal` are Univer's own derived writes (formula
+ * results land this way on every recalculation), not edits to save.
+ */
+export function touchedSheet(event: {
+  id: string
+  params: unknown
+  options?: { onlyLocal?: boolean; fromChangeset?: boolean; fromCollab?: boolean }
+}): string | null {
+  if (!event.id.startsWith("sheet.mutation.") || SELF_MUTATIONS.has(event.id)) return null
+  const opts = event.options
+  if (opts?.onlyLocal === true || opts?.fromChangeset === true || opts?.fromCollab === true)
+    return null
+  return sheetIdOf(event.params)
+}
+
+/** `subUnitId` of a mutation's params, or the new sheet's id for insert-sheet. */
+function sheetIdOf(params: unknown): string | null {
+  if (typeof params !== "object" || params === null) return null
+  if ("subUnitId" in params && typeof params.subUnitId === "string") return params.subUnitId
+  if (!("sheet" in params) || typeof params.sheet !== "object" || params.sheet === null) return null
+  const sheet = params.sheet
+  return "id" in sheet && typeof sheet.id === "string" ? sheet.id : null
+}
+
+/**
+ * Snapshot trimmed to the touched sheets (plus sheets created in Univer,
+ * whose ids don't follow the converter's `sheet-<n>`) and the styles their
+ * cells use. `sheetOrder` stays whole: the server reads deletions from it.
+ * Turns a multi-MB upload into a few KB.
+ */
+function partialSnapshot(
+  full: IWorkbookData,
+  { touched, ops }: SheetEdits,
+): Record<string, unknown> {
+  const keep = (id: string) => touched.has(id) || !/^sheet-\d+$/.test(id)
+  const sheets = Object.fromEntries(Object.entries(full.sheets).filter(([id]) => keep(id)))
+  const used = new Set<string>()
+  for (const sheet of Object.values(sheets)) collectStyleIds(sheet.cellData, used)
+  const styles = Object.fromEntries(Object.entries(full.styles).filter(([id]) => used.has(id)))
+  return { id: full.id, sheetOrder: full.sheetOrder, styles, sheets, ops }
+}
+
+/** What the user changed since the last save. */
+export interface SheetEdits {
+  /** Sheets with an edit: Save uploads only these. */
+  touched: Set<string>
+  /** Row/column inserts and deletes, in order. */
+  ops: SheetOp[]
+}
+
+/** Forget every recorded edit (after a save or a remount). */
+export function clearEdits(edits: SheetEdits): void {
+  edits.touched.clear()
+  edits.ops.length = 0
+}
+
+/**
+ * Record a `CommandExecuted` event into `edits`; `true` when it was a user
+ * edit (the file is now dirty).
+ */
+export function recordEdit(edits: SheetEdits, event: Parameters<typeof touchedSheet>[0]): boolean {
+  const sheetId = touchedSheet(event)
+  if (!sheetId) return false
+  edits.touched.add(sheetId)
+  const op = structuralOp(event)
+  if (op) edits.ops.push(op)
+  return true
+}
+
+/**
+ * Row/column insert or delete, replayed by the server on the original file
+ * before the cell diff so shifted cells keep their own formatting. `at` is
+ * 0-based.
+ */
+export interface SheetOp {
+  sheet: string
+  kind: "insertRows" | "removeRows" | "insertCols" | "removeCols"
+  at: number
+  count: number
+}
+
+/** Univer mutation → op kind, and whether it spans rows. */
+const STRUCTURAL: Record<string, [SheetOp["kind"], boolean]> = {
+  "sheet.mutation.insert-row": ["insertRows", true],
+  "sheet.mutation.remove-rows": ["removeRows", true],
+  "sheet.mutation.insert-col": ["insertCols", false],
+  "sheet.mutation.remove-col": ["removeCols", false],
+}
+
+/**
+ * The structural op a user mutation carries, if any. Undo runs the inverse
+ * mutation, so the recorded list stays in step with the grid.
+ */
+export function structuralOp(event: {
+  id: string
+  params: unknown
+  options?: { onlyLocal?: boolean; fromChangeset?: boolean; fromCollab?: boolean }
+}): SheetOp | null {
+  const entry = STRUCTURAL[event.id]
+  const sheet = touchedSheet(event)
+  if (!entry || !sheet) return null
+  const params = event.params
+  if (typeof params !== "object" || params === null || !("range" in params)) return null
+  const range = params.range
+  if (typeof range !== "object" || range === null) return null
+  const [kind, rows] = entry
+  const start = field(range, rows ? "startRow" : "startColumn")
+  const end = field(range, rows ? "endRow" : "endColumn")
+  if (start === null || end === null || end < start) return null
+  return { sheet, kind, at: start, count: end - start + 1 }
+}
+
+/** A numeric field of an object, or null. */
+function field(o: object, key: string): number | null {
+  const v: unknown = (o as Record<string, unknown>)[key]
+  return typeof v === "number" ? v : null
+}
+
+/** Add every style id referenced by a sheet's cells to `out`. */
+function collectStyleIds(
+  cells: IObjectMatrixPrimitiveType<Nullable<ICellData>> | undefined,
+  out: Set<string>,
+): void {
+  const rows: Record<number, Record<number, Nullable<ICellData>> | undefined> = cells ?? {}
+  for (const r of Object.keys(rows)) {
+    const row = rows[Number(r)] ?? {}
+    for (const c of Object.keys(row)) {
+      const style = row[Number(c)]?.s
+      if (typeof style === "string") out.add(style)
+    }
+  }
 }
 
 // ── Style mapping ───────────────────────────────────────────────────

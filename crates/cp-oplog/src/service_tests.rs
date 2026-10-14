@@ -1,4 +1,4 @@
-//! Unit tests for [`crate::service`] — the off-loop group-commit thread and
+//! Unit tests for [`crate::service`] — the off-loop group-commit agent and
 //! its asymmetric backpressure policy (design doc GAP 2 / I2 / V11).
 //!
 //! Split out of `service.rs` to keep that file within the 500-line structure
@@ -9,9 +9,9 @@ use crate::replay::replay;
 use cp_wire::types::{ContentHash, Phase};
 use tempfile::tempdir;
 
-fn msg(thread: &str, byte: u8) -> OpEntryKind {
+fn msg(agent: &str, byte: u8) -> OpEntryKind {
     OpEntryKind::MessageCreated {
-        thread_id: thread.to_owned(),
+        agent_id: agent.to_owned(),
         message_id: format!("m{byte}"),
         head: ContentHash::new([byte; 32]),
         inline_body: None,
@@ -50,7 +50,7 @@ fn durable_appends_are_monotonic_and_survive_reopen() {
     assert_eq!(state.rev_head, Some(2));
     assert!(state.seen.contains("c0"), "durable command effect survived");
     let mut expected_heads = cp_wire::types::snapshot::Heads::default();
-    expected_heads.set_thread_head("T1", ContentHash::new([0x22; 32]));
+    expected_heads.set_agent_head("T1", ContentHash::new([0x22; 32]));
     assert_eq!(state.heads, expected_heads, "latest head folded through the service");
 }
 
@@ -82,7 +82,7 @@ fn mixed_workload_replays_correctly() {
     assert!(state.seen.contains("cmd-a"));
     assert!(state.seen.contains("cmd-b"));
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T7", ContentHash::new([0xAB; 32]));
+    expected.set_agent_head("T7", ContentHash::new([0xAB; 32]));
     assert_eq!(state.heads, expected);
 }
 
@@ -90,7 +90,7 @@ fn mixed_workload_replays_correctly() {
 fn group_commit_rolls_segments_and_replays() {
     let dir = tempdir().expect("tempdir");
     {
-        // Tiny limit forces rolls inside the commit thread; the buffered
+        // Tiny limit forces rolls inside the commit agent; the buffered
         // roll must flush the old segment so nothing is lost.
         let service = Service::spawn_with_segment_limit(dir.path(), 16).expect("spawn");
         let mut last = 0;
@@ -102,7 +102,7 @@ fn group_commit_rolls_segments_and_replays() {
     }
     let state = replay(dir.path()).expect("replay");
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T1", ContentHash::new([11; 32]));
+    expected.set_agent_head("T1", ContentHash::new([11; 32]));
     assert_eq!(state.heads, expected, "rolled, group-committed log replays intact");
 }
 
@@ -137,7 +137,7 @@ fn submit_durable_persists_without_awaiting_the_sync() {
     let state = replay(dir.path()).expect("replay");
     assert!(state.seen.contains("fire-and-forget"), "detached-ack record is still durable");
     let mut expected = cp_wire::types::snapshot::Heads::default();
-    expected.set_thread_head("T1", ContentHash::new([0x44; 32]));
+    expected.set_agent_head("T1", ContentHash::new([0x44; 32]));
     assert_eq!(state.heads, expected, "submitted head folded after off-loop commit");
 }
 
@@ -146,13 +146,13 @@ fn v11_emit_burst_never_blocks_the_loop_on_fsync() {
     // Design doc V11 / I2: the main loop NEVER fsyncs. A burst of phase
     // transitions during streaming must leave per-emit latency decoupled
     // from `fdatasync` latency — the loop only *enqueues*; the dedicated
-    // commit thread group-commits off-loop.
+    // commit agent group-commits off-loop.
     //
     // This is deterministic, not a flaky wall-clock race: `append_best_effort`
     // is a `try_send` on a bounded channel — it is *structurally*
     // non-blocking (returns `Dropped` instead of waiting when the queue is
     // full). So the strongest provable property is that no single emit call
-    // stalls on the commit thread's `fdatasync`, regardless of disk speed.
+    // stalls on the commit agent's `fdatasync`, regardless of disk speed.
     // We measure the WORST individual emit latency across a large burst and
     // assert it stays far below what even one fsync-per-call would cost.
     use std::time::Instant;

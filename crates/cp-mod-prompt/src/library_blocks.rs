@@ -13,14 +13,14 @@ use cp_base::state::runtime::State;
 /// Build IR blocks for the library panel's TUI display.
 pub(crate) fn library_blocks(state: &State) -> Vec<Block> {
     let ps = PromptState::get(state);
-    let agents = crate::storage::load_prompts_for(PromptType::Agent);
+    let systems = crate::storage::load_prompts_for(PromptType::System);
     let skills = crate::storage::load_prompts_for(PromptType::Skill);
     let commands = crate::storage::load_prompts_for(PromptType::Command);
 
     let mut blocks = Vec::new();
 
-    // Agents / skills / commands sequences, YAML-style (mirrors context()).
-    agents_yaml(&agents, ps, &mut blocks);
+    // Systems / skills / commands sequences, YAML-style (mirrors context()).
+    systems_yaml(&systems, ps, &mut blocks);
     skills_yaml(&skills, ps, &mut blocks);
     commands_yaml(&commands, &mut blocks);
 
@@ -47,16 +47,16 @@ fn entry_line(id: &str) -> Block {
 
 // ── Sequence builders ────────────────────────────────────────────────
 
-/// Build the agents YAML sequence.
-fn agents_yaml(agents: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
-    blocks.push(Block::Line(vec![S::styled("agents:".into(), Semantic::Header).bold()]));
-    for agent in agents {
-        let is_active = ps.active_agent_id.as_deref() == Some(&agent.id);
-        blocks.push(entry_line(&agent.id));
-        blocks.push(kv_line(4, "name", agent.name.clone(), Semantic::Default));
+/// Build the systems YAML sequence.
+fn systems_yaml(systems: &[crate::types::PromptItem], ps: &PromptState, blocks: &mut Vec<Block>) {
+    blocks.push(Block::Line(vec![S::styled("systems:".into(), Semantic::Header).bold()]));
+    for system in systems {
+        let is_active = ps.active_system_id.as_deref() == Some(&system.id);
+        blocks.push(entry_line(&system.id));
+        blocks.push(kv_line(4, "name", system.name.clone(), Semantic::Default));
         blocks.push(bool_line("active", is_active));
-        blocks.push(bool_line("builtin", agent.is_builtin));
-        blocks.push(kv_line(4, "description", agent.description.clone(), Semantic::Muted));
+        blocks.push(bool_line("builtin", system.is_builtin));
+        blocks.push(kv_line(4, "description", system.description.clone(), Semantic::Muted));
     }
 }
 

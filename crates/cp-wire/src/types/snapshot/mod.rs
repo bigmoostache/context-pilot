@@ -2,14 +2,14 @@
 //!
 //! Replaying the oplog reconstructs a small, bounded set of structures:
 //!
-//! * [`Heads`] — per-thread and per-panel content hashes (the latest state of
-//!   each, **O(threads + panels)** rather than O(total-files); design doc I3,
+//! * [`Heads`] — per-agent and per-panel content hashes (the latest state of
+//!   each, **O(agents + panels)** rather than O(total-files); design doc I3,
 //!   resolves K3);
 //! * [`SeenSet`] — the dedup-tokens of command effects that are durable but not
 //!   yet acknowledged-and-evicted, which makes command application
 //!   **exactly-once** across a replay (design doc I4); and
-//! * a [`RosterThread`] list — the bounded thread roster so the backend can
-//!   render the thread list after oplog **compaction** without folding roster
+//! * a [`RosterAgent`] list — the bounded agent roster so the backend can
+//!   render the agent list after oplog **compaction** without folding roster
 //!   deltas from offset 0 (design doc I5 / §16).
 //!
 //! A [`Snapshot`] bundles all three. It is what a `Checkpoint` oplog record
@@ -21,13 +21,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{ContentHash, ThreadTurn};
+use super::{AgentTurn, ContentHash};
 
 pub mod notes;
 pub mod roster_builder;
 pub mod todo;
 use notes::WireNote;
-use roster_builder::RosterThreadBuilder;
+use roster_builder::RosterAgentBuilder;
 use todo::WireTask;
 
 /// Wire-schema revision stamped onto freshly-constructed snapshot structures.
@@ -46,9 +46,9 @@ pub struct Snapshot {
     /// Dedup-tokens of durable, not-yet-evicted command effects.
     pub seen: SeenSet,
 
-    /// The thread roster as of this `rev` — one entry per live thread (design
-    /// doc §16 journals thread create/archive/restore; carrying it in the
-    /// checkpoint is what lets a backend rebuild the thread list after oplog
+    /// The agent roster as of this `rev` — one entry per live agent (design
+    /// doc §16 journals agent create/archive/restore; carrying it in the
+    /// checkpoint is what lets a backend rebuild the agent list after oplog
     /// **compaction** without folding from offset 0, design doc I5).
     ///
     /// Additive + `serde(default)`: a checkpoint written by an older agent
@@ -56,7 +56,7 @@ pub struct Snapshot {
     /// older backend reading a newer checkpoint ignores the field — N-1
     /// compatible in both directions (design doc §18).
     #[serde(default)]
-    pub roster: Vec<RosterThread>,
+    pub roster: Vec<RosterAgent>,
 }
 
 impl Snapshot {
@@ -66,39 +66,40 @@ impl Snapshot {
     /// `#[non_exhaustive]` — a future recoverable structure is added here
     /// without breaking cross-crate callers.
     #[must_use]
-    pub const fn new(heads: Heads, seen: SeenSet, roster: Vec<RosterThread>) -> Self {
+    pub const fn new(heads: Heads, seen: SeenSet, roster: Vec<RosterAgent>) -> Self {
         Self { heads, seen, roster }
     }
 }
 
-/// One thread's snapshotted roster entry — the lightweight per-thread metadata
-/// needed to render a thread list (name, turn, archived, activity, count)
+/// One agent's snapshotted roster entry — the lightweight per-agent metadata
+/// needed to render an agent list (name, turn, archived, activity, count)
 /// without hydrating any message body.
 ///
 /// Folded from the thread-roster oplog deltas
-/// ([`ThreadCreated`](super::oplog::OpEntryKind::ThreadCreated) and friends),
+/// ([`AgentCreated`](super::oplog::OpEntryKind::AgentCreated) and friends),
 /// with `msg_count`/`last_activity_ms` accumulated from each subsequent
 /// [`MessageCreated`](super::oplog::OpEntryKind::MessageCreated). The backend's
 /// materialized view uses this struct directly as its roster element, so the
 /// checkpoint-restored roster and the live-folded roster are the same type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct RosterThread {
-    /// Thread identifier (e.g. `"T7"`).
-    pub thread_id: String,
+pub struct RosterAgent {
+    /// Agent identifier (e.g. `"T7"`).
+    #[serde(rename = "agent_id", alias = "thread_id")]
+    pub agent_id: String,
 
-    /// User-chosen thread label.
+    /// User-chosen agent label.
     pub name: String,
 
     /// Current turn ownership.
-    pub status: ThreadTurn,
+    pub status: AgentTurn,
 
-    /// Whether the thread is archived (soft-deleted: hidden from the active
+    /// Whether the agent is archived (soft-deleted: hidden from the active
     /// list but restorable).
     pub archived: bool,
 
-    /// Whether the thread is paused — `MY_TURN` status no longer fires idle
-    /// notifications, but the thread remains visible and functional.
+    /// Whether the agent is paused — `MY_TURN` status no longer fires idle
+    /// notifications, but the agent remains visible and functional.
     #[serde(default)]
     pub paused: bool,
 
@@ -106,10 +107,10 @@ pub struct RosterThread {
     /// message.
     pub last_activity_ms: u64,
 
-    /// Number of messages folded into this thread so far.
+    /// Number of messages folded into this agent so far.
     pub msg_count: u32,
 
-    /// The thread's projected tasks (read-only todo items), a flat list with
+    /// The agent's projected tasks (read-only todo items), a flat list with
     /// nesting expressed via [`WireTask::parent_id`]. Cancelled tasks are
     /// excluded upstream. Replaced wholesale by each
     /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) delta
@@ -121,7 +122,7 @@ pub struct RosterThread {
     #[serde(default)]
     pub tasks: Vec<WireTask>,
 
-    /// The thread's projected scratchpad notes (read-only cells), a flat list.
+    /// The agent's projected scratchpad notes (read-only cells), a flat list.
     /// Replaced wholesale by each
     /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) delta
     /// (whole-list snapshot semantics — the twin of [`tasks`](Self::tasks)).
@@ -131,71 +132,90 @@ pub struct RosterThread {
     /// ignores the field — N-1 compatible in both directions.
     #[serde(default)]
     pub notes: Vec<WireNote>,
+
+    /// The agent's parent when it is a sub-agent (created by another agent's
+    /// `Agent` tool); `None` for a root. Lets the backend nest an agent the
+    /// disk config has not flushed yet. `#[serde(default)]`: N-1 compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_agent_id: Option<String>,
 }
 
-/// The facts a `ThreadCreated` oplog delta carries — the borrowed payload of
-/// [`RosterThread::fold_created`].
+/// The facts a `AgentCreated` oplog delta carries — the borrowed payload of
+/// [`RosterAgent::fold_created`].
 ///
 /// A named carrier (rather than four loose arguments) keeps the fold signature
 /// small and mirrors the
-/// [`ThreadCreated`](super::oplog::OpEntryKind::ThreadCreated) variant the
+/// [`AgentCreated`](super::oplog::OpEntryKind::AgentCreated) variant the
 /// caller match-binds: both the agent's replay fold and the backend's live
 /// fold construct one inline from the same fields, so the two paths stay
 /// identical.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
-pub struct ThreadCreation<'src> {
-    /// Thread identifier (e.g. `"T7"`).
-    pub thread_id: &'src str,
+pub struct AgentCreation<'src> {
+    /// Agent identifier (e.g. `"T7"`).
+    pub agent_id: &'src str,
 
-    /// User-chosen thread label.
+    /// User-chosen agent label.
     pub name: &'src str,
 
     /// Turn ownership at creation.
-    pub status: ThreadTurn,
+    pub status: AgentTurn,
 
-    /// Epoch-ms the thread was created (seeds `last_activity_ms`).
+    /// Epoch-ms the agent was created (seeds `last_activity_ms`).
     pub timestamp_ms: u64,
+
+    /// Parent agent id of a sub-agent; `None` for a root.
+    pub parent_agent_id: Option<&'src str>,
 }
 
-impl<'src> ThreadCreation<'src> {
-    /// Build the borrowed `ThreadCreated` payload the fold consumes.
-    /// Keeps [`ThreadCreation`] `#[non_exhaustive]` across the agent-replay
+impl<'src> AgentCreation<'src> {
+    /// Build the borrowed `AgentCreated` payload the fold consumes.
+    /// Keeps [`AgentCreation`] `#[non_exhaustive]` across the agent-replay
     /// and backend-fold call sites.
     #[must_use]
-    pub const fn new(thread_id: &'src str, name: &'src str, status: ThreadTurn, timestamp_ms: u64) -> Self {
-        Self { thread_id, name, status, timestamp_ms }
+    pub const fn new(agent_id: &'src str, name: &'src str, status: AgentTurn, timestamp_ms: u64) -> Self {
+        Self { agent_id, name, status, timestamp_ms, parent_agent_id: None }
+    }
+
+    /// Set the parent of a sub-agent.
+    #[must_use]
+    pub const fn with_parent(mut self, parent_agent_id: Option<&'src str>) -> Self {
+        self.parent_agent_id = parent_agent_id;
+        self
     }
 }
 
-impl RosterThread {
+impl RosterAgent {
     /// Start building a roster entry from its three required identifying fields;
     /// the four state fields default to zero until set on the returned
-    /// [`RosterThreadBuilder`].
+    /// [`RosterAgentBuilder`].
     ///
-    /// The builder is what lets [`RosterThread`] stay `#[non_exhaustive]`
+    /// The builder is what lets [`RosterAgent`] stay `#[non_exhaustive]`
     /// (cross-crate fixtures cannot use a struct literal) without a
     /// seven-argument constructor tripping `too_many_arguments`.
     #[must_use]
-    pub fn builder<T, U>(thread_id: T, name: U, status: ThreadTurn) -> RosterThreadBuilder
+    pub fn builder<T, U>(agent_id: T, name: U, status: AgentTurn) -> RosterAgentBuilder
     where
         T: Into<String>,
         U: Into<String>,
     {
-        RosterThreadBuilder::new(thread_id, name, status)
+        RosterAgentBuilder::new(agent_id, name, status)
     }
 
-    /// Apply a `ThreadCreated` to a roster, **insert-or-update** so a duplicate
+    /// Apply a `AgentCreated` to a roster, **insert-or-update** so a duplicate
     /// delivery or a replay folds idempotently (a re-seen creation refreshes
     /// name/status and clears `archived`, never duplicates the entry).
-    pub fn fold_created(roster: &mut Vec<Self>, created: ThreadCreation<'_>) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == created.thread_id) {
+    pub fn fold_created(roster: &mut Vec<Self>, created: AgentCreation<'_>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == created.agent_id) {
             created.name.clone_into(&mut existing.name);
             existing.status = created.status;
             existing.archived = false;
+            if created.parent_agent_id.is_some() {
+                existing.parent_agent_id = created.parent_agent_id.map(str::to_owned);
+            }
         } else {
             roster.push(Self {
-                thread_id: created.thread_id.to_owned(),
+                agent_id: created.agent_id.to_owned(),
                 name: created.name.to_owned(),
                 status: created.status,
                 archived: false,
@@ -204,64 +224,65 @@ impl RosterThread {
                 msg_count: 0,
                 tasks: Vec::new(),
                 notes: Vec::new(),
+                parent_agent_id: created.parent_agent_id.map(str::to_owned),
             });
         }
     }
 
-    /// Set the `archived` flag for `thread_id`, if present (a no-op otherwise).
-    pub fn fold_archived(roster: &mut [Self], thread_id: &str, archived: bool) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    /// Set the `archived` flag for `agent_id`, if present (a no-op otherwise).
+    pub fn fold_archived(roster: &mut [Self], agent_id: &str, archived: bool) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.archived = archived;
         }
     }
 
-    /// Set the `paused` flag for `thread_id`, if present (a no-op otherwise).
-    pub fn fold_paused(roster: &mut [Self], thread_id: &str, paused: bool) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    /// Set the `paused` flag for `agent_id`, if present (a no-op otherwise).
+    pub fn fold_paused(roster: &mut [Self], agent_id: &str, paused: bool) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.paused = paused;
         }
     }
 
-    /// Remove `thread_id` from the roster entirely (permanent delete).
-    pub fn fold_deleted(roster: &mut Vec<Self>, thread_id: &str) {
-        roster.retain(|e| e.thread_id != thread_id);
+    /// Remove `agent_id` from the roster entirely (permanent delete).
+    pub fn fold_deleted(roster: &mut Vec<Self>, agent_id: &str) {
+        roster.retain(|e| e.agent_id != agent_id);
     }
 
-    /// Set the turn `status` for `thread_id`, if present (a no-op otherwise).
-    pub fn fold_status(roster: &mut [Self], thread_id: &str, status: ThreadTurn) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    /// Set the turn `status` for `agent_id`, if present (a no-op otherwise).
+    pub fn fold_status(roster: &mut [Self], agent_id: &str, status: AgentTurn) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.status = status;
         }
     }
 
-    /// Record a message in `thread_id`: bump its count and advance its activity
-    /// timestamp (a no-op if the thread is not in the roster — e.g. a message
+    /// Record a message in `agent_id`: bump its count and advance its activity
+    /// timestamp (a no-op if the agent is not in the roster — e.g. a message
     /// folded before its creation delta was seen).
-    pub fn fold_message(roster: &mut [Self], thread_id: &str, timestamp_ms: u64) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    pub fn fold_message(roster: &mut [Self], agent_id: &str, timestamp_ms: u64) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.msg_count = existing.msg_count.saturating_add(1);
             existing.last_activity_ms = timestamp_ms;
         }
     }
 
-    /// Replace `thread_id`'s task list wholesale — whole-list snapshot
+    /// Replace `agent_id`'s task list wholesale — whole-list snapshot
     /// semantics (each
     /// [`TaskListChanged`](super::oplog::OpEntryKind::TaskListChanged) carries
-    /// the thread's complete cancelled-excluded list, so folding is an
-    /// assignment). A no-op if the thread is not in the roster.
-    pub fn fold_tasks(roster: &mut [Self], thread_id: &str, tasks: Vec<WireTask>) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    /// the agent's complete cancelled-excluded list, so folding is an
+    /// assignment). A no-op if the agent is not in the roster.
+    pub fn fold_tasks(roster: &mut [Self], agent_id: &str, tasks: Vec<WireTask>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.tasks = tasks;
         }
     }
 
-    /// Replace `thread_id`'s note list wholesale — whole-list snapshot
+    /// Replace `agent_id`'s note list wholesale — whole-list snapshot
     /// semantics (each
     /// [`NotesChanged`](super::oplog::OpEntryKind::NotesChanged) carries the
-    /// thread's complete note list, so folding is an assignment). A no-op if the
-    /// thread is not in the roster. The twin of [`fold_tasks`](Self::fold_tasks).
-    pub fn fold_notes(roster: &mut [Self], thread_id: &str, notes: Vec<WireNote>) {
-        if let Some(existing) = roster.iter_mut().find(|e| e.thread_id == thread_id) {
+    /// agent's complete note list, so folding is an assignment). A no-op if the
+    /// agent is not in the roster. The twin of [`fold_tasks`](Self::fold_tasks).
+    pub fn fold_notes(roster: &mut [Self], agent_id: &str, notes: Vec<WireNote>) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.notes = notes;
         }
     }
@@ -281,7 +302,8 @@ pub struct Heads {
     pub schema_version: u32,
 
     /// Per-thread last-message head.
-    pub threads: Vec<ThreadHead>,
+    #[serde(rename = "agents", alias = "threads")]
+    pub agents: Vec<AgentHead>,
 
     /// Per-panel content head.
     pub panels: Vec<PanelHead>,
@@ -291,35 +313,36 @@ impl Default for Heads {
     /// An empty head set — the state of a freshly-booted agent before any
     /// message or panel exists.
     fn default() -> Self {
-        Self { schema_version: SNAPSHOT_SCHEMA_VERSION, threads: Vec::new(), panels: Vec::new() }
+        Self { schema_version: SNAPSHOT_SCHEMA_VERSION, agents: Vec::new(), panels: Vec::new() }
     }
 }
 
 impl Heads {
-    /// Set (or insert) the last-message head for `thread_id`.
+    /// Set (or insert) the last-message head for `agent_id`.
     ///
     /// Replay folds a `MessageCreated` entry through this: the most recent
-    /// message of a thread overwrites the previous head, so the head set stays
-    /// bounded at one entry per thread (design doc I3). Insertion order is
+    /// message of an agent overwrites the previous head, so the head set stays
+    /// bounded at one entry per agent (design doc I3). Insertion order is
     /// deterministic (append-on-first-sight, update-in-place), so two replays
     /// of the same log produce byte-identical heads.
-    pub fn set_thread_head(&mut self, thread_id: &str, last_message_hash: ContentHash) {
-        if let Some(existing) = self.threads.iter_mut().find(|head| head.thread_id == thread_id) {
+    pub fn set_agent_head(&mut self, agent_id: &str, last_message_hash: ContentHash) {
+        if let Some(existing) = self.agents.iter_mut().find(|head| head.agent_id == agent_id) {
             existing.last_message_hash = last_message_hash;
         } else {
-            self.threads.push(ThreadHead { thread_id: thread_id.to_owned(), last_message_hash });
+            self.agents.push(AgentHead { agent_id: agent_id.to_owned(), last_message_hash });
         }
     }
 }
 
-/// A single thread's head — the hash of its most recent message body.
+/// A single agent's head — the hash of its most recent message body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
-pub struct ThreadHead {
-    /// Thread identifier.
-    pub thread_id: String,
+pub struct AgentHead {
+    /// Agent identifier.
+    #[serde(rename = "agent_id", alias = "thread_id")]
+    pub agent_id: String,
 
-    /// Content hash of the last message body in this thread.
+    /// Content hash of the last message body in this agent.
     pub last_message_hash: ContentHash,
 }
 

@@ -23,9 +23,9 @@
 //!
 //! | Method | Path | Handler |
 //! |---|---|---|
-//! | `GET`  | `/api/fleet` | [`rest::fleet`] |
-//! | `GET`  | `/api/agent/{id}` | [`rest::agent`] |
-//! | `POST` | `/api/agent/{id}/command` | [`rest::command`] |
+//! | `GET`  | `/api/fleets` | [`rest::fleet`] |
+//! | `GET`  | `/api/fleet/{id}` | [`rest::agent`] |
+//! | `POST` | `/api/fleet/{id}/command` | [`rest::command`] |
 //! | `GET`  | `/api/stream?agent={id}&ticket={t}` | SSE (this module) |
 
 mod auth;
@@ -140,9 +140,9 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
     // Per-agent ACL check (Phase 6). When auth is enabled and the route
     // targets a specific agent, verify the caller has access. System admins
     // bypass (FR-09); regular users need an ACL entry (FR-10).
-    if let Some(agent_id) = auth::extract_agent_id(&segments)
+    if let Some(fleet_id) = auth::extract_fleet_id(&segments)
         && let Some(user) = auth_user.as_ref()
-        && !auth::authorize_agent(state, agent_id, user)
+        && !auth::authorize_fleet(state, fleet_id, user)
     {
         respond_json(request, &rest::HttpReply::error(403, "no access to this agent"));
         return;
@@ -282,15 +282,40 @@ fn cors_headers() -> Vec<Header> {
 }
 
 /// Respond with a JSON [`HttpReply`](rest::HttpReply), including CORS headers.
+///
+/// Bodies over [`GZIP_MIN`] are gzipped when the client accepts it: a
+/// workbook snapshot shrinks ~8× (6 MB → 0.8 MB), which dominates over Tailscale.
 fn respond_json(request: Request, reply: &rest::HttpReply) {
-    let mut response = Response::from_string(&reply.body).with_status_code(reply.status);
+    let packed = (reply.body.len() > GZIP_MIN && accepts_gzip(&request)).then(|| gzip(&reply.body)).flatten();
+    let gzipped = packed.is_some();
+    let mut response =
+        Response::from_data(packed.unwrap_or_else(|| reply.body.as_bytes().to_vec())).with_status_code(reply.status);
     if let Ok(header) = Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]) {
+        response = response.with_header(header);
+    }
+    if gzipped && let Ok(header) = Header::from_bytes(&b"Content-Encoding"[..], &b"gzip"[..]) {
         response = response.with_header(header);
     }
     for header in cors_headers() {
         response = response.with_header(header);
     }
     let _sent = request.respond(response);
+}
+
+/// Smallest body worth compressing, in bytes.
+const GZIP_MIN: usize = 1024;
+
+/// Whether the request's `Accept-Encoding` lists gzip.
+fn accepts_gzip(request: &Request) -> bool {
+    request.headers().iter().any(|h| h.field.equiv("Accept-Encoding") && h.value.as_str().contains("gzip"))
+}
+
+/// Gzip `body` at the fastest level; `None` on an encoder error.
+fn gzip(body: &str) -> Option<Vec<u8>> {
+    use std::io::Write as _;
+    let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    enc.write_all(body.as_bytes()).ok()?;
+    enc.finish().ok()
 }
 
 /// Extract a `Last-Event-ID` header value as a `rev`.
@@ -316,6 +341,6 @@ mod tests {
             split_url("/api/stream?agent=a1&ticket=x"),
             ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned())
         );
-        assert_eq!(split_url("/api/fleet"), ("/api/fleet".to_owned(), String::new()));
+        assert_eq!(split_url("/api/fleets"), ("/api/fleets".to_owned(), String::new()));
     }
 }

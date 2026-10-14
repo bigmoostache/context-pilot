@@ -5,18 +5,17 @@ use std::collections::HashMap;
 use super::super::data::config::ViewMode;
 use super::super::flags::{ConfigOverlay, StatusBools, UiState};
 use super::State;
-use super::bundle::ThreadRuntime;
 use crate::config::llm::types::LlmProvider;
 
 impl Default for State {
-    // `State` now holds only fleet-shared data plus the resident thread's
-    // per-thread bundle; the ~45 per-thread leaf fields moved onto
-    // [`ThreadRuntime`](super::bundle::ThreadRuntime) and are initialized by its
+    // `State` now holds only fleet-shared data plus the executing agent's
+    // per-agent bundle; the ~45 per-agent leaf fields moved onto
+    // [`AgentRuntime`](super::bundle::AgentRuntime) and are initialized by its
     // own `Default`. This initializer is a short linear literal of the shared
-    // fields + `resident: ThreadRuntime::default()`.
+    // fields + an empty `AgentStore`.
     fn default() -> Self {
         Self {
-            resident: ThreadRuntime::default(),
+            agent_store: super::agents::AgentStore::default(),
             flags: StatusBools {
                 ui: UiState { dirty: true, ..UiState::default() },
                 config: ConfigOverlay { reverie_enabled: true, ..ConfigOverlay::default() },
@@ -43,7 +42,6 @@ impl Default for State {
             highlight_ir_fn: None,
             shared_module_data: HashMap::new(),
             init_is_global: None,
-            resident_thread_id: None,
         }
     }
 }

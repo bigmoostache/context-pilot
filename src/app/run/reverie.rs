@@ -13,69 +13,69 @@ use cp_mod_queue::types::QueueState;
 /// Check if any reverie needs a stream started (state has reverie but no stream).
 /// Called from the main event loop.
 pub(super) fn maybe_start_reverie_stream(app: &mut App) {
-    // Collect agent_ids that need a stream started
+    // Collect system_ids that need a stream started
     let needs_start: Vec<String> = app
         .state
         .reveries
         .iter()
         .filter(|entry| entry.1.is_streaming && !app.reverie_streams.contains_key(entry.0))
-        .map(|(agent_id, _)| agent_id.clone())
+        .map(|(system_id, _)| system_id.clone())
         .collect();
 
-    for agent_id in needs_start {
+    for system_id in needs_start {
         let (tx, rx) = mpsc::channel();
-        streaming::start_reverie_stream(&mut app.state, &agent_id, tx);
+        streaming::start_reverie_stream(&mut app.state, &system_id, tx);
         let _r = app
             .reverie_streams
-            .insert(agent_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
+            .insert(system_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
     }
 }
 
 /// Poll all reverie streams for events and process them.
 /// Called from the main event loop, AFTER main stream events.
 pub(super) fn process_reverie_events(app: &mut App) {
-    // Collect agent_ids that have streams
-    let agent_ids: Vec<String> = app.reverie_streams.keys().cloned().collect();
+    // Collect system_ids that have streams
+    let system_ids: Vec<String> = app.reverie_streams.keys().cloned().collect();
 
-    for agent_id in agent_ids {
+    for system_id in system_ids {
         // Drain all events from this reverie's stream
-        let events: Vec<StreamEvent> = match app.reverie_streams.get(&agent_id) {
+        let events: Vec<StreamEvent> = match app.reverie_streams.get(&system_id) {
             Some(s) => s.rx.try_iter().collect(),
             None => continue,
         };
 
         for evt in events {
             app.state.flags.ui.dirty = true;
-            if apply_reverie_event(app, &agent_id, evt) {
+            if apply_reverie_event(app, &system_id, evt) {
                 break; // This agent's stream is gone, move to next
             }
         }
     }
 }
 
-/// Apply one drained reverie stream event to `agent_id`'s state. Returns `true`
+/// Apply one drained reverie stream event to `system_id`'s state. Returns `true`
 /// when the agent's session was destroyed (caller must stop draining it).
-fn apply_reverie_event(app: &mut App, agent_id: &str, evt: StreamEvent) -> bool {
+fn apply_reverie_event(app: &mut App, system_id: &str, evt: StreamEvent) -> bool {
     // `if let` chain (not an exhaustive match) so StreamEvent stays #[non_exhaustive].
     // Reveries run in the background — a ToolProgress event has no UI preview, so it
     // falls through to the trailing no-op else with every future variant.
     if let StreamEvent::Chunk(text) = evt {
-        append_reverie_chunk(app, agent_id, &text);
+        append_reverie_chunk(app, system_id, &text);
     } else if let StreamEvent::ToolUse(tool) = evt {
         // Nested (not a `&&` let-chain): a chain would partially move `tool` out of
         // `evt` even when `get_mut` fails, poisoning the later `= evt` arms (E0382).
-        if let Some(stream) = app.reverie_streams.get_mut(agent_id) {
+        if let Some(stream) = app.reverie_streams.get_mut(system_id) {
             stream.pending_tools.push(tool);
         }
     } else if let StreamEvent::Done { .. } = evt
-        && let Some(rev) = app.state.reveries.get_mut(agent_id)
+        && let Some(rev) = app.state.reveries.get_mut(system_id)
     {
         if let Some(msg) = rev.messages.last_mut() {
             msg.status = crate::state::MsgStatus::Full;
         }
         rev.is_streaming = false;
     } else if let StreamEvent::Error(e) = evt {
-        destroy_reverie_on_error(app, agent_id, &e);
+        destroy_reverie_on_error(app, system_id, &e);
         return true;
     } else {
         // ToolProgress (no background preview) + future non_exhaustive variants.
@@ -85,8 +85,8 @@ fn apply_reverie_event(app: &mut App, agent_id: &str, evt: StreamEvent) -> bool 
 
 /// Append a streamed text chunk to the reverie's trailing assistant message,
 /// opening a fresh assistant message when none is in progress.
-fn append_reverie_chunk(app: &mut App, agent_id: &str, text: &str) {
-    let Some(rev) = app.state.reveries.get_mut(agent_id) else { return };
+fn append_reverie_chunk(app: &mut App, system_id: &str, text: &str) {
+    let Some(rev) = app.state.reveries.get_mut(system_id) else { return };
     if rev.messages.last().is_none_or(|m| m.role != "assistant") {
         rev.messages.push(crate::state::Message::new_text(
             format!("rev-{}", rev.messages.len()),
@@ -101,37 +101,37 @@ fn append_reverie_chunk(app: &mut App, agent_id: &str, text: &str) {
 
 /// A reverie stream errored: notify, discard its queued actions, destroy the
 /// agent's session (non-critical — reveries are best-effort).
-fn destroy_reverie_on_error(app: &mut App, agent_id: &str, err: &str) {
-    let session = app.state.reveries.get(agent_id);
-    let tid = session.and_then(|r| r.thread_id.clone());
-    let label = session.map_or_else(|| agent_id.to_owned(), |r| r.agent_id.clone());
+fn destroy_reverie_on_error(app: &mut App, system_id: &str, err: &str) {
+    let session = app.state.reveries.get(system_id);
+    let tid = session.and_then(|r| r.agent_id.clone());
+    let label = session.map_or_else(|| system_id.to_owned(), |r| r.system_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
         format!("Reverie '{label}' error: {err}. Destroying session."),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
-    drop(app.state.reveries.remove(agent_id));
-    drop(app.reverie_streams.remove(agent_id));
+    drop(app.state.reveries.remove(system_id));
+    drop(app.reverie_streams.remove(system_id));
 }
 
 /// Execute pending reverie tool calls for all active reveries.
 /// Called from the main event loop, AFTER main tools are processed.
 pub(super) fn handle_reverie_tools(app: &mut App) {
     let _fg = cp_base::flame!("reverie_tools");
-    // Collect agent_ids that have pending tools
-    let agent_ids: Vec<String> = app
+    // Collect system_ids that have pending tools
+    let system_ids: Vec<String> = app
         .reverie_streams
         .iter()
         .filter(|entry| !entry.1.pending_tools.is_empty())
         .map(|(id, _)| id.clone())
         .collect();
 
-    for agent_id in agent_ids {
+    for system_id in system_ids {
         // Take pending tools from the stream state
-        let pending = match app.reverie_streams.get_mut(&agent_id) {
+        let pending = match app.reverie_streams.get_mut(&system_id) {
             Some(s) => std::mem::take(&mut s.pending_tools),
             None => continue,
         };
@@ -140,46 +140,46 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
 
         for tool in &pending {
             // Increment tool call count
-            if let Some(rev) = app.state.reveries.get_mut(&agent_id) {
+            if let Some(rev) = app.state.reveries.get_mut(&system_id) {
                 rev.tool_call_count = rev.tool_call_count.saturating_add(1);
             }
 
-            if reverie_over_tool_cap(app, &agent_id) {
+            if reverie_over_tool_cap(app, &system_id) {
                 break; // Move to next agent
             }
 
-            let Some(result) = dispatch_one_reverie_tool(app, &agent_id, tool) else {
+            let Some(result) = dispatch_one_reverie_tool(app, &system_id, tool) else {
                 break; // Report / destroy sentinel — agent gone, move on
             };
 
-            record_reverie_tool_exchange(app, &agent_id, tool, &result);
+            record_reverie_tool_exchange(app, &system_id, tool, &result);
             tool_results.push(result);
         }
 
-        restream_reverie_if_alive(app, &agent_id, &tool_results);
+        restream_reverie_if_alive(app, &system_id, &tool_results);
     }
 }
 
 /// Guard rail: if the agent exceeded `REVERIE_TOOL_CAP`, notify, clear its queue,
 /// and destroy the session. Returns `true` when force-stopped.
-fn reverie_over_tool_cap(app: &mut App, agent_id: &str) -> bool {
+fn reverie_over_tool_cap(app: &mut App, system_id: &str) -> bool {
     let cap = crate::infra::constants::REVERIE_TOOL_CAP;
-    if app.state.reveries.get(agent_id).is_none_or(|r| r.tool_call_count <= cap) {
+    if app.state.reveries.get(system_id).is_none_or(|r| r.tool_call_count <= cap) {
         return false;
     }
-    let session = app.state.reveries.get(agent_id);
-    let tid = session.and_then(|r| r.thread_id.clone());
-    let label = session.map_or_else(|| agent_id.to_owned(), |r| r.agent_id.clone());
+    let session = app.state.reveries.get(system_id);
+    let tid = session.and_then(|r| r.agent_id.clone());
+    let label = session.map_or_else(|| system_id.to_owned(), |r| r.system_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
         format!("Tool cap ({cap}) reached for '{label}'. Force-stopping."),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
     QueueState::get_mut(&mut app.state).clear();
-    drop(app.state.reveries.remove(agent_id));
-    drop(app.reverie_streams.remove(agent_id));
+    drop(app.state.reveries.remove(system_id));
+    drop(app.reverie_streams.remove(system_id));
     true
 }
 
@@ -189,7 +189,7 @@ fn reverie_over_tool_cap(app: &mut App, agent_id: &str) -> bool {
 /// everything else is either queued (reverie queue active) or dispatched.
 fn dispatch_one_reverie_tool(
     app: &mut App,
-    agent_id: &str,
+    system_id: &str,
     tool: &cp_base::tools::ToolUse,
 ) -> Option<crate::infra::tools::ToolResult> {
     if tool.name == "Queue_execute" {
@@ -197,7 +197,7 @@ fn dispatch_one_reverie_tool(
         return Some(super::tools::queue_flush::execute_queue_flush(tool, &mut app.state).0);
     }
     if tool.name == "Queue_pause" {
-        if let Some(rev) = app.state.reveries.get_mut(agent_id) {
+        if let Some(rev) = app.state.reveries.get_mut(system_id) {
             rev.queue_active = false;
         }
         return Some(crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue paused (reverie)".into(), false));
@@ -206,7 +206,7 @@ fn dispatch_one_reverie_tool(
     if let Some(result) = tools::dispatch_reverie_tool(tool, &app.state) {
         // Check for Report sentinel
         if result.content.starts_with("REVERIE_REPORT:") {
-            destroy_reverie_on_report(app, agent_id, &result.content);
+            destroy_reverie_on_report(app, system_id, &result.content);
             return None;
         }
         return Some(result);
@@ -214,7 +214,7 @@ fn dispatch_one_reverie_tool(
 
     // Tool is allowed — check if reverie queue is active
     let should_queue =
-        app.state.reveries.get(agent_id).is_some_and(|r| r.queue_active) && !QueueState::is_queue_tool(&tool.name);
+        app.state.reveries.get(system_id).is_some_and(|r| r.queue_active) && !QueueState::is_queue_tool(&tool.name);
     if should_queue {
         let qs = QueueState::get_mut(&mut app.state);
         let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall::new(
@@ -231,35 +231,35 @@ fn dispatch_one_reverie_tool(
 
 /// Handle a `REVERIE_REPORT:` sentinel: emit the summary notification, mark the
 /// stream reported, clear its queued actions, and destroy the session.
-fn destroy_reverie_on_report(app: &mut App, agent_id: &str, content: &str) {
+fn destroy_reverie_on_report(app: &mut App, system_id: &str, content: &str) {
     let summary = content.strip_prefix("REVERIE_REPORT:").unwrap_or("Completed");
-    let tid = app.state.reveries.get(agent_id).and_then(|r| r.thread_id.clone());
+    let tid = app.state.reveries.get(system_id).and_then(|r| r.agent_id.clone());
     let nid = cp_mod_spine::types::SpineState::create_notification(
         &mut app.state,
         cp_mod_spine::types::NotificationType::Custom,
         "Reverie".to_owned(),
         summary.to_owned(),
     );
-    cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
-    if let Some(stream) = app.reverie_streams.get_mut(agent_id) {
+    cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
+    if let Some(stream) = app.reverie_streams.get_mut(system_id) {
         stream.report_called = true;
     }
     // Clear queued actions from this reverie (shared queue) but do NOT touch
     // QueueState.active — that's the main worker's toggle.
     QueueState::get_mut(&mut app.state).clear();
-    drop(app.state.reveries.remove(agent_id));
-    drop(app.reverie_streams.remove(agent_id));
+    drop(app.state.reveries.remove(system_id));
+    drop(app.reverie_streams.remove(system_id));
     save_state(&app.state);
 }
 
 /// Record a reverie tool call + its result as a `ToolCall`/`ToolResult` message pair.
 fn record_reverie_tool_exchange(
     app: &mut App,
-    agent_id: &str,
+    system_id: &str,
     tool: &cp_base::tools::ToolUse,
     result: &crate::infra::tools::ToolResult,
 ) {
-    let Some(rev) = app.state.reveries.get_mut(agent_id) else { return };
+    let Some(rev) = app.state.reveries.get_mut(system_id) else { return };
     rev.messages.push(crate::state::Message::new_tool_call(
         format!("rev-tc-{}", rev.messages.len()),
         None,
@@ -279,11 +279,11 @@ fn record_reverie_tool_exchange(
 
 /// After executing a batch of reverie tools, re-stream the agent if it's still
 /// alive (trims trailing whitespace, flips `is_streaming`, spawns a fresh stream).
-fn restream_reverie_if_alive(app: &mut App, agent_id: &str, tool_results: &[crate::infra::tools::ToolResult]) {
-    if tool_results.is_empty() || !app.state.reveries.contains_key(agent_id) {
+fn restream_reverie_if_alive(app: &mut App, system_id: &str, tool_results: &[crate::infra::tools::ToolResult]) {
+    if tool_results.is_empty() || !app.state.reveries.contains_key(system_id) {
         return;
     }
-    if let Some(rev) = app.state.reveries.get_mut(agent_id) {
+    if let Some(rev) = app.state.reveries.get_mut(system_id) {
         for msg in &mut rev.messages {
             if msg.role == "assistant" {
                 msg.content = msg.content.trim_end().to_owned();
@@ -292,9 +292,9 @@ fn restream_reverie_if_alive(app: &mut App, agent_id: &str, tool_results: &[crat
         rev.is_streaming = true;
     }
     let (tx, rx) = mpsc::channel();
-    streaming::start_reverie_stream(&mut app.state, agent_id, tx);
+    streaming::start_reverie_stream(&mut app.state, system_id, tx);
     let _r = app.reverie_streams.insert(
-        agent_id.to_owned(),
+        system_id.to_owned(),
         super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false },
     );
 }
@@ -302,39 +302,39 @@ fn restream_reverie_if_alive(app: &mut App, agent_id: &str, tool_results: &[crat
 /// Check if any reverie ended without calling Report.
 /// If so, inject a user message telling it to call Report, then re-stream.
 pub(super) fn check_reverie_end_turn(app: &mut App) {
-    // Collect agent_ids of reveries that have stopped streaming
+    // Collect system_ids of reveries that have stopped streaming
     let stopped: Vec<String> =
         app.state.reveries.iter().filter(|entry| !entry.1.is_streaming).map(|(id, _)| id.clone()).collect();
 
-    for agent_id in stopped {
-        let report_called = app.reverie_streams.get(&agent_id).is_some_and(|s| s.report_called);
+    for system_id in stopped {
+        let report_called = app.reverie_streams.get(&system_id).is_some_and(|s| s.report_called);
 
         if report_called {
             continue; // All good
         }
 
         // End turn without Report — check retry limit
-        let retries = app.state.reveries.get(&agent_id).map_or(0, |r| r.report_retries);
+        let retries = app.state.reveries.get(&system_id).map_or(0, |r| r.report_retries);
         if retries >= 1 {
             // Max retries reached — force destroy
-            let session = app.state.reveries.get(&agent_id);
-            let tid = session.and_then(|r| r.thread_id.clone());
-            let label = session.map_or_else(|| agent_id.clone(), |r| r.agent_id.clone());
+            let session = app.state.reveries.get(&system_id);
+            let tid = session.and_then(|r| r.agent_id.clone());
+            let label = session.map_or_else(|| system_id.clone(), |r| r.system_id.clone());
             let nid = cp_mod_spine::types::SpineState::create_notification(
                 &mut app.state,
                 cp_mod_spine::types::NotificationType::Custom,
                 "Reverie".to_owned(),
                 format!("Reverie '{label}' ended without Report after retry. Force-destroying."),
             );
-            cp_mod_spine::types::SpineState::set_notification_thread(&mut app.state, &nid, tid);
+            cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
             QueueState::get_mut(&mut app.state).clear();
-            drop(app.state.reveries.remove(&agent_id));
-            drop(app.reverie_streams.remove(&agent_id));
+            drop(app.state.reveries.remove(&system_id));
+            drop(app.reverie_streams.remove(&system_id));
             continue;
         }
 
         // Inject a user message telling the LLM to call Report, then re-stream
-        if let Some(rev) = app.state.reveries.get_mut(&agent_id) {
+        if let Some(rev) = app.state.reveries.get_mut(&system_id) {
             rev.report_retries = rev.report_retries.saturating_add(1);
             rev.is_streaming = true;
 
@@ -352,9 +352,9 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
         }
 
         let (tx, rx) = mpsc::channel();
-        streaming::start_reverie_stream(&mut app.state, &agent_id, tx);
+        streaming::start_reverie_stream(&mut app.state, &system_id, tx);
         let _r = app
             .reverie_streams
-            .insert(agent_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
+            .insert(system_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
     }
 }

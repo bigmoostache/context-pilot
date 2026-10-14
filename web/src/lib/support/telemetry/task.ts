@@ -1,7 +1,7 @@
 // ── Named block-timing (the stall ATTRIBUTION layer) ─────────────────
 //
 // The rAF stall watchdog (./stall) is universal but ANONYMOUS — it reports that
-// the main thread was blocked for N ms, not *what* blocked it. On Chromium the
+// the main agent was blocked for N ms, not *what* blocked it. On Chromium the
 // Long Animation Frames API names the culprit script for free; Firefox/Safari
 // have no such API, so a multi-second freeze there is a nameless gap.
 //
@@ -10,7 +10,7 @@
 // records a labelled {@link TaskEvent} when the block crosses the threshold. If
 // the freeze lives in an instrumented path, the HUD then shows a named entry
 // (e.g. `sse:apply 7900ms`) right beside the anonymous stall — turning "the
-// main thread blocked for 8 s" into "*this* path blocked for 8 s", on every
+// main agent blocked for 8 s" into "*this* path blocked for 8 s", on every
 // browser.
 
 import { record } from "./store"
@@ -41,11 +41,11 @@ export function measure<T>(label: string, fn: () => T): T {
  * records a {@link TaskEvent} for every call.
  *
  * A span includes any network wait, so on a REMOTE endpoint this over-reports
- * (the wait isn't a main-thread block). But the cockpit talks to a same-origin
+ * (the wait isn't a main-agent block). But the cockpit talks to a same-origin
  * orchestrator on `127.0.0.1` where round-trips are sub-millisecond, so a
  * multi-second `load:*` span is overwhelmingly the SYNCHRONOUS `res.json()`
- * deserialize + reshape of the payload — i.e. real main-thread cost. Correlate
- * a `load:*` entry with a same-timestamp main-thread block to name which polled
+ * deserialize + reshape of the payload — i.e. real main-agent cost. Correlate
+ * a `load:*` entry with a same-timestamp main-agent block to name which polled
  * endpoint's parse burned the freeze.
  */
 export async function measureAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {

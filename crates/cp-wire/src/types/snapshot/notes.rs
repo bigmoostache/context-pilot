@@ -1,11 +1,11 @@
 //! Thread-owned scratchpad-note projection type — the read-only shape the web
-//! thread view renders in its Notes aside.
+//! agent view renders in its Notes aside.
 //!
 //! Defined here in the I/O-free protocol crate rather than imported from
 //! `cp-mod-scratchpad` to keep the layering one-directional (modules depend on
 //! the wire, never the reverse), exactly like [`WireTask`](super::todo::WireTask).
-//! Carried on the owning thread's
-//! [`RosterThread::notes`](super::RosterThread::notes) and replaced wholesale by
+//! Carried on the owning agent's
+//! [`RosterAgent::notes`](super::RosterAgent::notes) and replaced wholesale by
 //! each [`NotesChanged`](super::super::oplog::OpEntryKind::NotesChanged) delta
 //! (whole-list snapshot semantics — the twin of `TaskListChanged`).
 //!
@@ -19,10 +19,10 @@
 use serde::{Deserialize, Serialize};
 
 /// One thread-owned scratchpad cell as projected onto the wire — the read-only
-/// shape the web thread view renders in its Notes aside.
+/// shape the web agent view renders in its Notes aside.
 ///
-/// A flat list carried on the owning thread's
-/// [`RosterThread::notes`](super::RosterThread::notes); the frontend renders it
+/// A flat list carried on the owning agent's
+/// [`RosterAgent::notes`](super::RosterAgent::notes); the frontend renders it
 /// as a list that expands on click to show [`content`](Self::content) (the Files
 /// tab interaction pattern).
 ///

@@ -199,9 +199,9 @@ mod tests {
     use cp_wire::types::ContentHash;
     use tempfile::tempdir;
 
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,

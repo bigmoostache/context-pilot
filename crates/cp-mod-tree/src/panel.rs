@@ -7,7 +7,7 @@ use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens}
 use cp_base::state::runtime::State;
 use cp_base::ui::{find_children_pattern, find_size_pattern};
 
-use crate::types::TreeState;
+use crate::types::{TreeState, TreeView};
 use cp_base::panels::scroll_key_action;
 
 /// Data payload sent to the background cache worker for tree generation.
@@ -16,12 +16,14 @@ pub(crate) struct TreeCacheRequest {
     pub filter: String,
     /// Paths of currently expanded folders.
     pub open_folders: Vec<String>,
-    /// File/folder description annotations.
-    pub descriptions: Vec<crate::types::TreeFileDescription>,
+    /// File/folder description annotations, shared with `TreeState` (O(1) clone).
+    pub descriptions: std::sync::Arc<crate::types::Descriptions>,
+    /// Directory to render: the executing agent's workdir.
+    pub root: std::path::PathBuf,
 }
 
 /// Worker output: rendered tree plus the stale-description swaps the main
-/// thread must replay onto `TreeState`.
+/// agent must replay onto `TreeState`.
 struct TreeCacheResult {
     /// Rendered tree text.
     content: String,
@@ -47,6 +49,7 @@ impl Panel for TreePanel {
         use cp_render::{Block, Semantic, Span as S};
 
         let tree_content = state
+            .agent()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::TREE)
@@ -98,8 +101,9 @@ impl Panel for TreePanel {
             Kind::new(Kind::TREE),
             Box::new(TreeCacheRequest {
                 filter: ts.filter.clone(),
-                open_folders: ts.open_folders.clone(),
-                descriptions: ts.descriptions.clone(),
+                open_folders: TreeView::get(state).open_folders.clone(),
+                descriptions: std::sync::Arc::clone(&ts.descriptions),
+                root: state.workdir(),
             }),
         ))
     }
@@ -116,7 +120,13 @@ impl Panel for TreePanel {
 
         // Stale descriptions were refreshed from the YAML on the worker thread
         // (and already rendered into `content`); only replay the swaps here.
-        let refreshed = crate::storage::apply_patches(&mut TreeState::get_mut(state).descriptions, patches);
+        // `get_mut` bumps the save stamp; with no patches it would re-save the
+        // whole tree for nothing on every refresh.
+        let refreshed = !patches.is_empty()
+            && crate::storage::apply_patches(
+                std::sync::Arc::make_mut(&mut TreeState::get_mut(state).descriptions).as_mut_slice(),
+                patches,
+            );
 
         // Check if content actually changed before updating
         if !refreshed && !cp_base::panels::update_if_changed(ctx, &content) && ctx.cached_content.is_some() {
@@ -136,10 +146,19 @@ impl Panel for TreePanel {
 
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<TreeCacheRequest>().ok()?;
-        let TreeCacheRequest { filter, open_folders, mut descriptions } = *req;
-        // YAML parse + per-file hashing happen here, off the main thread.
-        let patches = crate::storage::refresh_stale_from_yaml(&mut descriptions);
-        let content = crate::render::generate_tree_string(&filter, &open_folders, &descriptions);
+        let TreeCacheRequest { filter, open_folders, descriptions, root } = *req;
+        // YAML parse + per-file hashing happen here, off the main thread. The
+        // shared list is copied only when a stale entry needs patching.
+        let patches = crate::storage::refresh_stale_from_yaml(&descriptions);
+        let content = if patches.is_empty() {
+            crate::render::generate_tree_string(&root, &filter, &open_folders, &descriptions)
+        } else {
+            let mut refreshed = (*descriptions).clone();
+            // Patches were computed from this very snapshot, so all apply.
+            let applied = crate::storage::apply_patches(&mut refreshed, patches.clone());
+            debug_assert!(applied, "worker patches must match their own snapshot");
+            crate::render::generate_tree_string(&root, &filter, &open_folders, &refreshed)
+        };
         let token_count = estimate_tokens(&content);
         Some(CacheUpdate::ModuleSpecific {
             context_type: Kind::new(Kind::TREE),
@@ -153,7 +172,7 @@ impl Panel for TreePanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         // Find tree context and use cached content
-        for ctx in &state.context {
+        for ctx in &state.agent().context {
             if ctx.context_type.as_str() == Kind::TREE {
                 if let Some(content) = ctx.cached_content.as_ref()
                     && !content.is_empty()

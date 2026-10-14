@@ -9,11 +9,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useLibrary, sendCommand, useDeleteLibraryAgent } from "@/lib/live"
-import { fetchLibraryAgent } from "@/lib/api"
+import { useLibrary, sendCommand, useDeleteLibrarySystem } from "@/lib/live"
+import { fetchLibrarySystem } from "@/lib/api"
 import { Tip } from "@/components/ui/tip"
 import type { LibraryItem } from "@/lib/types"
-import { AgentEditorDialog, type AgentEditorMode } from "./AgentEditorDialog"
+import { SystemEditorDialog, type SystemEditorMode } from "./SystemEditor"
 
 /**
  * Dropdown-row highlight — TEXT-COLOUR ONLY (T635). Hover/keyboard focus
@@ -30,11 +30,11 @@ type EditorState =
   | { open: false }
   | {
       open: true
-      mode: AgentEditorMode
+      mode: SystemEditorMode
       initial?: { name: string; description: string; body: string }
     }
 
-// ── Behaviour-agent `.md` frontmatter parser (Import preview) ─────────
+// ── Behaviour-system `.md` frontmatter parser (Import preview) ─────────
 //
 // A light client-side mirror of the orchestrator's frontmatter parser (which
 // re-validates authoritatively on save, M141). Previews a picked `.md`'s
@@ -62,7 +62,7 @@ function stripLeading(text: string): string {
  * preview. Returns `null` when the frontmatter block is missing or has no
  * `name:` (so the caller can reject the file before opening the editor).
  */
-function parseAgentMd(text: string): { name: string; description: string; body: string } | null {
+function parseSystemMd(text: string): { name: string; description: string; body: string } | null {
   const trimmed = stripLeading(text)
   if (!trimmed.startsWith("---")) return null
 
@@ -91,38 +91,38 @@ function parseAgentMd(text: string): { name: string; description: string; body: 
 }
 
 /**
- * Active-behaviour-agent chip + selector — right of the footer "Ready" indicator
- * (T581). Shows the loaded system-prompt agent's name and, on click, a dropdown
+ * Active-behaviour-system chip + selector — right of the footer "Ready" indicator
+ * (T581). Shows the loaded system's name and, on click, a dropdown
  * to switch it, edit/export/delete each entry, and create/import new ones.
  *
- * Switching issues a `load_behaviour` command down the SAME live path threads
- * use (`sendCommand → POST /command → apply_command → set_active_agent`); the
+ * Switching issues a `load_behaviour` command down the SAME live path agents
+ * use (`sendCommand → POST /command → apply_command → set_active_system`); the
  * active flag comes back through the library query's `behaviour_changed` fold.
  * Editing/creating/importing all converge on the backend's authoritative
- * `PUT …/library/agent/{itemId}` upsert (M141) — this component only renders +
+ * `PUT …/library/system/{itemId}` upsert (M141) — this component only renders +
  * calls. Delete is hidden for pure built-ins (no on-disk `.md` to remove).
  */
-export function BehaviourChip({ agentId }: { agentId: string }) {
-  const { data: library = [] } = useLibrary(agentId)
-  const agentBehaviours = library.filter((item) => item.kind === "agent")
-  const active = agentBehaviours.find((item) => item.active)
+export function BehaviourChip({ fleetId }: { fleetId: string }) {
+  const { data: library = [] } = useLibrary(fleetId)
+  const systemBehaviours = library.filter((item) => item.kind === "system")
+  const active = systemBehaviours.find((item) => item.active)
   const activeName = active?.name ?? "default"
 
   const [editor, setEditor] = useState<EditorState>({ open: false })
-  const del = useDeleteLibraryAgent(agentId)
+  const del = useDeleteLibrarySystem(fleetId)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const select = (id: string) => {
     if (id === active?.id) return
-    void sendCommand(agentId, { kind: "load_behaviour", id }).catch(() => {
+    void sendCommand(fleetId, { kind: "load_behaviour", id }).catch(() => {
       // Fire-and-forget: a failed switch keeps the current behaviour; the
       // library query re-reports ground truth on its next fold/poll.
     })
   }
 
   // Export = fetch the raw `.md` (disk file or built-in seed) and download it.
-  const exportAgent = (item: LibraryItem) => {
-    void fetchLibraryAgent(agentId, item.id)
+  const exportSystem = (item: LibraryItem) => {
+    void fetchLibrarySystem(fleetId, item.id)
       .then((raw) => {
         const md = `---\nname: ${raw.name}\ndescription: ${raw.description}\n---\n${raw.body}\n`
         const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }))
@@ -144,7 +144,7 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
     e.target.value = "" // allow re-picking the same file
     if (!file) return
     void file.text().then((text) => {
-      const parsed = parseAgentMd(text)
+      const parsed = parseSystemMd(text)
       if (!parsed) {
         window.alert("That .md has no valid frontmatter (needs a `name:` field).")
         return
@@ -174,19 +174,19 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
               onClick={() => setEditor({ open: true, mode: { kind: "create" } })}
             >
               <span className="flex items-center gap-2 text-foreground/80 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-                <Plus className="size-3.5 text-muted-foreground/70" /> Create agent
+                <Plus className="size-3.5 text-muted-foreground/70" /> Create system
               </span>
             </DropdownMenuItem>
             <DropdownMenuItem className={ROW_HILITE} onClick={() => fileInputRef.current?.click()}>
               <span className="flex items-center gap-2 text-foreground/80 group-focus/dropdown-menu-item:text-foreground! group-data-highlighted/dropdown-menu-item:text-foreground!">
-                <Upload className="size-3.5 text-muted-foreground/70" /> Import agent
+                <Upload className="size-3.5 text-muted-foreground/70" /> Import system
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {agentBehaviours.length === 0 ? (
+            {systemBehaviours.length === 0 ? (
               <DropdownMenuItem disabled>No behaviours</DropdownMenuItem>
             ) : (
-              agentBehaviours.map((item) => (
+              systemBehaviours.map((item) => (
                 <BehaviourRow
                   key={item.id}
                   item={item}
@@ -197,7 +197,7 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
                       mode: { kind: "edit", itemId: item.id, builtin: item.builtin === true },
                     })
                   }
-                  onExport={() => exportAgent(item)}
+                  onExport={() => exportSystem(item)}
                   onDelete={() => del.mutate(item.id)}
                 />
               ))
@@ -215,10 +215,10 @@ export function BehaviourChip({ agentId }: { agentId: string }) {
       />
 
       {editor.open && (
-        <AgentEditorDialog
+        <SystemEditorDialog
           open
           onClose={() => setEditor({ open: false })}
-          agentId={agentId}
+          fleetId={fleetId}
           mode={editor.mode}
           initial={editor.initial}
         />
@@ -264,7 +264,7 @@ function BehaviourRow({
   // hide Delete. The list marks `builtin: true` for BOTH a pure built-in and a
   // local override of one — but an override also carries a real on-disk name, so
   // it is indistinguishable here. We therefore hide Delete only for built-ins;
-  // user agents always show it. (Backstop: the backend 404s a fileless delete.)
+  // user systems always show it. (Backstop: the backend 404s a fileless delete.)
   const showDelete = item.builtin !== true
 
   // The label's classes must carry the text-only hover highlight (T635), so
@@ -292,7 +292,7 @@ function BehaviourRow({
         item.active ? "font-semibold text-foreground" : "text-foreground/70"
       }`}
     >
-      {/* The agent's description as the app's styled Tip (T635 revision — was a
+      {/* The system's description as the app's styled Tip (T635 revision — was a
           native `title`). `side="right"` keeps the popup clear of the rows
           stacked below it. Tip renders its trigger as a plain <span> and opens
           on hover, so it coexists with base-ui's menu roving-focus + typeahead;

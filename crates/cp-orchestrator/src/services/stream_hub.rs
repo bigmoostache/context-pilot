@@ -114,7 +114,7 @@ impl Subscriber {
 /// Fan-out registry: per-agent subscribers, each independently bounded.
 #[derive(Debug)]
 pub struct StreamHub {
-    /// Subscribers grouped by `agent_id`.
+    /// Subscribers grouped by `fleet_id`.
     agents: HashMap<String, Vec<Subscriber>>,
 
     /// Monotonic id source for new subscribers.
@@ -131,35 +131,35 @@ impl StreamHub {
         Self { agents: HashMap::new(), next_id: 0, sub_capacity }
     }
 
-    /// Register a new subscriber for `agent_id`, returning its id.
-    pub fn subscribe(&mut self, agent_id: &str) -> u64 {
+    /// Register a new subscriber for `fleet_id`, returning its id.
+    pub fn subscribe(&mut self, fleet_id: &str) -> u64 {
         let id = self.next_id;
         self.next_id = self.next_id.saturating_add(1);
-        self.agents.entry(agent_id.to_owned()).or_default().push(Subscriber::new(id, self.sub_capacity));
+        self.agents.entry(fleet_id.to_owned()).or_default().push(Subscriber::new(id, self.sub_capacity));
         id
     }
 
     /// Remove a subscriber. Returns `true` if it was present.
-    pub fn unsubscribe(&mut self, agent_id: &str, sub_id: u64) -> bool {
-        let Some(subs) = self.agents.get_mut(agent_id) else {
+    pub fn unsubscribe(&mut self, fleet_id: &str, sub_id: u64) -> bool {
+        let Some(subs) = self.agents.get_mut(fleet_id) else {
             return false;
         };
         let before = subs.len();
         subs.retain(|s| s.id != sub_id);
         let removed = subs.len() != before;
         if subs.is_empty() {
-            let _gone = self.agents.remove(agent_id);
+            let _gone = self.agents.remove(fleet_id);
         }
         removed
     }
 
-    /// Fan a frame out to every subscriber of `agent_id`.
+    /// Fan a frame out to every subscriber of `fleet_id`.
     ///
     /// Returns the number of subscribers that admitted it without loss. A frame
     /// for an agent with no subscribers is silently discarded (a late
     /// subscriber sees live frames, not a backlog).
-    pub fn publish(&mut self, agent_id: &str, frame: &Frame) -> usize {
-        let Some(subs) = self.agents.get_mut(agent_id) else {
+    pub fn publish(&mut self, fleet_id: &str, frame: &Frame) -> usize {
+        let Some(subs) = self.agents.get_mut(fleet_id) else {
             return 0;
         };
         let mut clean: usize = 0;
@@ -174,32 +174,32 @@ impl StreamHub {
     /// Drain a subscriber's buffered frames.
     ///
     /// Returns `None` if no such subscriber exists.
-    pub fn drain(&mut self, agent_id: &str, sub_id: u64) -> Option<Vec<Frame>> {
-        self.subscriber_mut(agent_id, sub_id).map(Subscriber::drain)
+    pub fn drain(&mut self, fleet_id: &str, sub_id: u64) -> Option<Vec<Frame>> {
+        self.subscriber_mut(fleet_id, sub_id).map(Subscriber::drain)
     }
 
     /// Inspect a subscriber (degraded flag, dropped count, buffered len).
     #[must_use]
-    pub fn subscriber(&self, agent_id: &str, sub_id: u64) -> Option<&Subscriber> {
-        self.agents.get(agent_id)?.iter().find(|s| s.id == sub_id)
+    pub fn subscriber(&self, fleet_id: &str, sub_id: u64) -> Option<&Subscriber> {
+        self.agents.get(fleet_id)?.iter().find(|s| s.id == sub_id)
     }
 
     /// Clear a subscriber's degraded state after delivering a snapshot resync.
     /// Returns `true` if the subscriber was found.
-    pub fn mark_reconciled(&mut self, agent_id: &str, sub_id: u64) -> bool {
-        self.subscriber_mut(agent_id, sub_id).is_some_and(|sub| {
+    pub fn mark_reconciled(&mut self, fleet_id: &str, sub_id: u64) -> bool {
+        self.subscriber_mut(fleet_id, sub_id).is_some_and(|sub| {
             sub.mark_reconciled();
             true
         })
     }
 
-    /// Number of subscribers attached to `agent_id`.
+    /// Number of subscribers attached to `fleet_id`.
     #[must_use]
-    pub fn subscriber_count(&self, agent_id: &str) -> usize {
-        self.agents.get(agent_id).map_or(0, Vec::len)
+    pub fn subscriber_count(&self, fleet_id: &str) -> usize {
+        self.agents.get(fleet_id).map_or(0, Vec::len)
     }
 
-    /// Aggregate stream health for `agent_id` (design doc §19 observability):
+    /// Aggregate stream health for `fleet_id` (design doc §19 observability):
     /// `(subscriber_count, total_dropped_frames, any_degraded)`.
     ///
     /// Sums the per-subscriber dropped counters and ORs their degraded flags so
@@ -208,8 +208,8 @@ impl StreamHub {
     /// walking subscribers itself. Returns `(0, 0, false)` for an agent with no
     /// subscribers.
     #[must_use]
-    pub fn agent_stream_health(&self, agent_id: &str) -> (usize, u64, bool) {
-        self.agents.get(agent_id).map_or((0, 0, false), |subs| {
+    pub fn agent_stream_health(&self, fleet_id: &str) -> (usize, u64, bool) {
+        self.agents.get(fleet_id).map_or((0, 0, false), |subs| {
             subs.iter().fold((0, 0, false), |(n, dropped, degraded), s| {
                 (n.saturating_add(1), dropped.saturating_add(s.dropped_count()), degraded || s.is_degraded())
             })
@@ -217,8 +217,8 @@ impl StreamHub {
     }
 
     /// Mutable subscriber lookup (private helper).
-    fn subscriber_mut(&mut self, agent_id: &str, sub_id: u64) -> Option<&mut Subscriber> {
-        self.agents.get_mut(agent_id)?.iter_mut().find(|s| s.id == sub_id)
+    fn subscriber_mut(&mut self, fleet_id: &str, sub_id: u64) -> Option<&mut Subscriber> {
+        self.agents.get_mut(fleet_id)?.iter_mut().find(|s| s.id == sub_id)
     }
 }
 
@@ -231,9 +231,9 @@ mod tests {
     fn token(seq: u64, text: &str) -> Frame {
         Frame {
             schema_version: 1,
-            agent_id: "a1".into(),
+            fleet_id: "a1".into(),
             worker_id: "w0".into(),
-            thread_id: "T1".into(),
+            agent_id: "T1".into(),
             message_id: "m1".into(),
             seq,
             kind: Kind::Token { text: text.to_owned() },

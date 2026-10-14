@@ -15,25 +15,25 @@
 //! segment reconstructs its complete heads — so rebuilding the whole view costs
 //! one short replay per agent, independent of total oplog size on disk. The
 //! fold here is what makes that guarantee real at the view layer: see
-//! [`AgentView::apply`].
+//! [`FleetView::apply`].
 
 use std::collections::HashMap;
 
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::snapshot::{Heads, RosterThread};
+use cp_wire::types::snapshot::{Heads, RosterAgent};
 use cp_wire::types::{LifecycleState, Phase};
 
-/// One thread's roster entry — the lightweight per-thread metadata the
-/// `/threads` endpoint serves directly from the view.
+/// One agent's roster entry — the lightweight per-agent metadata the
+/// `/agents` endpoint serves directly from the view.
 ///
-/// No tier-② disk read (design doc §16 journals thread create/archive/restore;
+/// No tier-② disk read (design doc §16 journals agent create/archive/restore;
 /// I5 keeps live reads off disk).
 ///
-/// This is [`cp_wire::types::snapshot::RosterThread`] — the *same* type the
+/// This is [`cp_wire::types::snapshot::RosterAgent`] — the *same* type the
 /// checkpoint carries — so a roster rebuilt by folding live deltas and one
 /// restored wholesale from a checkpoint are byte-identical, and the
-/// checkpoint-restore is a plain clone (see [`AgentView::apply`]).
-pub type RosterEntry = RosterThread;
+/// checkpoint-restore is a plain clone (see [`FleetView::apply`]).
+pub type RosterEntry = RosterAgent;
 
 /// The latest cumulative cost figures reported by an agent.
 ///
@@ -92,28 +92,35 @@ impl ContextSnapshot {
 /// One agent's current projected state.
 ///
 /// Folded from the agent's [`OpEntry`] stream; every field reflects the most
-/// recent relevant entry (heads accumulate per thread, the scalars are
+/// recent relevant entry (heads accumulate per agent, the scalars are
 /// latest-wins).
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
-pub struct AgentView {
+pub struct FleetView {
     /// Highest `rev` folded into this view so far.
     pub rev: u64,
 
     /// Per-thread / per-panel content heads as of `rev`.
     pub heads: Heads,
 
-    /// Thread roster — the live list `/threads` serves from (folded from the
+    /// Agent roster — the live list `/agents` serves from (folded from the
     /// thread-roster deltas; design doc I5).
     pub roster: Vec<RosterEntry>,
 
-    /// The thread the agent is currently *focused* on (actively working), or
+    /// Agents hard-deleted since this view started folding. The agent's disk
+    /// config flushes on a debounce, so `/agents` would otherwise re-serve a
+    /// deleted agent from the stale disk list; it drops these ids instead.
+    /// Cleared per id by a later `AgentCreated` of the same id.
+    pub deleted: std::collections::BTreeSet<String>,
+
+    /// The agent the agent is currently *focused* on (actively working), or
     /// `None` when focus is released. Folded latest-wins from
-    /// [`ThreadFocusChanged`](OpEntryKind::ThreadFocusChanged) — ephemeral,
+    /// [`AgentFocusChanged`](OpEntryKind::AgentFocusChanged) — ephemeral,
     /// disposable UI state (like [`phase`](Self::phase)): it is **not** carried
     /// in a checkpoint, so after a backend cold start it is `None` until the
-    /// agent emits its next focus change (the `/threads` handler falls back to
+    /// agent emits its next focus change (the `/agents` handler falls back to
     /// the agent's tier-② `FocusState` to cover that window).
-    pub focused_thread_id: Option<String>,
+    #[serde(alias = "focused_thread_id")]
+    pub focused_agent_id: Option<String>,
 
     /// Most recent execution phase, or `None` before any phase transition.
     pub phase: Option<Phase>,
@@ -131,18 +138,25 @@ pub struct AgentView {
     pub context: ContextSnapshot,
 }
 
-impl AgentView {
+impl FleetView {
+    /// Fold an `AgentCreated` (any other kind is ignored): lift a tombstone of
+    /// the same id, then insert-or-refresh the roster entry with its parent.
+    fn fold_created(&mut self, created: cp_wire::types::snapshot::AgentCreation<'_>) {
+        let _was_deleted = self.deleted.remove(created.agent_id);
+        RosterAgent::fold_created(&mut self.roster, created);
+    }
+
     /// Fold one oplog entry into this view, advancing `rev`.
     ///
     /// A [`Checkpoint`](OpEntryKind::Checkpoint) replaces the heads **and the
     /// roster** wholesale (authoritative reset, the mechanism behind
     /// count-bounded restart — a backend that cold-starts after oplog
-    /// compaction rebuilds the thread list from the checkpoint, not from the
+    /// compaction rebuilds the agent list from the checkpoint, not from the
     /// original deltas); a [`MessageCreated`](OpEntryKind::MessageCreated)
-    /// updates a single thread head and bumps that thread's roster activity;
-    /// the thread-roster deltas (`ThreadCreated`/`Archived`/`Restored`/
+    /// updates a single agent head and bumps that agent's roster activity;
+    /// the thread-roster deltas (`AgentCreated`/`Archived`/`Restored`/
     /// `StatusChanged`) maintain the roster idempotently via the shared
-    /// [`RosterThread`] fold helpers (so this fold and the agent's replay fold
+    /// [`RosterAgent`] fold helpers (so this fold and the agent's replay fold
     /// stay identical); phase, lifecycle, cost, and focus are latest-wins.
     /// Durability-only records (`CommandEffect`, `SeenMark`) and forward-compat
     /// `Unknown` variants do not affect the projected state.
@@ -153,42 +167,43 @@ impl AgentView {
                 self.heads = snapshot.heads.clone();
                 self.roster.clone_from(&snapshot.roster);
             }
-            OpEntryKind::MessageCreated { ref thread_id, head, .. } => {
-                self.heads.set_thread_head(thread_id, head);
-                RosterThread::fold_message(&mut self.roster, thread_id, entry.timestamp_ms);
+            OpEntryKind::MessageCreated { ref agent_id, head, .. } => {
+                self.heads.set_agent_head(agent_id, head);
+                RosterAgent::fold_message(&mut self.roster, agent_id, entry.timestamp_ms);
             }
-            OpEntryKind::ThreadCreated { ref thread_id, ref name, status, timestamp_ms, .. } => {
-                RosterThread::fold_created(
-                    &mut self.roster,
-                    cp_wire::types::snapshot::ThreadCreation::new(thread_id, name, status, timestamp_ms),
+            OpEntryKind::AgentCreated { ref agent_id, ref name, status, timestamp_ms, ref parent_agent_id, .. } => {
+                self.fold_created(
+                    cp_wire::types::snapshot::AgentCreation::new(agent_id, name, status, timestamp_ms)
+                        .with_parent(parent_agent_id.as_deref()),
                 );
             }
-            OpEntryKind::ThreadArchived { ref thread_id } => {
-                RosterThread::fold_archived(&mut self.roster, thread_id, true);
+            OpEntryKind::AgentArchived { ref agent_id } => {
+                RosterAgent::fold_archived(&mut self.roster, agent_id, true);
             }
-            OpEntryKind::ThreadRestored { ref thread_id } => {
-                RosterThread::fold_archived(&mut self.roster, thread_id, false);
+            OpEntryKind::AgentRestored { ref agent_id } => {
+                RosterAgent::fold_archived(&mut self.roster, agent_id, false);
             }
-            OpEntryKind::ThreadPaused { ref thread_id } => {
-                RosterThread::fold_paused(&mut self.roster, thread_id, true);
+            OpEntryKind::AgentPaused { ref agent_id } => {
+                RosterAgent::fold_paused(&mut self.roster, agent_id, true);
             }
-            OpEntryKind::ThreadResumed { ref thread_id } => {
-                RosterThread::fold_paused(&mut self.roster, thread_id, false);
+            OpEntryKind::AgentResumed { ref agent_id } => {
+                RosterAgent::fold_paused(&mut self.roster, agent_id, false);
             }
-            OpEntryKind::ThreadDeleted { ref thread_id } => {
-                RosterThread::fold_deleted(&mut self.roster, thread_id);
+            OpEntryKind::AgentDeleted { ref agent_id } => {
+                RosterAgent::fold_deleted(&mut self.roster, agent_id);
+                let _new = self.deleted.insert(agent_id.clone());
             }
-            OpEntryKind::ThreadStatusChanged { ref thread_id, status } => {
-                RosterThread::fold_status(&mut self.roster, thread_id, status);
+            OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
+                RosterAgent::fold_status(&mut self.roster, agent_id, status);
             }
-            OpEntryKind::TaskListChanged { ref thread_id, ref tasks } => {
-                RosterThread::fold_tasks(&mut self.roster, thread_id, tasks.clone());
+            OpEntryKind::TaskListChanged { ref agent_id, ref tasks } => {
+                RosterAgent::fold_tasks(&mut self.roster, agent_id, tasks.clone());
             }
-            OpEntryKind::NotesChanged { ref thread_id, ref notes } => {
-                RosterThread::fold_notes(&mut self.roster, thread_id, notes.clone());
+            OpEntryKind::NotesChanged { ref agent_id, ref notes } => {
+                RosterAgent::fold_notes(&mut self.roster, agent_id, notes.clone());
             }
-            OpEntryKind::ThreadFocusChanged { ref thread_id } => {
-                self.focused_thread_id.clone_from(thread_id);
+            OpEntryKind::AgentFocusChanged { ref agent_id } => {
+                self.focused_agent_id.clone_from(agent_id);
             }
             OpEntryKind::PhaseTransition { phase } => self.phase = Some(phase),
             OpEntryKind::Lifecycle { state } => self.lifecycle = Some(state),
@@ -210,15 +225,15 @@ impl AgentView {
     }
 }
 
-/// The fleet-wide materialized view: one [`AgentView`] per known agent.
+/// The fleet-wide materialized view: one [`FleetView`] per known agent.
 ///
 /// Driven by the orchestrator loop, which polls each agent's
 /// [`Tailer`](crate::tailer::Tailer) and feeds the resulting entries through
 /// [`apply`](MaterializedView::apply).
 #[derive(Debug, Default)]
 pub struct MaterializedView {
-    /// Per-agent projected state, keyed by `agent_id`.
-    agents: HashMap<String, AgentView>,
+    /// Per-agent projected state, keyed by `fleet_id`.
+    agents: HashMap<String, FleetView>,
 }
 
 impl MaterializedView {
@@ -228,34 +243,34 @@ impl MaterializedView {
         Self::default()
     }
 
-    /// Fold one entry into `agent_id`'s view, creating it on first sight.
-    pub fn apply(&mut self, agent_id: &str, entry: &OpEntry) {
-        self.agents.entry(agent_id.to_owned()).or_default().apply(entry);
+    /// Fold one entry into `fleet_id`'s view, creating it on first sight.
+    pub fn apply(&mut self, fleet_id: &str, entry: &OpEntry) {
+        self.agents.entry(fleet_id.to_owned()).or_default().apply(entry);
     }
 
     /// Fold a batch of entries (as returned by one
-    /// [`Tailer::poll`](crate::tailer::Tailer::poll)) into `agent_id`'s view.
-    pub fn apply_batch(&mut self, agent_id: &str, entries: &[OpEntry]) {
+    /// [`Tailer::poll`](crate::tailer::Tailer::poll)) into `fleet_id`'s view.
+    pub fn apply_batch(&mut self, fleet_id: &str, entries: &[OpEntry]) {
         if entries.is_empty() {
             return;
         }
-        let view = self.agents.entry(agent_id.to_owned()).or_default();
+        let view = self.agents.entry(fleet_id.to_owned()).or_default();
         for entry in entries {
             view.apply(entry);
         }
     }
 
-    /// The current projection for `agent_id`, or `None` if unknown.
+    /// The current projection for `fleet_id`, or `None` if unknown.
     #[must_use]
-    pub fn get(&self, agent_id: &str) -> Option<&AgentView> {
-        self.agents.get(agent_id)
+    pub fn get(&self, fleet_id: &str) -> Option<&FleetView> {
+        self.agents.get(fleet_id)
     }
 
     /// Drop an agent's projection (called when discovery reports it gone).
     ///
     /// Returns the removed view, if any.
-    pub fn remove(&mut self, agent_id: &str) -> Option<AgentView> {
-        self.agents.remove(agent_id)
+    pub fn remove(&mut self, fleet_id: &str) -> Option<FleetView> {
+        self.agents.remove(fleet_id)
     }
 
     /// Number of agents currently projected.
@@ -271,7 +286,7 @@ impl MaterializedView {
     }
 
     /// Iterator over the projected agent ids.
-    pub fn agent_ids(&self) -> impl Iterator<Item = &str> {
+    pub fn fleet_ids(&self) -> impl Iterator<Item = &str> {
         self.agents.keys().map(String::as_str)
     }
 }

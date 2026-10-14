@@ -6,9 +6,11 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{agent_folder, confined_path, count_visible_children, extract_param, infer_kind};
+use super::support::{
+    confined_path, count_visible_children, extract_param, fleet_folder, infer_kind, previewable_path,
+};
 
-/// `GET /api/agent/{id}/fs/descriptions` — the agent's tree descriptions.
+/// `GET /api/fleet/{id}/fs/descriptions` — the agent's tree descriptions.
 ///
 /// Reads the agent's `tree` module persistence
 /// (`<folder>/.context-pilot/shared/tree-descriptions.yaml`) and returns a flat
@@ -21,8 +23,8 @@ use super::support::{agent_folder, confined_path, count_visible_children, extrac
 /// flattens it to `{ path: description }`. A missing or unparseable file yields
 /// an empty object (a realm with no descriptions is the normal case, never an
 /// error). The agent id is still resolved so an unknown agent is a `404`.
-pub(crate) fn fs_descriptions(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_descriptions(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -58,14 +60,14 @@ const MAX_PREVIEW_BYTES: u64 = 1024 * 1024;
 /// Maximum number of conversation messages returned per request.
 const MAX_CONVERSATION_MESSAGES: usize = 200;
 
-/// `GET /api/agent/{id}/fs?path=` — confined directory listing.
+/// `GET /api/fleet/{id}/fs?path=` — confined directory listing.
 ///
 /// Lists one level of the agent's working directory at the given relative
 /// path. Returns an array of `FinderNode` objects. The path is confined to
 /// the agent's folder — any attempt to escape (via `..`, symlinks, or
 /// absolute paths) is rejected with a `403`.
-pub(crate) fn fs_list(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_list(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -142,8 +144,8 @@ fn fs_node(name: &str, path: &str, entry_path: &Path, meta: &std::fs::Metadata) 
 /// Returns the first [`MAX_PREVIEW_BYTES`] of a file as a JSON object with
 /// `content` (text) and `truncated` (bool). Binary-looking files are rejected
 /// with a 415.
-pub(crate) fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_preview(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -151,7 +153,7 @@ pub(crate) fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) ->
         Some(p) if !p.is_empty() => p,
         _ => return HttpReply::error(400, "missing path parameter"),
     };
-    let Some(target) = confined_path(&folder, &relative) else {
+    let Some(target) = previewable_path(&folder, &relative) else {
         return HttpReply::error(403, "path outside agent realm");
     };
     if !target.is_file() {
@@ -186,13 +188,13 @@ pub(crate) fn fs_preview(state: &Mutex<Backend>, agent_id: &str, query: &str) ->
     }))
 }
 
-/// `GET /api/agent/{id}/conversation` — conversation messages.
+/// `GET /api/fleet/{id}/conversation` — conversation messages.
 ///
 /// Reads YAML message files from the agent's `.context-pilot/messages/`
 /// directory, sorted by filename (which encodes chronological order), capped
 /// at [`MAX_CONVERSATION_MESSAGES`] most recent.
-pub(crate) fn conversation(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn conversation(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };

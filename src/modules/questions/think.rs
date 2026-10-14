@@ -84,21 +84,17 @@ pub(super) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     result
 }
 
-/// Apply the `Todo` structured upsert to the focused thread's tasks.
+/// Apply the `Todo` structured upsert to the focused agent's tasks.
 ///
-/// Resolves the focused thread from `FocusState`; rejects when none is focused
-/// (all task-tracking must live in a thread — design §5/§9-#7). Parses the
+/// Resolves the focused agent from `FocusState`; rejects when none is focused
+/// (all task-tracking must live in an agent — design §5/§9-#7). Parses the
 /// `items` array, upserts it (validate-then-apply, atomic), and returns the
 /// refreshed task tree. On any change the Todo panel is **deprecated but tempo
 /// preserved** (FR8): `touch_panel` marks it stale so the fresh tree emits at
 /// tempo exhaustion, never forced immediately.
 fn apply_todo_upsert(items_val: &serde_json::Value, state: &mut State) -> Result<String, String> {
-    let Some(tid) = state
-        .resident_thread_id
-        .clone()
-        .or_else(|| cp_mod_threads::types::FocusState::get(state).focused_thread_id.clone())
-    else {
-        return Err("no focused thread (tasks must live in a thread; Read a thread first).".to_owned());
+    let Some(tid) = state.executing_agent_id().map(str::to_owned) else {
+        return Err("no focused agent (tasks must live in an agent; Read an agent first).".to_owned());
     };
     let items = cp_mod_todo::upsert::parse_items(items_val)?;
     let _created = cp_mod_todo::upsert::upsert(state, &tid, &items)?;
@@ -108,7 +104,7 @@ fn apply_todo_upsert(items_val: &serde_json::Value, state: &mut State) -> Result
 }
 
 /// Execute the `Todo` tool — upsert a nested list of tasks onto the focused
-/// thread's task tree.
+/// agent's task tree.
 ///
 /// This is the single task-editing entry point. Each payload item carrying an
 /// `id` **updates** that task (only the fields present are touched); an item
@@ -116,7 +112,7 @@ fn apply_todo_upsert(items_val: &serde_json::Value, state: &mut State) -> Result
 /// an item's `children` are created under it, and a nested item may never carry
 /// an `id`. The call **merges**: tasks absent from the payload are untouched, so
 /// removal is an explicit `status: cancelled`, never an omission. Rejects when
-/// no thread is focused — tasks are thread-owned (design §5/§9-#7).
+/// no agent is focused — tasks are thread-owned (design §5/§9-#7).
 ///
 /// On success the result echoes the refreshed task tree so the model (and user)
 /// always see the interpreted state. Tempo-preserving (FR8): a structural edit

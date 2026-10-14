@@ -66,8 +66,9 @@ pub const TYPEWRITER_DEFAULT_DELAY_MS: f64 = 15.0;
 // UI LAYOUT
 // =============================================================================
 
-/// Width of the sidebar in characters
-pub const SIDEBAR_WIDTH: u16 = 36;
+/// Width of the sidebar in characters — shared by the panel-centric sidebar
+/// and the agent-centric agents list so both layouts line up.
+pub const SIDEBAR_WIDTH: u16 = 47;
 
 /// Height of the status bar
 pub const STATUS_BAR_HEIGHT: u16 = 1;
@@ -97,6 +98,16 @@ pub const MAX_API_RETRIES: u32 = 3;
 
 /// Directory for storing state and messages
 pub const STORE_DIR: &str = "./.context-pilot";
+
+/// The project root: the process cwd, fixed at launch and never changed
+/// (agents switch worktrees via [`State::workdir`](crate::state::State::workdir)).
+#[must_use]
+pub fn project_root() -> std::path::PathBuf {
+    std::env::current_dir().unwrap_or_else(|_err| std::path::PathBuf::from("."))
+}
+
+/// Folder (under the project root) holding every managed git worktree.
+pub const WORKTREES_DIR: &str = ".worktrees";
 
 /// Messages subdirectory
 pub const MESSAGES_DIR: &str = "messages";
@@ -142,6 +153,18 @@ pub const SHARED_DIR: &str = ".context-pilot/shared";
 #[must_use]
 pub fn home_behaviours_dir() -> std::path::PathBuf {
     cp_env::env().core.home.join(".context-pilot").join("behaviours")
+}
+
+/// Shared dir holding system (persona) `.md` files: `behaviours/systems/`.
+///
+/// Falls back to the legacy `behaviours/agents/` (pre-T860) until an agent
+/// binary has run the one-shot rename, so the orchestrator reads the right
+/// files whichever side deploys first.
+#[must_use]
+pub fn home_systems_dir() -> std::path::PathBuf {
+    let root = home_behaviours_dir();
+    let systems = root.join("systems");
+    if systems.exists() { systems } else { root.join("agents") }
 }
 
 /// Ensure the `.context-pilot/shared/` directory exists and is un-gitignored.

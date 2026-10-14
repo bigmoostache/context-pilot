@@ -29,10 +29,10 @@ pub(super) struct StreamContext {
 /// reverie's own messages. Panels and tools remain IDENTICAL for cache hits.
 pub(super) struct ReverieContext {
     /// Agent ID driving this reverie (e.g., "cleaner", "cartographer")
-    pub agent_id: String,
+    pub system_id: String,
     /// Optional directive (from `optimize_context`) injected into the preamble.
     /// Carried here so prompt building never looks the reverie up in the
-    /// `state.reveries` map — that map is keyed by an opaque per-thread slot.
+    /// `state.reveries` map — that map is keyed by an opaque per-agent slot.
     pub directive: Option<String>,
     /// The reverie's own conversation messages (may be empty on first run)
     pub messages: Vec<Message>,
@@ -96,7 +96,7 @@ pub(super) fn prepare_stream_context(
     // Read the current tempo flag for this tick's freeze decisions, then reset.
     // If tempo is true (no tool broke it last tick), we freeze everything.
     // (cond already captured state.tempo above)
-    state.tempo = true; // Reset for next tick — tools will break it if they execute
+    state.agent_mut().tempo = true; // Reset for next tick — tools will break it if they execute
 
     // === Panel ordering (stable base) ═══════════════════════════════════════
     // `previous_panel_order` is the PERSISTENT source of truth for panel order:
@@ -109,13 +109,13 @@ pub(super) fn prepare_stream_context(
     // The ONLY reordering happens later, inside `run_panel_freeze_pass`, and ONLY
     // within the already-broken tail (free to permute). That pass also persists
     // the final order back into `previous_panel_order`.
-    if state.previous_panel_order.is_empty() {
+    if state.agent().previous_panel_order.is_empty() {
         context_items.sort_by_key(|item| item.last_refresh_ms);
     } else {
         // Index once instead of a linear scan per comparison; `rev` keeps the
         // first occurrence on duplicate ids, matching `position`.
         let order: std::collections::HashMap<&str, usize> =
-            state.previous_panel_order.iter().enumerate().rev().map(|(pos, id)| (id.as_str(), pos)).collect();
+            state.agent().previous_panel_order.iter().enumerate().rev().map(|(pos, id)| (id.as_str(), pos)).collect();
         context_items.sort_by_key(|item| {
             if item.id == "chat" {
                 (2usize, 0usize) // conversation tail — always last
@@ -142,16 +142,16 @@ pub(super) fn prepare_stream_context(
     // Pre-compute system + tools token prefix for tick telemetry
     let prompt_prefix_tokens = {
         let _g = crate::profile!("ctx_prefix_tokens");
-        let system_tokens = crate::state::estimate_tokens(&get_active_agent_content(state));
+        let system_tokens = crate::state::estimate_tokens(&get_active_system_content(state));
         let tools_tokens = modules::overview::context::estimate_tool_definitions_tokens(state);
         system_tokens.saturating_add(tools_tokens)
     };
 
-    let full_freeze = cond.freeze_order() && state.frozen_context_snapshot.is_some();
+    let full_freeze = cond.freeze_order() && state.agent().frozen_context_snapshot.is_some();
     let meta = FreezeMeta { cond, prompt_prefix_tokens };
 
     let freeze_guard = crate::profile!("ctx_freeze_pass");
-    if let (true, Some(snapshot)) = (full_freeze, state.frozen_context_snapshot.as_ref()) {
+    if let (true, Some(snapshot)) = (full_freeze, state.agent().frozen_context_snapshot.as_ref()) {
         // ═══ FULL FREEZE: replay exact previous prompt ═══════════════════════
         let snap = snapshot.clone();
         freeze_pass::apply_full_freeze(state, &mut context_items, &snap, meta);
@@ -160,7 +160,8 @@ pub(super) fn prepare_stream_context(
         freeze_pass::run_panel_freeze_pass(state, &mut context_items, meta);
 
         // Save snapshot for next frozen tick (panels only, no "chat")
-        state.frozen_context_snapshot = Some(context_items.iter().filter(|i| i.id != "chat").cloned().collect());
+        state.agent_mut().frozen_context_snapshot =
+            Some(context_items.iter().filter(|i| i.id != "chat").cloned().collect());
     }
 
     drop(freeze_guard);
@@ -189,6 +190,7 @@ fn build_reverie_stream_context(
     // Add P-main-conv: the main worker's conversation as a read-only panel
     let main_conv_content = cp_base::state::data::message::format_messages_to_chunk(
         &state
+            .agent()
             .messages
             .iter()
             .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty())
@@ -220,10 +222,10 @@ fn build_reverie_stream_context(
 /// restrictions + a conversation-follows marker.
 fn build_reverie_panel_content(rev: &ReverieContext) -> String {
     let mut content = String::new();
-    let agents = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::Agent);
-    if let Some(agent) = agents.iter().find(|a| a.id == rev.agent_id) {
+    let systems = cp_mod_prompt::storage::load_prompts_for(cp_mod_prompt::types::PromptType::System);
+    if let Some(system) = systems.iter().find(|a| a.id == rev.system_id) {
         content.push_str("## Agent Instructions\n");
-        content.push_str(&agent.content);
+        content.push_str(&system.content);
         content.push('\n');
     }
     if let Some(ctx) = rev.directive.as_ref() {
@@ -246,13 +248,14 @@ fn build_main_stream_context(
     include_last_message: bool,
 ) -> StreamContext {
     let non_empty = state
+        .agent()
         .messages
         .iter()
         .filter(|m| !m.content.is_empty() || !m.tool_uses.is_empty() || !m.tool_results.is_empty());
     let messages: Vec<_> = if include_last_message {
         non_empty.cloned().collect()
     } else {
-        non_empty.take(state.messages.len().saturating_sub(1)).cloned().collect()
+        non_empty.take(state.agent().messages.len().saturating_sub(1)).cloned().collect()
     };
     StreamContext { messages, context_items, tools: state.tools.clone() }
 }
@@ -270,7 +273,7 @@ pub(crate) fn build_stream_params(
     ctx: StreamContext,
     seed_content: Option<String>,
 ) -> crate::infra::api::StreamParams {
-    let system_prompt = get_active_agent_content(state);
+    let system_prompt = get_active_system_content(state);
     crate::infra::api::StreamParams {
         provider: state.llm_provider,
         model: state.current_model(),
@@ -281,10 +284,10 @@ pub(crate) fn build_stream_params(
         system_prompt,
         seed_content,
         worker_id: crate::infra::constants::DEFAULT_WORKER_ID.to_owned(),
-        cache_engine_json: state.cache_engine_json.clone(),
+        cache_engine_json: state.agent().cache_engine_json.clone(),
     }
 }
 
 /// Default context initialization (panel creation, UID assignment, agent seeds).
 mod init;
-pub(crate) use init::{ensure_default_agent, ensure_default_contexts, get_active_agent_content};
+pub(crate) use init::{ensure_default_contexts, ensure_default_system, get_active_system_content};

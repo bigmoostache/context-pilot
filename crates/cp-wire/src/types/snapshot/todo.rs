@@ -1,11 +1,11 @@
-//! Thread-owned task projection types — the read-only shape the web thread
+//! Thread-owned task projection types — the read-only shape the web agent
 //! view renders in its todo aside.
 //!
 //! Defined here in the I/O-free protocol crate rather than imported from
 //! `cp-mod-todo` to keep the layering one-directional (modules depend on the
-//! wire, never the reverse), exactly like [`ThreadTurn`](super::super::ThreadTurn).
-//! Carried on the owning thread's
-//! [`RosterThread::tasks`](super::RosterThread::tasks) and replaced wholesale
+//! wire, never the reverse), exactly like [`AgentTurn`](super::super::AgentTurn).
+//! Carried on the owning agent's
+//! [`RosterAgent::tasks`](super::RosterAgent::tasks) and replaced wholesale
 //! by each [`TaskListChanged`](super::super::oplog::OpEntryKind::TaskListChanged)
 //! delta.
 
@@ -37,10 +37,10 @@ pub enum WireTaskStatus {
 }
 
 /// One thread-owned task as projected onto the wire — the read-only shape the
-/// web thread view renders in its todo aside.
+/// web agent view renders in its todo aside.
 ///
-/// A flat list carried on the owning thread's
-/// [`RosterThread::tasks`](super::RosterThread::tasks); nesting is reconstructed
+/// A flat list carried on the owning agent's
+/// [`RosterAgent::tasks`](super::RosterAgent::tasks); nesting is reconstructed
 /// frontend-side from [`parent_id`](Self::parent_id) (roots have `None`).
 /// Cancelled tasks are excluded upstream, so every `WireTask` on the wire is
 /// `Planned`, `InProgress`, or `Done`.
@@ -60,7 +60,7 @@ pub struct WireTask {
     pub id: String,
 
     /// Parent task id for nesting, or `None` for a top-level (root) task. The
-    /// parent always belongs to the same thread.
+    /// parent always belongs to the same agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
 

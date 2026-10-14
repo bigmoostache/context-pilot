@@ -1,9 +1,9 @@
 //! Todo module — hierarchical, thread-owned task tracking with status management.
 //!
 //! State (`TodoState`) owns all task items; each item carries a compulsory
-//! `thread_id` (thread-owned tasks rework). Structural edits and status marking
+//! `agent_id` (thread-owned tasks rework). Structural edits and status marking
 //! are hosted in the main crate (`Think.todo` + `todo_mark`) which resolves the
-//! focused thread and calls the pure ops in [`tools`]; this module exposes the
+//! focused agent and calls the pure ops in [`tools`]; this module exposes the
 //! pure task operations + the focus-scoped Todo panel and owns **no tools** of
 //! its own. `TodoState` is shared (`is_global == true`).
 
@@ -11,7 +11,7 @@
 mod panel;
 /// Collapsing of superseded task recaps in the live conversation.
 pub mod recap;
-/// Focus-scoping + legacy purge (`set_focus_filter`, `purge_threadless`).
+/// Focus-scoping + legacy purge (`set_focus_filter`, `purge_agentless`).
 pub mod tools;
 /// Synthetic task-tree + in-progress-leaf warning for tool results (T686).
 pub mod tree;
@@ -19,7 +19,7 @@ pub mod tree;
 pub mod types;
 /// Structured nested upsert — the `Todo` tool's core.
 pub mod upsert;
-/// Canonical YAML render of a thread's task tree (feeds the Todo panel).
+/// Canonical YAML render of an agent's task tree (feeds the Todo panel).
 pub mod yaml;
 
 use types::{TodoState, TodoStatus};
@@ -76,6 +76,10 @@ impl Module for TodoModule {
         state.set_ext(TodoState::new());
     }
 
+    fn save_revision(&self, state: &State) -> Option<u64> {
+        Some(TodoState::get(state).revision)
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ts = TodoState::get(state);
         json!({
@@ -93,8 +97,8 @@ impl Module for TodoModule {
         if let Some(v) = data.get("next_todo_id").and_then(serde_json::Value::as_u64) {
             ts.next_todo_id = v.to_usize();
         }
-        // FR4: forever-purge legacy items lacking a thread_id (old schema).
-        tools::purge_threadless(state);
+        // FR4: forever-purge legacy items lacking an agent_id (old schema).
+        tools::purge_agentless(state);
     }
 
     fn fixed_panel_types(&self) -> Vec<Kind> {
@@ -114,7 +118,7 @@ impl Module for TodoModule {
 
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         // No tools of its own: `Think.todo` + `todo_mark` are hosted in the main
-        // crate (they need the focused thread from `cp-mod-threads::FocusState`).
+        // crate (they need the focused agent from `cp-mod-agents::FocusState`).
         vec![]
     }
 
@@ -145,7 +149,7 @@ impl Module for TodoModule {
 
     fn overview_context_section(&self, state: &State) -> Option<String> {
         let ts = TodoState::get(state);
-        // Global rollup across all threads; cancelled items are excluded from
+        // Global rollup across all agents; cancelled items are excluded from
         // both the numerator and denominator (they are soft-deleted).
         let counted: Vec<&types::TodoItem> = ts.todos.iter().filter(|t| t.status != TodoStatus::Cancelled).collect();
         if counted.is_empty() {

@@ -15,6 +15,7 @@ use crate::app::panels::Panel;
 use crate::infra::tools::{ToolDefinition, ToolResult, ToolUse};
 use crate::state::{Kind, State};
 
+pub(crate) use cp_mod_agents::AgentsModule;
 pub(crate) use cp_mod_brave::BraveModule;
 pub(crate) use cp_mod_bridge::BridgeModule;
 pub(crate) use cp_mod_callback::CallbackModule;
@@ -33,7 +34,6 @@ pub(crate) use cp_mod_scratchpad::ScratchpadModule;
 pub(crate) use cp_mod_search::SearchModule;
 pub(crate) use cp_mod_spine::SpineModule;
 pub(crate) use cp_mod_spine::persist::CoucouModule;
-pub(crate) use cp_mod_threads::ThreadsModule;
 pub(crate) use cp_mod_todo::TodoModule;
 pub(crate) use cp_mod_tree::TreeModule;
 
@@ -120,7 +120,10 @@ pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
         Box::new(MemoryModule::new()),
         Box::new(OcrModule::new()),
         Box::new(ScratchpadModule::new()),
-        Box::new(ThreadsModule::new()),
+        Box::new(cp_groups::wiring::GroupsModule::new()),
+        Box::new(AgentsModule::new()),
+        Box::new(cp_management::wiring::ManagementModule::new()),
+        Box::new(cp_coordination::wiring::CoordinationModule::new()),
         Box::new(SpineModule::new()),
         Box::new(CoucouModule::new()),
         Box::new(LogsModule::new()),

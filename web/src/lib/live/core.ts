@@ -24,21 +24,21 @@ export interface LiveQueryResult<T> {
 
 /**
  * Wrap a TanStack `useQuery` into the legacy `LiveQueryResult` shape and ensure
- * the agent's SSE→cache bridge is live. `agentId` is optional: fleet-level
+ * the agent's SSE→cache bridge is live. `fleetId` is optional: fleet-level
  * resources pass none (no bridge), agent-scoped ones pass theirs.
  */
 export function useLive<T>(
   queryKey: readonly unknown[],
   queryFn: () => Promise<T>,
-  opts: { agentId?: string; enabled?: boolean; pollMs?: number } = {},
+  opts: { fleetId?: string; enabled?: boolean; pollMs?: number } = {},
 ): LiveQueryResult<T> {
-  const { agentId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
+  const { fleetId, enabled = true, pollMs = BACKSTOP_POLL_MS } = opts
 
   // Guarantee the push plane is running for this agent whenever its data is
   // observed. Idempotent + no teardown (one long-lived subscription per agent).
   useEffect(() => {
-    if (agentId) ensureSync(agentId)
-  }, [agentId])
+    if (fleetId) ensureSync(fleetId)
+  }, [fleetId])
 
   const q = useQuery({
     queryKey,
@@ -47,7 +47,7 @@ export function useLive<T>(
     // same-origin 127.0.0.1 cockpit the network wait is sub-ms, so a multi-
     // second span is the synchronous payload parse/reshape — the freeze suspect
     // that lands OUTSIDE the SSE fold and React render (both already
-    // instrumented). A `load:*` entry coinciding with a main-thread stall names
+    // instrumented). A `load:*` entry coinciding with a main-agent stall names
     // exactly which endpoint's parse burned it, on every browser.
     queryFn: () => measureAsync(`load:${String(queryKey[0])}`, queryFn),
     enabled,

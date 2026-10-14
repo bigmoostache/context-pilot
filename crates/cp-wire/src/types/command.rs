@@ -56,100 +56,108 @@ impl Command {
     reason = "wire-protocol contract: Kind carries an Unknown catch-all for N-1 tolerance; its variant set is otherwise closed and constructed cross-crate (orchestrator builds commands, agent matches them exhaustively), so #[non_exhaustive] would forbid that construction"
 )]
 pub enum Kind {
-    /// Send a message to a thread (the primary user action).
+    /// Send a message to an agent (the primary user action).
     #[serde(rename = "send_message")]
     SendMessage {
-        /// Target thread identifier.
-        thread_id: String,
+        /// Target agent identifier.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
         /// Markdown body of the message.
         content: String,
     },
 
-    /// Create a new thread, optionally seeding its first user message and
+    /// Create a new agent, optionally seeding its first user message and
     /// starting it paused.
-    #[serde(rename = "create_thread")]
-    CreateThread {
-        /// Human-readable thread name.
+    #[serde(rename = "create_agent", alias = "create_thread")]
+    CreateAgent {
+        /// Human-readable agent name.
         name: String,
-        /// Optional first user message, sent atomically right after the thread
+        /// Optional first user message, sent atomically right after the agent
         /// is created (already carries any `file-upload` blocks the frontend
-        /// composed). `None` = create an empty thread. An N-1 agent that
-        /// predates this field ignores it and creates an empty thread.
+        /// composed). `None` = create an empty agent. An N-1 agent that
+        /// predates this field ignores it and creates an empty agent.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         initial_message: Option<String>,
-        /// Create the thread already paused (suppress `MY_TURN` notifications)
+        /// Create the agent already paused (suppress `MY_TURN` notifications)
         /// so a seeded first message is queued without waking the agent.
-        /// Defaults to `false`; an N-1 agent ignores it (thread stays active).
+        /// Defaults to `false`; an N-1 agent ignores it (agent stays active).
         #[serde(default)]
         paused: bool,
     },
 
-    /// Branch a new thread out of an existing one: the new thread inherits the
-    /// source thread's messages up to and including the one stamped
+    /// Branch a new agent out of an existing one: the new agent inherits the
+    /// source agent's messages up to and including the one stamped
     /// `message_ts`, then (optionally) gets a first user message — same
-    /// create -> pause -> send order as [`CreateThread`](Self::CreateThread).
+    /// create -> pause -> send order as [`CreateAgent`](Self::CreateAgent).
     ///
     /// The agent copies the history from its own state (the payload only names
     /// the branch point). An N-1 agent deserialises this as
     /// [`Unknown`](Self::Unknown) and ignores it.
-    #[serde(rename = "branch_thread")]
-    BranchThread {
-        /// Thread to branch out of.
-        source_thread_id: String,
+    #[serde(rename = "branch_agent", alias = "branch_thread")]
+    BranchAgent {
+        /// Agent to branch out of.
+        #[serde(rename = "source_agent_id", alias = "source_thread_id")]
+        source_agent_id: String,
         /// Epoch-ms timestamp of the last source message to copy (inclusive).
         message_ts: u64,
-        /// Human-readable name of the new thread.
+        /// Human-readable name of the new agent.
         name: String,
-        /// Optional first user message of the new thread (already carries any
+        /// Optional first user message of the new agent (already carries any
         /// `file-upload` blocks the frontend composed). `None` = history only.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         initial_message: Option<String>,
-        /// Create the branch already paused (see `CreateThread::paused`).
+        /// Create the branch already paused (see `CreateAgent::paused`).
         #[serde(default)]
         paused: bool,
     },
 
-    /// Archive an existing thread.
-    #[serde(rename = "archive_thread")]
-    ArchiveThread {
-        /// Thread to archive.
-        thread_id: String,
+    /// Archive an existing agent.
+    #[serde(rename = "archive_agent", alias = "archive_thread")]
+    ArchiveAgent {
+        /// Agent to archive.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// Restore a previously archived thread.
-    #[serde(rename = "restore_thread")]
-    RestoreThread {
-        /// Thread to restore.
-        thread_id: String,
+    /// Restore a previously archived agent.
+    #[serde(rename = "restore_agent", alias = "restore_thread")]
+    RestoreAgent {
+        /// Agent to restore.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// Pause a thread (suppress `MY_TURN` notifications).
-    #[serde(rename = "pause_thread")]
-    PauseThread {
-        /// Thread to pause.
-        thread_id: String,
+    /// Pause an agent (suppress `MY_TURN` notifications).
+    #[serde(rename = "pause_agent", alias = "pause_thread")]
+    PauseAgent {
+        /// Agent to pause.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// Resume a previously paused thread.
-    #[serde(rename = "resume_thread")]
-    ResumeThread {
-        /// Thread to resume.
-        thread_id: String,
+    /// Resume a previously paused agent.
+    #[serde(rename = "resume_agent", alias = "resume_thread")]
+    ResumeAgent {
+        /// Agent to resume.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// Permanently delete a thread and all its messages.
-    #[serde(rename = "delete_thread")]
-    DeleteThread {
-        /// Thread to delete.
-        thread_id: String,
+    /// Permanently delete an agent and all its messages.
+    #[serde(rename = "delete_agent", alias = "delete_thread")]
+    DeleteAgent {
+        /// Agent to delete.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
     },
 
-    /// Delete a specific message from a thread.
+    /// Delete a specific message from an agent.
     #[serde(rename = "delete_message")]
     DeleteMessage {
-        /// Thread containing the message.
-        thread_id: String,
-        /// Epoch-ms timestamp of the message to delete (unique per thread).
+        /// Agent containing the message.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: String,
+        /// Epoch-ms timestamp of the message to delete (unique per agent).
         message_ts: u64,
     },
 
@@ -172,7 +180,7 @@ pub enum Kind {
 
     /// Switch the agent's active behaviour agent (prompt-library system
     /// prompt) by library id. An empty id reverts to the default agent —
-    /// same contract as the agent-side `agent_load` tool, which this shares.
+    /// same contract as the agent-side `system_load` tool, which this shares.
     #[serde(rename = "load_behaviour")]
     LoadBehaviour {
         /// Prompt-library agent id to activate (empty = default).
@@ -249,7 +257,7 @@ mod tests {
             id: "cmd-001".into(),
             seq: 42,
             dedup_token: "user-msg-abc".into(),
-            kind: Kind::SendMessage { thread_id: "T1".into(), content: "Hello".into() },
+            kind: Kind::SendMessage { agent_id: "T1".into(), content: "Hello".into() },
         };
         let json = serde_json::to_string(&cmd).expect("serialize");
         let back: Command = serde_json::from_str(&json).expect("deserialize");

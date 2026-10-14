@@ -45,12 +45,12 @@ export function ConfigPanel({ variant = "dialog" }: { variant?: "dialog" | "inli
   const inline = variant === "inline"
 
   return (
-    // Threads design language (T679): the settings surface floats a
+    // Agents design language (T679): the settings surface floats a
     // `bg-surface-2` category rail (card-shadow + my-2 breathing room, no
     // border divider) over a `bg-background` detail pane — the exact model the
-    // thread list + conversation use — instead of the old docked bordered panes.
+    // agent list + conversation use — instead of the old docked bordered panes.
     <div className="flex min-h-0 flex-1 bg-background">
-      {/* floating category rail — a deliberate twin of the thread list rail */}
+      {/* floating category rail — a deliberate twin of the agent list rail */}
       <aside className="card-shadow my-2 ml-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
           {visibleCategories.map((c) => {

@@ -5,16 +5,16 @@
 
 use super::*;
 use cp_wire::types::snapshot::Snapshot;
-use cp_wire::types::{ContentHash, ThreadTurn};
+use cp_wire::types::{AgentTurn, ContentHash};
 
 /// Build an [`OpEntry`] with the given rev and kind.
 fn entry(rev: u64, kind: OpEntryKind) -> OpEntry {
     OpEntry::new(1, rev, 0, kind)
 }
 
-fn message(thread: &str, byte: u8) -> OpEntryKind {
+fn message(agent: &str, byte: u8) -> OpEntryKind {
     OpEntryKind::MessageCreated {
-        thread_id: thread.to_owned(),
+        agent_id: agent.to_owned(),
         message_id: format!("m{byte}"),
         head: ContentHash::new([byte; 32]),
         inline_body: None,
@@ -25,9 +25,9 @@ fn message(thread: &str, byte: u8) -> OpEntryKind {
 /// Extracted so `checkpoint_restores_roster_wholesale` stays under the
 /// cognitive-complexity cap.
 fn assert_carried_wholesale(e: &RosterEntry) {
-    assert_eq!(e.thread_id, "T7");
+    assert_eq!(e.agent_id, "T7");
     assert_eq!(e.name, "carried");
-    assert_eq!(e.status, ThreadTurn::MyTurn);
+    assert_eq!(e.status, AgentTurn::MyTurn);
     assert!(e.archived);
     assert_eq!(e.last_activity_ms, 9_000);
     assert_eq!(e.msg_count, 4);
@@ -37,22 +37,22 @@ fn assert_carried_wholesale(e: &RosterEntry) {
 /// `roster_create_archive_restore_cycle` stays under the cognitive-complexity
 /// cap.
 fn assert_fresh_created(e: &RosterEntry) {
-    assert_eq!(e.thread_id, "T1");
+    assert_eq!(e.agent_id, "T1");
     assert_eq!(e.name, "Refactor cache");
-    assert_eq!(e.status, ThreadTurn::TheirTurn);
+    assert_eq!(e.status, AgentTurn::TheirTurn);
     assert!(!e.archived);
     assert_eq!(e.last_activity_ms, 1_000);
     assert_eq!(e.msg_count, 0);
 }
 
 #[test]
-fn message_created_sets_thread_head() {
+fn message_created_sets_agent_head() {
     let mut view = MaterializedView::new();
     view.apply("a1", &entry(0, message("T1", 0x11)));
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 0);
-    let head = agent.heads.threads.iter().find(|h| h.thread_id == "T1").expect("thread head present");
+    let head = agent.heads.agents.iter().find(|h| h.agent_id == "T1").expect("agent head present");
     assert_eq!(head.last_message_hash, ContentHash::new([0x11; 32]));
 }
 
@@ -64,14 +64,14 @@ fn checkpoint_resets_heads_authoritatively() {
 
     // A checkpoint carrying a different head set must replace, not merge.
     let mut snapshot = Snapshot::default();
-    snapshot.heads.set_thread_head("T2", ContentHash::new([0x22; 32]));
+    snapshot.heads.set_agent_head("T2", ContentHash::new([0x22; 32]));
     view.apply("a1", &entry(5, OpEntryKind::Checkpoint { snapshot }));
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 5);
-    assert!(agent.heads.threads.iter().all(|h| h.thread_id != "T1"), "checkpoint must drop the pre-checkpoint head");
-    assert_eq!(agent.heads.threads.len(), 1);
-    assert_eq!(agent.heads.threads.first().expect("T2").thread_id, "T2");
+    assert!(agent.heads.agents.iter().all(|h| h.agent_id != "T1"), "checkpoint must drop the pre-checkpoint head");
+    assert_eq!(agent.heads.agents.len(), 1);
+    assert_eq!(agent.heads.agents.first().expect("T2").agent_id, "T2");
 }
 
 #[test]
@@ -82,22 +82,23 @@ fn checkpoint_restores_roster_wholesale() {
         "a1",
         &entry(
             0,
-            OpEntryKind::ThreadCreated {
-                thread_id: "T-stale".into(),
+            OpEntryKind::AgentCreated {
+                agent_id: "T-stale".into(),
                 name: "stale".into(),
-                status: ThreadTurn::TheirTurn,
+                status: AgentTurn::TheirTurn,
                 timestamp_ms: 1,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
 
     // A checkpoint carrying a *different* roster must replace, not merge —
     // this is the cold-restart-after-compaction path (I5): the backend
-    // rebuilds the thread list from the snapshot alone.
+    // rebuilds the agent list from the snapshot alone.
     let mut snapshot = Snapshot::default();
     snapshot.roster.push(
-        RosterEntry::builder("T7", "carried", ThreadTurn::MyTurn)
+        RosterEntry::builder("T7", "carried", AgentTurn::MyTurn)
             .archived(true)
             .last_activity_ms(9_000)
             .msg_count(4)
@@ -109,29 +110,30 @@ fn checkpoint_restores_roster_wholesale() {
     assert_eq!(agent.roster.len(), 1, "checkpoint replaces the roster wholesale");
     let e = agent.roster.first().expect("entry");
     assert_carried_wholesale(e);
-    assert!(agent.roster.iter().all(|r| r.thread_id != "T-stale"), "the pre-checkpoint roster entry is dropped");
+    assert!(agent.roster.iter().all(|r| r.agent_id != "T-stale"), "the pre-checkpoint roster entry is dropped");
 }
 
 #[test]
 fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
     // The full cold-restart shape: a checkpoint seeds the roster, then the
-    // post-checkpoint delta tail (a new thread + a message) folds on top.
+    // post-checkpoint delta tail (a new agent + a message) folds on top.
     let mut view = MaterializedView::new();
     let mut snapshot = Snapshot::default();
     snapshot
         .roster
-        .push(RosterEntry::builder("T1", "carried", ThreadTurn::TheirTurn).last_activity_ms(100).msg_count(2).build());
+        .push(RosterEntry::builder("T1", "carried", AgentTurn::TheirTurn).last_activity_ms(100).msg_count(2).build());
     view.apply("a1", &entry(10, OpEntryKind::Checkpoint { snapshot }));
     view.apply(
         "a1",
         &entry(
             11,
-            OpEntryKind::ThreadCreated {
-                thread_id: "T2".into(),
+            OpEntryKind::AgentCreated {
+                agent_id: "T2".into(),
                 name: "fresh".into(),
-                status: ThreadTurn::MyTurn,
+                status: AgentTurn::MyTurn,
                 timestamp_ms: 200,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
@@ -141,7 +143,7 @@ fn roster_survives_compaction_via_checkpoint_then_folds_tail() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.roster.len(), 2, "carried + fresh");
-    let t1 = agent.roster.iter().find(|r| r.thread_id == "T1").expect("T1");
+    let t1 = agent.roster.iter().find(|r| r.agent_id == "T1").expect("T1");
     assert_eq!(t1.msg_count, 3, "tail message bumped the carried count");
     assert_eq!(t1.last_activity_ms, 300);
 }
@@ -184,7 +186,7 @@ fn apply_batch_folds_in_order_and_tracks_max_rev() {
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 9, "rev tracks the maximum folded");
     assert_eq!(
-        agent.heads.threads.first().expect("T1").last_message_hash,
+        agent.heads.agents.first().expect("T1").last_message_hash,
         ContentHash::new([0x02; 32]),
         "later message overwrites the earlier head",
     );
@@ -200,7 +202,7 @@ fn durability_only_and_unknown_entries_are_inert() {
 
     let agent = view.get("a1").expect("agent present");
     assert_eq!(agent.rev, 2, "rev still advances");
-    assert!(agent.heads.threads.is_empty());
+    assert!(agent.heads.agents.is_empty());
     assert_eq!(agent.phase, None);
     assert_eq!(agent.lifecycle, None);
     assert_eq!(agent.cost, CostSnapshot::default());
@@ -213,12 +215,13 @@ fn roster_create_archive_restore_cycle() {
         "a1",
         &entry(
             0,
-            OpEntryKind::ThreadCreated {
-                thread_id: "T1".into(),
+            OpEntryKind::AgentCreated {
+                agent_id: "T1".into(),
                 name: "Refactor cache".into(),
-                status: ThreadTurn::TheirTurn,
+                status: AgentTurn::TheirTurn,
                 timestamp_ms: 1_000,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );
@@ -226,32 +229,54 @@ fn roster_create_archive_restore_cycle() {
     let e = agent.roster.first().expect("roster entry");
     assert_fresh_created(e);
 
-    view.apply("a1", &entry(1, OpEntryKind::ThreadArchived { thread_id: "T1".into() }));
+    view.apply("a1", &entry(1, OpEntryKind::AgentArchived { agent_id: "T1".into() }));
     assert!(view.get("a1").expect("a").roster.first().expect("e").archived);
 
-    view.apply("a1", &entry(2, OpEntryKind::ThreadRestored { thread_id: "T1".into() }));
+    view.apply("a1", &entry(2, OpEntryKind::AgentRestored { agent_id: "T1".into() }));
     assert!(!view.get("a1").expect("a").roster.first().expect("e").archived);
 
-    view.apply(
-        "a1",
-        &entry(3, OpEntryKind::ThreadStatusChanged { thread_id: "T1".into(), status: ThreadTurn::MyTurn }),
-    );
-    assert_eq!(view.get("a1").expect("a").roster.first().expect("e").status, ThreadTurn::MyTurn,);
+    view.apply("a1", &entry(3, OpEntryKind::AgentStatusChanged { agent_id: "T1".into(), status: AgentTurn::MyTurn }));
+    assert_eq!(view.get("a1").expect("a").roster.first().expect("e").status, AgentTurn::MyTurn,);
 }
 
 #[test]
-fn thread_created_folds_idempotently_on_replay() {
+fn agent_created_folds_idempotently_on_replay() {
     let mut view = MaterializedView::new();
-    let created = OpEntryKind::ThreadCreated {
-        thread_id: "T1".into(),
+    let created = OpEntryKind::AgentCreated {
+        agent_id: "T1".into(),
         name: "Plan".into(),
-        status: ThreadTurn::MyTurn,
+        status: AgentTurn::MyTurn,
         timestamp_ms: 5,
         branched_from: None,
+        parent_agent_id: None,
     };
     view.apply("a1", &entry(0, created.clone()));
     view.apply("a1", &entry(0, created)); // duplicate delivery / replay
     assert_eq!(view.get("a1").expect("agent").roster.len(), 1, "a re-seen creation must refresh, never duplicate");
+}
+
+#[test]
+fn sub_agent_keeps_parent_and_delete_leaves_tombstone() {
+    let mut view = MaterializedView::new();
+    let created = OpEntryKind::AgentCreated {
+        agent_id: "A2".into(),
+        name: "Child".into(),
+        status: AgentTurn::TheirTurn,
+        timestamp_ms: 5,
+        branched_from: None,
+        parent_agent_id: Some("A1".into()),
+    };
+    view.apply("a1", &entry(0, created.clone()));
+    let fleet = view.get("a1").expect("agent");
+    assert_eq!(fleet.roster.first().and_then(|e| e.parent_agent_id.as_deref()), Some("A1"));
+
+    view.apply("a1", &entry(1, OpEntryKind::AgentDeleted { agent_id: "A2".into() }));
+    let after_delete = view.get("a1").expect("agent");
+    assert!(after_delete.roster.is_empty());
+    assert!(after_delete.deleted.contains("A2"), "a delete must tombstone the id");
+
+    view.apply("a1", &entry(2, created));
+    assert!(view.get("a1").expect("agent").deleted.is_empty(), "a re-creation lifts the tombstone");
 }
 
 #[test]
@@ -261,12 +286,13 @@ fn message_created_bumps_roster_count_and_activity() {
         "a1",
         &entry(
             0,
-            OpEntryKind::ThreadCreated {
-                thread_id: "T1".into(),
+            OpEntryKind::AgentCreated {
+                agent_id: "T1".into(),
                 name: "Chat".into(),
-                status: ThreadTurn::MyTurn,
+                status: AgentTurn::MyTurn,
                 timestamp_ms: 100,
                 branched_from: None,
+                parent_agent_id: None,
             },
         ),
     );

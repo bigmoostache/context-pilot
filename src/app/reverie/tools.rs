@@ -102,17 +102,17 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
     }
 
     // Agent is configurable — default to "cleaner" if not provided
-    let agent_id =
+    let system_id =
         tool.input.get("agent").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).unwrap_or("cleaner").to_owned();
 
-    // Guard: this agent type is already running FOR THIS THREAD. The authoritative
+    // Guard: this agent type is already running FOR THIS AGENT. The authoritative
     // guard is in `start_manual_reverie`; this one gives the user an immediate error.
-    let owner = super::trigger::owner_thread_id(state);
-    let slot = super::trigger::reverie_slot(owner.as_deref(), &agent_id);
+    let owner = super::trigger::owner_agent_id(state);
+    let slot = super::trigger::reverie_slot(owner.as_deref(), &system_id);
     if state.reveries.contains_key(&slot) {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: REVERIE.errors.already_running.replace(concat!("{", "agent_id", "}"), &agent_id),
+            content: REVERIE.errors.already_running.replace(concat!("{", "agent_id", "}"), &system_id),
             display: None,
             tldr: None,
             is_error: true,
@@ -124,7 +124,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
     let context = tool.input.get("directive").and_then(|v| v.as_str()).map(str::to_owned);
 
     // Signal to the event loop that a reverie should be started.
-    // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
+    // Sentinel format: REVERIE_START:<system_id>\n<context_or_empty>\n<human_readable_msg>
     let msg = match context.as_deref() {
         Some(c) if !c.is_empty() => format!(
             "Context optimizer activated with directive: \"{c}\". It will run in the background and report when done."
@@ -134,7 +134,7 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!("REVERIE_START:{}\n{}\n{}", agent_id, context.as_deref().unwrap_or(""), msg),
+        content: format!("REVERIE_START:{}\n{}\n{}", system_id, context.as_deref().unwrap_or(""), msg),
         display: None,
         tldr: None,
         is_error: false,

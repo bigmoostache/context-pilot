@@ -321,9 +321,9 @@ mod tests {
     fn token(seq: u64, text: &str) -> StreamFrame {
         StreamFrame {
             schema_version: 1,
-            agent_id: "a".to_owned(),
+            fleet_id: "a".to_owned(),
             worker_id: "w".to_owned(),
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: "m1".to_owned(),
             seq,
             kind: Kind::Token { text: text.to_owned() },

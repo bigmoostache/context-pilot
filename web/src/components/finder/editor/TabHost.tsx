@@ -21,7 +21,7 @@ import { type EditorGroup, type GroupsState, tabDragId, groupDropId } from "./ta
  * `preview/` are still untouched, and a tab body is one `variant="full"`
  * preview.
  */
-export function TabHost({ groups, agentId }: { groups: GroupsState; agentId: string }) {
+export function TabHost({ groups, fleetId }: { groups: GroupsState; fleetId: string }) {
   return (
     <div className="m-2 flex min-h-0 min-w-0 flex-1 gap-2 overflow-hidden">
       {groups.groups.map((group) => (
@@ -29,7 +29,7 @@ export function TabHost({ groups, agentId }: { groups: GroupsState; agentId: str
           key={group.id}
           group={group}
           groups={groups}
-          agentId={agentId}
+          fleetId={fleetId}
           isActive={group.id === groups.activeGroupId}
           // The last remaining group cannot be split away into nothing, but any
           // group can always be split; the split button is unconditional.
@@ -51,13 +51,13 @@ export function TabHost({ groups, agentId }: { groups: GroupsState; agentId: str
 function GroupView({
   group,
   groups,
-  agentId,
+  fleetId,
   isActive,
   canSplit,
 }: {
   group: EditorGroup
   groups: GroupsState
-  agentId: string
+  fleetId: string
   isActive: boolean
   canSplit: boolean
 }) {
@@ -90,7 +90,7 @@ function GroupView({
           // would leak from the tab left behind into the one arrived at.
           key={active.path}
           node={toNode(active)}
-          agentId={agentId}
+          fleetId={fleetId}
           variant="full"
           onClose={() => groups.close(group.id, active.path)}
         />

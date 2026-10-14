@@ -67,7 +67,7 @@ fn inject_global_params(schema: &mut Value) {
 /// `intent`/`verb` — it never lives in `ToolDefinition.params`, so the pre-flight
 /// schema check never hard-blocks on it. A dedicated non-blocking pre-flight
 /// phase warns (never errors) when it is missing / unknown / cross-thread while a
-/// thread is focused.
+/// agent is focused.
 fn inject_task_id_param(schema: &mut Value) {
     if let Some(obj) = schema.as_object_mut() {
         if let Some(props) = obj.get_mut("properties").and_then(Value::as_object_mut) {

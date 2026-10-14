@@ -8,7 +8,7 @@
 //!
 //! # Layout
 //!
-//! * [`types`] — Domain types: [`AuthError`], [`UserRole`], [`AgentRole`],
+//! * [`types`] — Domain types: [`AuthError`], [`UserRole`], [`FleetRole`],
 //!   [`User`], [`Session`].
 //! * [`db`] — [`AuthStore`] struct: schema init, password hashing,
 //!   token generation, and all CRUD operations.

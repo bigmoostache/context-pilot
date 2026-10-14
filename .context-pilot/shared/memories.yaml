@@ -797,15 +797,22 @@ M-tiny-50:
   last_edited_ms: 1791368656912
 M-tiny-51:
   tier: tiny
-  title: sweep
-  importance: low
-  last_edited_ms: 1791369691329
+  title: No profile under PERF lk
+  contents: 'Never put profile! guards inside PERF.snapshot() or anything holding PERF.ops lock: a new op name calls record_op -> ops.write() on same thread = deadlock (F12 freeze, fixed 40fb2275).'
+  importance: high
+  last_edited_ms: 1791790674883
 M-tiny-52:
   tier: tiny
   title: 'Perf: optimize, not async'
   contents: 'CRITICAL perf rule: instrument before optimizing, never blind. No async frenzy: optimizing the work beats moving it off the main loop (loses control).'
   importance: critical
   last_edited_ms: 1791375401749
+M-tiny-53:
+  tier: tiny
+  title: Ever-growing groups
+  contents: 'TODO (user, critical): tackle ever-expanding groups. Group panels show the WHOLE history, no truncation/omitted (user mandate), so group size grows unbounded in context. Needs a design.'
+  importance: critical
+  last_edited_ms: 1791972359342
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'

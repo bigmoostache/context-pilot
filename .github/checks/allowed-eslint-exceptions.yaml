@@ -51,7 +51,7 @@ exceptions:
       upstream files are ever restructured to component-only exports.
 
   # ── MarkdownEditor — contentEditable WYSIWYG has no non-deprecated API ────
-  - path: "web/src/components/agents/MarkdownEditor.tsx"
+  - path: "web/src/components/fleets/MarkdownEditor.tsx"
     rule: "@typescript-eslint/no-deprecated"
     reason: >
       The WYSIWYG editor drives a contentEditable surface through
@@ -408,7 +408,7 @@ exceptions:
       the key space; re-evaluate if a type-aware object-injection rule appears.
 
   # ── P7 no-unsanitized — contentEditable seeding is injection-free ─────────
-  - path: "web/src/components/agents/MarkdownEditor.tsx"
+  - path: "web/src/components/fleets/MarkdownEditor.tsx"
     rule: "no-unsanitized/property"
     reason: >
       The WYSIWYG editor seeds its contentEditable surface once on mount via

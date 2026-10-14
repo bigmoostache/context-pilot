@@ -1,6 +1,6 @@
 # Design: Multi-Thread Core Loop
 
-> Status: **DRAFT v8 — thread-centric rewrite.** Iterating with Guillaume. Nothing here is implemented yet.
+> Status: **v8 — thread-centric, implemented** on `multi-thread-core-loop` (phases A–H + T840 thread ownership, §4.1).
 > ****Disclaimer — the one place the old vocabulary survives.** Earlier drafts (v1–v7) were *worker-centric*: a fixed pool of **worker** entities roamed over threads, acquiring an exclusive **focus lease** on one thread at a time. That framing is **superseded**. The unit of execution is now the **thread itself** — there is no separate worker entity. A reader of the old draft can map across with this table; the word "worker" does **not** appear anywhere below this disclaimer.
 >
 > | v1–v7 (worker-centric) | v8 (thread-centric) |
@@ -95,6 +95,19 @@ The old exclusive focus lease is **deleted**. It existed only to arbitrate *whic
 - The only remaining scarcity is the **concurrency cap** `K` (§7.3): more Runnable threads than slots means some wait. That is a scheduling decision, not an ownership one.
 
 This single change dissolves a whole class of former problems: a stuck thread strands only *itself* and can never block another; there is nothing to "reassign"; dispatch has nothing to arbitrate (§13).
+
+### 4.1 Thread ownership in code `IMPLEMENTED (T840)`
+
+Every thread owns its runtime permanently. There is no "resident" slot and nothing is ever swapped in or out of `State`.
+
+- **`State` holds only shared data** (bucket A/C of §3: flags, tools, active modules, provider/model, reveries, `shared_module_data`, `global_next_uid`) plus one field, `thread_store: ThreadStore`.
+- **`ThreadStore`** (`cp-base/src/state/runtime/threads.rs`) stores every thread's `ThreadRuntime` keyed by thread id, plus the **executing thread id** and an *unbound* runtime used before the first placement or when focus is cleared. `ThreadRuntime` (`bundle.rs`) is bucket B: conversation, panels, editor/scroll, stream phase, token/cost telemetry, cache/freeze snapshots, `thread_module_data`.
+- **Per-thread data is reached explicitly**: `state.thread()` / `state.thread_mut()` return the executing thread's runtime. There is no `Deref` from `State` to a thread, so code cannot read a thread's data without saying so. Per-thread module state goes through `ext`/`set_ext_thread`, which read the executing thread's `thread_module_data`.
+- **The stream runtime is per-thread data too.** `StreamRuntime` (typewriter, pending tools, deferred `StreamDone`, console-wait and blocking-watcher accumulators, deferred-sleep flags) lives in the thread's `thread_module_data`, reached via `App::stream_rt()` / `stream_rt_mut()`.
+- **Switching threads is an id change**: `thread_store.set_executing(id)`. It is the single primitive behind focus change, a background step (`advance_background_threads`), save (`save_all_threads`), delivery to a background thread (`deliver_to_thread`), the drill-in paint, and boot migrations. Each caller restores the previous id when done.
+- **`executing_thread_id()` is the owner of every per-thread write** (todos, scratchpad, traces, notifications, the bridge stream tag). It never falls back to the human's focus: focus is UI-only (§4).
+- **`cp-fleet` holds scheduling metadata only** (`Entry { role, exec_state, waiting_since_ms }`), keyed by the same thread id. It has no runtime payload and no `cp-base` dependency.
+- **Deleting a thread** removes its slot from `ThreadStore`, which drops its runtime and its per-thread resources (watchers, queue, spine inbox). If it was executing, the store falls back to a freshly initialized unbound runtime.
 
 ## 5. Concurrency Model `DECIDED: cooperative, yield-based, lock-free`
 
@@ -305,6 +318,8 @@ A **new crate,** `cp-fleet`, owns the *mechanism* of the fleet:
 - The **spine** = the **notification engine** — delivers/injects thread-addressed notifications and drives auto-continuation (unchanged from single-thread, now per-thread).
 - The **loop** = **advancing active runnable threads** (§7.4). There is no separate "scheduler" entity.
 
+The registry holds **scheduling metadata only**; thread runtimes live in `cp-base`'s `ThreadStore` (§4.1).
+
 The spine reads/mutates the registry through `cp-fleet`'s API but holds no storage itself. **There is no lease map** — it was deleted with the lease (§4).
 
 ## 13. Adversarial Review — Resolutions `CLOSED`
@@ -377,6 +392,8 @@ Kept as-is; becomes per-thread under the inbox split:
 - Reverie = **same execution primitive**, subordinate role; it does **not** count against `K` and is not itself a thread — **RATIFIED**.
 - Split of concern: `cp-fleet` **= mechanism + the promoter (slot-fill policy)**, **spine = notification engine**, **loop = advancement** — RATIFIED. **No lease map.**
 - Hardening (§13): the lease/dispatch items (**H3, H6, H7, H11**) are **dissolved** by the thread-centric model; the rest keep their resolutions (streaming = per-thread async collector; cache build duplicated verbatim, never modified; callbacks per-thread with `concurrency_friendly` informational notes; structural teardown by container; guardrails per-thread, no fleet ceiling; removal of three guardrails deferred to implementation; per-thread detail view **pixel-identical** to today's panel-view).
+
+- **Thread ownership (T840):** no resident slot, no swap. `ThreadStore` owns every thread's runtime by id; switching = changing the executing id; `Deref` removed in favour of explicit `state.thread()` / `thread_mut()`; `StreamRuntime` is per-thread module data; `cp-fleet` entries are metadata only (§4.1).
 
 ## Open Questions Log
 

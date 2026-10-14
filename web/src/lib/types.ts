@@ -16,8 +16,8 @@ export type {
   AccentToken,
   FinderKind,
   LibraryItem,
-  ThreadNote,
-  ThreadTask,
+  AgentNote,
+  AgentTask,
   ToolCall,
 } from "./api/generated/types.gen"
 
@@ -25,39 +25,39 @@ export type {
 
 import type {
   AccentToken,
-  Agent as GenAgent,
+  Fleet as GenFleet,
   FinderNode as GenFinderNode,
-  ThreadDetail as GenThreadDetail,
-  ThreadMsg as GenThreadMsg,
+  AgentDetail as GenAgentDetail,
+  AgentMsg as GenAgentMsg,
 } from "./api/generated/types.gen"
 
 /**
- * Agent with UI-only `accent` field (computed client-side in reducers) and a
+ * Fleet with UI-only `accent` field (computed client-side in reducers) and a
  * `status` widened to include the client-only `"waiting"` restart status (set
  * by {@link useRestartFlow}; never emitted by the backend). The base
- * `GenAgent["status"]` is the narrow backend union, so we override it here.
+ * `GenFleet["status"]` is the narrow backend union, so we override it here.
  */
-export type Agent = Omit<GenAgent, "status"> & {
+export type Fleet = Omit<GenFleet, "status"> & {
   accent: AccentToken
-  status: AgentStatus
+  status: FleetStatus
 }
 
 /**
- * ThreadMsg with UI-only `streaming` flag (set during active LLM output).
+ * AgentMsg with UI-only `streaming` flag (set during active LLM output).
  *
  * `ts` is widened from the generated `number` (epoch ms from REST) to also
  * accept an ISO string: SSE-appended messages carry their timestamp as an ISO
  * string (see reducers `message_created`), and the mock fixtures use display
  * strings. Consumers normalise both (`typeof ts === "number" ? … : new Date(ts)`).
  */
-export type ThreadMsg = Omit<GenThreadMsg, "ts"> & {
+export type AgentMsg = Omit<GenAgentMsg, "ts"> & {
   ts?: number | string | undefined
   streaming?: boolean | undefined
 }
 
-/** ThreadDetail re-exported as-is (field optionality matches backend). */
-export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
-  log: ThreadMsg[]
+/** AgentDetail re-exported as-is (field optionality matches backend). */
+export type AgentDetail = Omit<GenAgentDetail, "log"> & {
+  log: AgentMsg[]
 }
 
 // ── Derived type aliases (extracted from generated union literals) ────
@@ -67,13 +67,13 @@ export type ThreadDetail = Omit<GenThreadDetail, "log"> & {
  * by {@link useRestartFlow} during a controlled restart. The new agent's
  * `Lifecycle::Running` delta naturally clears it back to `"idle"`.
  */
-export type AgentStatus = GenAgent["status"] | "waiting"
-export type ThreadStatus = GenThreadDetail["status"]
+export type FleetStatus = GenFleet["status"] | "waiting"
+export type AgentStatus = GenAgentDetail["status"]
 
 // ── UI-only types (no backend equivalent) ────────────────────────────
 
-/** Backend execution phase — linked to generated Agent.phase. */
-type Phase = NonNullable<GenAgent["phase"]>
+/** Backend execution phase — linked to generated Fleet.phase. */
+type Phase = NonNullable<GenFleet["phase"]>
 
 /** UI phase extends backend Phase: renames idle→ready, adds blocked. */
 export type StreamPhase = Exclude<Phase, "idle"> | "ready" | "blocked"
@@ -121,7 +121,7 @@ export interface FsNode {
   path: string
   kind: "dir" | "file"
   /** when this dir hosts an agent, its id (lets us badge it) */
-  agentId?: string
+  fleetId?: string
   children?: FsNode[]
 }
 
@@ -173,7 +173,7 @@ export type FinderNode = Omit<GenFinderNode, "modified"> & {
  * Top-level surfaces. `fleet` = the mission-control dashboard (the ONLY place
  * agents are managed). The other three are the per-agent views.
  */
-export type ViewMode = "fleet" | "threads" | "finder" | "costs"
+export type ViewMode = "fleet" | "agents" | "finder" | "costs"
 
 // ── Usage / cost analytics (Usage page) ──────────────────────────
 

@@ -1,0 +1,470 @@
+//! Thread-list shaping — pure transforms from agent state + live roster to the
+//! maquette `AgentDetail` JSON shape.
+//!
+//! The `/agents` handler ([`agents`](super::agents)) combines two
+//! sources: the agent's on-disk `config.json` (full message logs) and the
+//! in-memory [`MaterializedView`](crate::services::materialized_view::MaterializedView) roster
+//! (the live, up-to-the-millisecond agent list). The functions here perform
+//! the reshaping and the merge, kept separate from the request-handling code so
+//! both stay small and independently testable.
+
+use cp_wire::types::AgentTurn;
+use cp_wire::types::snapshot::notes::WireNote;
+use cp_wire::types::snapshot::todo::{WireTask, WireTaskStatus};
+
+use crate::services::materialized_view::RosterEntry;
+
+/// Map a [`WireTaskStatus`] to its maquette wire string (lowercase `snake_case`,
+/// matching the agent's `TodoStatus` serde). `Unknown` degrades to `"planned"`
+/// rather than failing — a newer protocol status renders as a plain item.
+const fn task_status_str(status: WireTaskStatus) -> &'static str {
+    match status {
+        WireTaskStatus::Planned | WireTaskStatus::Unknown => "planned",
+        WireTaskStatus::InProgress => "in_progress",
+        WireTaskStatus::Done => "done",
+    }
+}
+
+/// Reshape one projected [`WireTask`] into the maquette `AgentTask` JSON shape
+/// (`snake_case` → camelCase `parentId`), the read-only todo item the web aside
+/// renders. Cancelled tasks never reach here (excluded upstream).
+fn reshape_task(task: &WireTask) -> serde_json::Value {
+    serde_json::json!({
+        "id": task.id,
+        "parentId": task.parent_id,
+        "name": task.name,
+        "description": task.description,
+        "status": task_status_str(task.status),
+    })
+}
+
+/// Build the maquette `tasks` array for a roster entry — its projected tasks in
+/// order, each reshaped to the camelCase `AgentTask` shape.
+fn roster_tasks_value(entry: &RosterEntry) -> serde_json::Value {
+    serde_json::Value::Array(entry.tasks.iter().map(reshape_task).collect())
+}
+
+/// Reshape one projected [`WireNote`] into the maquette `AgentNote` JSON shape,
+/// the read-only scratchpad cell the web Notes aside renders as a list row that
+/// expands on click. The twin of [`reshape_task`].
+fn reshape_note(note: &WireNote) -> serde_json::Value {
+    serde_json::json!({
+        "id": note.id,
+        "title": note.title,
+        "content": note.content,
+    })
+}
+
+/// Build the maquette `notes` array for a roster entry — its projected notes in
+/// order, each reshaped to the `AgentNote` shape. The twin of
+/// [`roster_tasks_value`].
+fn roster_notes_value(entry: &RosterEntry) -> serde_json::Value {
+    serde_json::Value::Array(entry.notes.iter().map(reshape_note).collect())
+}
+
+/// Merge the live view roster into the disk-derived agent list (X848).
+///
+/// For each roster entry: if a disk agent with that id exists, refresh its
+/// `status`, `archived`, and `lastActivity` from the view (the authoritative,
+/// up-to-the-millisecond source — design doc I5); otherwise synthesise a
+/// log-less `AgentDetail` so an agent created since the last disk flush still
+/// appears immediately.
+pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[RosterEntry], fleet_id: &str) {
+    for entry in roster.iter().filter(|e| !superseded(e, roster)) {
+        let existing = details.iter_mut().find(|d| {
+            d.get("id").and_then(serde_json::Value::as_str).is_some_and(|id| same_agent(id, &entry.agent_id))
+        });
+        match existing {
+            // A legacy `T<n>` entry no longer receives deltas (the agent now
+            // emits `A<n>`), so its flags are frozen: the disk row wins.
+            Some(detail) if detail.get("id").and_then(serde_json::Value::as_str) != Some(entry.agent_id.as_str()) => {}
+            Some(detail) => {
+                if let Some(obj) = detail.as_object_mut() {
+                    drop(obj.insert("status".to_owned(), roster_status_value(entry.status)));
+                    drop(obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived)));
+                    drop(obj.insert("paused".to_owned(), serde_json::Value::Bool(entry.paused)));
+                    // Activity is the later of the two: disk has real message
+                    // timestamps; the view bumps on creation/restore.
+                    let disk_activity = obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                    drop(obj.insert(
+                        "lastActivity".to_owned(),
+                        serde_json::Value::from(disk_activity.max(entry.last_activity_ms)),
+                    ));
+                    // The view's projected task list is the fresher authority
+                    // (delta-fed) — it overrides any disk-derived first-paint
+                    // tasks.
+                    drop(obj.insert("tasks".to_owned(), roster_tasks_value(entry)));
+                    // Same for the projected note list (twin of tasks).
+                    drop(obj.insert("notes".to_owned(), roster_notes_value(entry)));
+                    // A stale disk record may predate the parent link.
+                    if obj.get("parentAgentId").is_none_or(serde_json::Value::is_null)
+                        && let Some(parent) = entry.parent_agent_id.as_ref()
+                    {
+                        drop(obj.insert("parentAgentId".to_owned(), serde_json::Value::from(parent.as_str())));
+                    }
+                }
+            }
+            None => details.push(synthesize_from_roster(entry, fleet_id)),
+        }
+    }
+}
+
+/// Whether two agent ids name the same agent across the T860 id migration:
+/// equal, or `T<n>` (pre-migration, still in the oplog-fed view) vs `A<n>`.
+pub(crate) fn same_agent(a: &str, b: &str) -> bool {
+    a == b || (legacy_number(a).is_some() && legacy_number(a) == legacy_number(b))
+}
+
+/// The `<n>` of a `T<n>` / `A<n>` agent id.
+fn legacy_number(id: &str) -> Option<&str> {
+    let n = id.strip_prefix('T').or_else(|| id.strip_prefix('A'))?;
+    (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).then_some(n)
+}
+
+/// A pre-migration `T<n>` roster entry whose `A<n>` twin is also present.
+fn superseded(entry: &RosterEntry, roster: &[RosterEntry]) -> bool {
+    entry.agent_id.starts_with('T')
+        && roster.iter().any(|o| o.agent_id != entry.agent_id && same_agent(&o.agent_id, &entry.agent_id))
+}
+
+/// Build a `AgentDetail` from a roster entry alone — no message bodies yet.
+fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": entry.agent_id,
+        "name": entry.name,
+        "status": roster_status_value(entry.status),
+        "fleetId": fleet_id,
+        "lastMessage": "",
+        "lastActivity": entry.last_activity_ms,
+        // Not yet flushed to disk = just created; the view's activity bump on
+        // creation is the closest creation time available.
+        "createdAt": entry.last_activity_ms,
+        "messageCount": entry.msg_count,
+        "unread": 0,
+        "archived": entry.archived,
+        "paused": entry.paused,
+        "parentAgentId": entry.parent_agent_id,
+        "log": serde_json::Value::Array(Vec::new()),
+        "tasks": roster_tasks_value(entry),
+        "notes": roster_notes_value(entry),
+    })
+}
+
+/// Attach first-paint tasks to disk-derived agent details from the agent's
+/// `config.json` todo module (`modules.todo.todos`).
+///
+/// Thread-owned todos live **separately** from the agent record in the shared
+/// todo module, so [`reshape_agent`] cannot see them — it defaults `tasks` to
+/// empty. This fills that gap for the cold-start / pre-delta window: it groups
+/// the flat todo list by `agent_id`, excludes cancelled items (the projection
+/// contract), reshapes each to the camelCase `AgentTask` shape, and writes the
+/// per-agent array onto the matching detail. The live [`overlay_roster`] then
+/// overrides these with the fresher view-fed task lists where the roster has
+/// them.
+///
+/// `config` is the parsed `config.json`; a missing todo module is tolerated
+/// (details keep their empty `tasks`).
+pub(crate) fn attach_disk_tasks(details: &mut [serde_json::Value], config: Option<&serde_json::Value>) {
+    let Some(todos) = config
+        .and_then(|c| c.get("modules"))
+        .and_then(|m| m.get("todo"))
+        .and_then(|t| t.get("todos"))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return;
+    };
+
+    for detail in details.iter_mut() {
+        let Some(tid) = detail.get("id").and_then(serde_json::Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let tasks: Vec<serde_json::Value> = todos
+            .iter()
+            .filter(|todo| {
+                todo.get("agent_id").or_else(|| todo.get("thread_id")).and_then(serde_json::Value::as_str)
+                    == Some(tid.as_str())
+            })
+            .filter(|todo| todo.get("status").and_then(serde_json::Value::as_str) != Some("cancelled"))
+            .map(disk_task_json)
+            .collect();
+        if let Some(obj) = detail.as_object_mut() {
+            let _prev = obj.insert("tasks".to_owned(), serde_json::Value::Array(tasks));
+        }
+    }
+}
+
+/// Reshape one raw `config.json` todo item into the maquette `AgentTask` shape
+/// (`parent_id` → `parentId`; status kept as its `snake_case` wire string).
+fn disk_task_json(todo: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": todo.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "parentId": todo.get("parent_id").and_then(serde_json::Value::as_str),
+        "name": todo.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "description": todo.get("description").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "status": todo.get("status").and_then(serde_json::Value::as_str).unwrap_or("planned"),
+    })
+}
+
+/// Attach first-paint notes to disk-derived agent details from the agent's
+/// `config.json` scratchpad module (`modules.scratchpad.scratchpad_cells`).
+///
+/// The twin of [`attach_disk_tasks`] for the thread-owned scratchpad: cells live
+/// **separately** from the agent record in the shared scratchpad module, so
+/// [`reshape_agent`] cannot see them — it defaults `notes` to empty. This fills
+/// the cold-start / pre-delta window: it groups the flat cell list by
+/// `agent_id` and writes the per-agent `AgentNote` array onto the matching
+/// detail. The live [`overlay_roster`] then overrides these with the fresher
+/// view-fed note lists where the roster has them. Scratchpad cells have no
+/// cancelled/soft-deleted state, so (unlike tasks) there is no exclusion filter.
+///
+/// `config` is the parsed `config.json`; a missing scratchpad module is
+/// tolerated (details keep their empty `notes`).
+pub(crate) fn attach_disk_notes(details: &mut [serde_json::Value], config: Option<&serde_json::Value>) {
+    let Some(cells) = config
+        .and_then(|c| c.get("modules"))
+        .and_then(|m| m.get("scratchpad"))
+        .and_then(|s| s.get("scratchpad_cells"))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return;
+    };
+
+    for detail in details.iter_mut() {
+        let Some(tid) = detail.get("id").and_then(serde_json::Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let notes: Vec<serde_json::Value> = cells
+            .iter()
+            .filter(|cell| {
+                cell.get("agent_id").or_else(|| cell.get("thread_id")).and_then(serde_json::Value::as_str)
+                    == Some(tid.as_str())
+            })
+            .map(disk_note_json)
+            .collect();
+        if let Some(obj) = detail.as_object_mut() {
+            let _prev = obj.insert("notes".to_owned(), serde_json::Value::Array(notes));
+        }
+    }
+}
+
+/// Reshape one raw `config.json` scratchpad cell into the maquette `AgentNote`
+/// shape (`id`/`title`/`content`). The twin of [`disk_task_json`].
+fn disk_note_json(cell: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": cell.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "title": cell.get("title").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "content": cell.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
+    })
+}
+
+/// Map a wire [`AgentTurn`] to the maquette status string.
+fn roster_status_value(status: AgentTurn) -> serde_json::Value {
+    let s = match status {
+        AgentTurn::MyTurn => "MY_TURN",
+        AgentTurn::TheirTurn | AgentTurn::Unknown => "THEIR_TURN",
+    };
+    serde_json::Value::String(s.to_owned())
+}
+
+/// Reshape one raw agent from agent state to the maquette `AgentDetail`
+/// shape: `snake_case` → camelCase, computed fields (`messageCount`, `unread`,
+/// `lastMessage`, `lastActivity`), `origin.agent_id` flattened to
+/// `branchedFrom` (null for a non-branched agent), and messages mapped to `log`.
+pub(crate) fn reshape_agent(raw: &serde_json::Value, fleet_id: &str) -> serde_json::Value {
+    let messages = raw.get("messages").and_then(serde_json::Value::as_array);
+    let msg_count = messages.map_or(0, Vec::len);
+    let unread = messages.map_or(0, |msgs| {
+        msgs.iter().filter(|m| m.get("acknowledged") == Some(&serde_json::Value::Bool(false))).count()
+    });
+    let last_msg = messages
+        .and_then(|msgs| msgs.last())
+        .and_then(|m| m.get("content"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    // Latest of the last message and the agent's own creation: a branched
+    // agent's copied history keeps the parent's (older) timestamps, so its
+    // creation is what marks it as recent until a new message lands.
+    let last_activity = messages
+        .and_then(|msgs| msgs.last())
+        .and_then(|m| m.get("timestamp"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0)
+        .max(raw.get("created_at").and_then(serde_json::Value::as_u64).unwrap_or(0));
+
+    let log: Vec<serde_json::Value> =
+        messages.map(|msgs| msgs.iter().enumerate().map(|(i, m)| reshape_message(m, i)).collect()).unwrap_or_default();
+
+    let status_str = match raw.get("status").and_then(serde_json::Value::as_str).unwrap_or("TheirTurn") {
+        "MyTurn" => "MY_TURN",
+        _ => "THEIR_TURN",
+    };
+
+    serde_json::json!({
+        "id": raw.get("id").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "name": raw.get("name").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "status": status_str,
+        "fleetId": fleet_id,
+        "lastMessage": last_msg,
+        "lastActivity": last_activity,
+        "messageCount": msg_count,
+        "unread": unread,
+        "archived": raw.get("archived").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "paused": raw.get("paused").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "branchedFrom": raw.pointer("/origin/agent_id").or_else(|| raw.pointer("/origin/thread_id")).and_then(serde_json::Value::as_str),
+        "parentAgentId": raw.get("parent_agent_id").and_then(serde_json::Value::as_str),
+        "description": raw.get("description").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "createdAt": raw.get("created_at").and_then(serde_json::Value::as_u64).unwrap_or(0),
+        "log": log,
+        "tasks": serde_json::Value::Array(Vec::new()),
+        "notes": serde_json::Value::Array(Vec::new()),
+    })
+}
+
+/// Reshape one agent message to the maquette `AgentMsg` shape.
+fn reshape_message(raw: &serde_json::Value, index: usize) -> serde_json::Value {
+    let role = match raw.get("author").and_then(serde_json::Value::as_str).unwrap_or("User") {
+        "Assistant" => "assistant",
+        _ => "user",
+    };
+    let mut msg = serde_json::json!({
+        "id": format!("msg_{index}"),
+        "author": role,
+        "text": raw.get("content").and_then(serde_json::Value::as_str).unwrap_or(""),
+        "ts": raw.get("timestamp").and_then(serde_json::Value::as_u64).unwrap_or(0),
+        "auto": raw.get("auto").and_then(serde_json::Value::as_bool).unwrap_or(false),
+    });
+    if let Some(fp) = raw.get("file_path").and_then(serde_json::Value::as_str)
+        && let Some(obj) = msg.as_object_mut()
+    {
+        drop(obj.insert("fileRef".to_owned(), serde_json::Value::String(fp.to_owned())));
+    }
+    msg
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Read a string field without indexing (`indexing_slicing` is forbid, even
+    /// in tests); `None` when absent or not a string.
+    fn str_at<'val>(v: &'val serde_json::Value, key: &str) -> Option<&'val str> {
+        v.get(key).and_then(serde_json::Value::as_str)
+    }
+
+    /// Read a `u64` field without indexing; `Some(u64)` keeps the compared
+    /// literal typed, so `default_numeric_fallback` never fires.
+    fn u64_at(v: &serde_json::Value, key: &str) -> Option<u64> {
+        v.get(key).and_then(serde_json::Value::as_u64)
+    }
+
+    /// Read a bool field without indexing.
+    fn bool_at(v: &serde_json::Value, key: &str) -> Option<bool> {
+        v.get(key).and_then(serde_json::Value::as_bool)
+    }
+
+    /// Read an array field without indexing.
+    fn arr_at<'val>(v: &'val serde_json::Value, key: &str) -> Option<&'val Vec<serde_json::Value>> {
+        v.get(key).and_then(serde_json::Value::as_array)
+    }
+
+    #[test]
+    fn overlay_synthesises_view_only_agent() {
+        // An agent present in the roster but absent on disk is appended with an
+        // empty log — the instant-appearance path.
+        let mut details: Vec<serde_json::Value> = Vec::new();
+        let roster = [RosterEntry::builder("T9", "fresh", AgentTurn::TheirTurn).last_activity_ms(4_242).build()];
+        overlay_roster(&mut details, &roster, "a1");
+        let d = details.first().expect("one synthesised detail");
+        assert_eq!(str_at(d, "id"), Some("T9"));
+        assert_eq!(str_at(d, "name"), Some("fresh"));
+        assert_eq!(str_at(d, "status"), Some("THEIR_TURN"));
+        assert_eq!(str_at(d, "fleetId"), Some("a1"));
+        assert_eq!(u64_at(d, "lastActivity"), Some(4_242));
+        assert_eq!(arr_at(d, "log").map(Vec::len), Some(0), "empty log");
+    }
+
+    #[test]
+    fn overlay_refreshes_status_archived_and_activity_on_disk_agent() {
+        // A disk agent keeps its log but takes the view's fresher status,
+        // archived flag, and (later) activity.
+        let mut details = vec![serde_json::json!({
+            "id": "T1",
+            "name": "old",
+            "status": "THEIR_TURN",
+            "fleetId": "a1",
+            "lastActivity": 100u64,
+            "archived": false,
+            "log": [{"id": "msg_0", "role": "user", "content": "hi", "timestamp": 100u64}],
+        })];
+        let roster = [RosterEntry::builder("T1", "old", AgentTurn::MyTurn)
+            .archived(true)
+            .last_activity_ms(500)
+            .msg_count(1)
+            .build()];
+        overlay_roster(&mut details, &roster, "a1");
+        let d = details.first().expect("no duplicate appended for a matched agent");
+        assert_eq!(str_at(d, "status"), Some("MY_TURN"), "status refreshed from the view");
+        assert_eq!(bool_at(d, "archived"), Some(true), "archived refreshed from the view");
+        assert_eq!(u64_at(d, "lastActivity"), Some(500), "activity is the later of disk/view");
+        assert_eq!(arr_at(d, "log").map(Vec::len), Some(1), "disk log preserved");
+    }
+
+    #[test]
+    fn reshape_agent_maps_fields_and_messages() {
+        let raw = serde_json::json!({
+            "id": "T1",
+            "name": "Plan",
+            "status": "MyTurn",
+            "archived": false,
+            "messages": [
+                {"author": "User", "content": "hi", "timestamp": 10u64, "acknowledged": true},
+                {"author": "Assistant", "content": "yo", "timestamp": 20u64, "acknowledged": false},
+            ],
+        });
+        let d = reshape_agent(&raw, "a1");
+        assert_eq!(str_at(&d, "id"), Some("T1"));
+        assert_eq!(str_at(&d, "status"), Some("MY_TURN"));
+        assert_eq!(u64_at(&d, "messageCount"), Some(2));
+        assert_eq!(u64_at(&d, "unread"), Some(1), "one unacknowledged message");
+        assert_eq!(str_at(&d, "lastMessage"), Some("yo"));
+        assert_eq!(u64_at(&d, "lastActivity"), Some(20));
+        assert_log_roles(&d);
+    }
+
+    #[test]
+    fn reshape_plain_agent_has_null_branched_from() {
+        let raw = serde_json::json!({"id": "T1", "name": "Plan", "status": "TheirTurn", "messages": []});
+        let d = reshape_agent(&raw, "a1");
+        assert_eq!(d.get("branchedFrom"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn reshape_branched_agent_exposes_parent_and_creation_activity() {
+        // A branch's copied history keeps the parent's old timestamps; its
+        // creation time is what makes it recent.
+        let raw = serde_json::json!({
+            "id": "T4",
+            "name": "Alt",
+            "status": "TheirTurn",
+            "created_at": 900u64,
+            "origin": {"thread_id": "T1", "message_ts": 20u64},
+            "messages": [
+                {"author": "User", "content": "hi", "timestamp": 10u64, "acknowledged": true},
+                {"author": "Assistant", "content": "yo", "timestamp": 20u64, "acknowledged": true},
+            ],
+        });
+        let d = reshape_agent(&raw, "a1");
+        assert_eq!(str_at(&d, "branchedFrom"), Some("T1"));
+        assert_eq!(u64_at(&d, "lastActivity"), Some(900));
+        assert_eq!(u64_at(&d, "messageCount"), Some(2));
+    }
+
+    /// The two log entries map `User`/`Assistant` to `user`/`assistant` roles —
+    /// factored out of the test body so the closures don't inflate its
+    /// cognitive complexity past the strict threshold.
+    fn assert_log_roles(d: &serde_json::Value) {
+        let log = arr_at(d, "log").expect("log array");
+        assert_eq!(log.first().and_then(|m| str_at(m, "author")), Some("user"));
+        assert_eq!(log.get(1).and_then(|m| str_at(m, "author")), Some("assistant"));
+    }
+}

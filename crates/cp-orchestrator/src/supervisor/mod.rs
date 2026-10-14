@@ -1,7 +1,7 @@
 //! Agent lifecycle **supervisor** — spawn, stop, restart, adopt.
 //!
 //! The [`ProcManager`] is the backend's process manager.  It owns the
-//! mapping from `agent_id` → running process and enforces the **allow-list
+//! mapping from `fleet_id` → running process and enforces the **allow-list
 //! gate** (R2-15): only binaries whose `realpath` appears on the list may be
 //! spawned.  Path canonicalisation (`std::fs::canonicalize`) defeats symlink
 //! traversal and `..` escape.
@@ -60,12 +60,12 @@ pub enum Error {
     /// No supervised agent with this id.
     NotFound {
         /// The id that was not found in the supervised set.
-        agent_id: String,
+        fleet_id: String,
     },
     /// Agent already tracked by the supervisor.
     AlreadySupervised {
         /// The id that is already supervised.
-        agent_id: String,
+        fleet_id: String,
     },
     /// OS-level I/O failure.
     Io {
@@ -92,11 +92,11 @@ impl core::fmt::Display for Error {
             Self::NotAllowed { ref binary } => {
                 write!(f, "binary not on allow-list: {}", binary.display())
             }
-            Self::NotFound { ref agent_id } => {
-                write!(f, "agent not found: {agent_id}")
+            Self::NotFound { ref fleet_id } => {
+                write!(f, "agent not found: {fleet_id}")
             }
-            Self::AlreadySupervised { ref agent_id } => {
-                write!(f, "agent already supervised: {agent_id}")
+            Self::AlreadySupervised { ref fleet_id } => {
+                write!(f, "agent already supervised: {fleet_id}")
             }
             Self::Io { context, ref source } => write!(f, "{context}: {source}"),
             Self::Signal { source } => write!(f, "signal error: {source}"),
@@ -116,14 +116,14 @@ pub enum Event {
     /// A spawned agent exited on its own (reaped via `try_wait`).
     Exited {
         /// The agent that exited.
-        agent_id: String,
+        fleet_id: String,
         /// Process exit code, if one was reported.
         status: Option<i32>,
     },
     /// An adopted agent's pid is no longer alive.
     Vanished {
         /// The agent whose pid stopped responding to signal-0.
-        agent_id: String,
+        fleet_id: String,
     },
 }
 
@@ -167,7 +167,7 @@ pub struct PtyPlan<'plan> {
 pub struct ProcManager {
     /// Canonicalised binary paths that may be spawned.
     allow_list: Vec<PathBuf>,
-    /// Active agents keyed by `agent_id`.
+    /// Active agents keyed by `fleet_id`.
     known: HashMap<String, Supervised>,
 }
 
@@ -196,8 +196,8 @@ impl ProcManager {
 
     /// Whether an agent with this key is currently supervised.
     #[must_use]
-    pub fn is_supervised(&self, agent_id: &str) -> bool {
-        self.known.contains_key(agent_id)
+    pub fn is_supervised(&self, fleet_id: &str) -> bool {
+        self.known.contains_key(fleet_id)
     }
 
     // ── Allow-list gate ─────────────────────────────────────────────
@@ -227,9 +227,9 @@ impl ProcManager {
     /// [`Error::AlreadySupervised`] for a duplicate id, [`Error::NotAllowed`]
     /// for an off-allow-list binary, and [`Error::Io`] for a folder or binary
     /// path that cannot be canonicalised or a spawn that fails.
-    pub fn spawn(&mut self, agent_id: String, plan: SpawnPlan<'_>) -> Result<u32> {
-        if self.known.contains_key(&agent_id) {
-            return Err(Error::AlreadySupervised { agent_id });
+    pub fn spawn(&mut self, fleet_id: String, plan: SpawnPlan<'_>) -> Result<u32> {
+        if self.known.contains_key(&fleet_id) {
+            return Err(Error::AlreadySupervised { fleet_id });
         }
         let canonical = self.validate_binary(plan.binary)?;
         let folder_canonical =
@@ -247,7 +247,7 @@ impl ProcManager {
 
         let pid = child.id();
         let _previous = self.known.insert(
-            agent_id,
+            fleet_id,
             Supervised {
                 proc: Proc::Std(child),
                 pid,
@@ -286,9 +286,9 @@ impl ProcManager {
     /// [`Error::NotAllowed`] for an off-allow-list binary, [`Error::Io`] for a
     /// folder that cannot be canonicalised, [`Error::AlreadySupervised`] for a
     /// duplicate id, and [`Error::Pty`] for any pty-layer failure.
-    pub fn spawn_pty(&mut self, agent_id: String, plan: PtyPlan<'_>) -> Result<u32> {
-        if self.known.contains_key(&agent_id) {
-            return Err(Error::AlreadySupervised { agent_id });
+    pub fn spawn_pty(&mut self, fleet_id: String, plan: PtyPlan<'_>) -> Result<u32> {
+        if self.known.contains_key(&fleet_id) {
+            return Err(Error::AlreadySupervised { fleet_id });
         }
         let canonical = self.validate_binary(plan.binary)?;
         let folder_canonical =
@@ -298,7 +298,7 @@ impl ProcManager {
 
         let _previous = self
             .known
-            .insert(agent_id, Supervised { proc, pid, binary: canonical, folder: folder_canonical, args: Vec::new() });
+            .insert(fleet_id, Supervised { proc, pid, binary: canonical, folder: folder_canonical, args: Vec::new() });
         Ok(pid)
     }
 
@@ -312,9 +312,9 @@ impl ProcManager {
     /// # Errors
     ///
     /// [`Error::NotFound`] if no supervised agent has this id.
-    pub fn stop(&mut self, agent_id: &str) -> Result<()> {
+    pub fn stop(&mut self, fleet_id: &str) -> Result<()> {
         let mut supervised =
-            self.known.remove(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
+            self.known.remove(fleet_id).ok_or_else(|| Error::NotFound { fleet_id: fleet_id.to_owned() })?;
         let raw_pid = Pid::from_raw(i32::try_from(supervised.pid).unwrap_or(i32::MAX));
 
         // Phase 1: SIGTERM
@@ -361,16 +361,16 @@ impl ProcManager {
     ///
     /// [`Error::NotFound`] if no supervised agent has this id, plus any error
     /// from the underlying [`stop`](Self::stop) / [`spawn`](Self::spawn).
-    pub fn restart(&mut self, agent_id: &str) -> Result<u32> {
-        let info = self.known.get(agent_id).ok_or_else(|| Error::NotFound { agent_id: agent_id.to_owned() })?;
+    pub fn restart(&mut self, fleet_id: &str) -> Result<u32> {
+        let info = self.known.get(fleet_id).ok_or_else(|| Error::NotFound { fleet_id: fleet_id.to_owned() })?;
         let binary = info.binary.clone();
         let folder = info.folder.clone();
         let args = info.args.clone();
 
-        self.stop(agent_id)?;
+        self.stop(fleet_id)?;
 
         let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
-        self.spawn(agent_id.to_owned(), SpawnPlan { binary: &binary, folder: &folder, args: &arg_refs })
+        self.spawn(fleet_id.to_owned(), SpawnPlan { binary: &binary, folder: &folder, args: &arg_refs })
     }
 
     // ── Adopt ───────────────────────────────────────────────────────
@@ -383,12 +383,12 @@ impl ProcManager {
     /// # Errors
     ///
     /// [`Error::AlreadySupervised`] if an agent with this id is already tracked.
-    pub fn adopt(&mut self, agent_id: String, entry: &Entry, binary: PathBuf) -> Result<()> {
-        if self.known.contains_key(&agent_id) {
-            return Err(Error::AlreadySupervised { agent_id });
+    pub fn adopt(&mut self, fleet_id: String, entry: &Entry, binary: PathBuf) -> Result<()> {
+        if self.known.contains_key(&fleet_id) {
+            return Err(Error::AlreadySupervised { fleet_id });
         }
         let _previous = self.known.insert(
-            agent_id,
+            fleet_id,
             Supervised {
                 proc: Proc::Adopted,
                 pid: entry.pid,
@@ -422,12 +422,12 @@ impl ProcManager {
             match sup.proc {
                 Proc::Std(ref mut child) => match child.try_wait() {
                     Ok(Some(status)) => {
-                        events.push(Event::Exited { agent_id: id.clone(), status: status.code() });
+                        events.push(Event::Exited { fleet_id: id.clone(), status: status.code() });
                         dead_ids.push(id.clone());
                     }
                     Ok(None) => {}
                     Err(_) => {
-                        events.push(Event::Vanished { agent_id: id.clone() });
+                        events.push(Event::Vanished { fleet_id: id.clone() });
                         dead_ids.push(id.clone());
                     }
                 },
@@ -436,18 +436,18 @@ impl ProcManager {
                         // portable_pty exit codes are u32; narrow to i32 for the
                         // shared Event shape (clamps an out-of-range code).
                         let code = i32::try_from(status.exit_code()).ok();
-                        events.push(Event::Exited { agent_id: id.clone(), status: code });
+                        events.push(Event::Exited { fleet_id: id.clone(), status: code });
                         dead_ids.push(id.clone());
                     }
                     Ok(None) => {}
                     Err(_) => {
-                        events.push(Event::Vanished { agent_id: id.clone() });
+                        events.push(Event::Vanished { fleet_id: id.clone() });
                         dead_ids.push(id.clone());
                     }
                 },
                 Proc::Adopted => {
                     if !pid_alive(raw_pid) {
-                        events.push(Event::Vanished { agent_id: id.clone() });
+                        events.push(Event::Vanished { fleet_id: id.clone() });
                         dead_ids.push(id.clone());
                     }
                 }

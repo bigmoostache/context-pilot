@@ -18,7 +18,7 @@ use calamine::{Data, Reader as _, open_workbook_auto};
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{agent_folder, confined_path, extract_param};
+use super::support::{confined_path, extract_param, fleet_folder};
 
 /// Maximum rows returned per sheet — bounds the response for a tall sheet.
 const MAX_ROWS: usize = 1000;
@@ -34,15 +34,15 @@ const MAX_SHEETS: usize = 20;
 /// is read up to the cap and flagged `truncated`.
 const MAX_CSV_BYTES: u64 = 8 * 1024 * 1024;
 
-/// `GET /api/agent/{id}/fs/sheet?path=` — spreadsheet → table JSON.
+/// `GET /api/fleet/{id}/fs/sheet?path=` — spreadsheet → table JSON.
 ///
 /// Returns `{ sheets: [{ name, rows: [[cell, …]] }], truncated }` where every
 /// cell is a string (numbers/dates are stringified for display). Confined to
 /// the agent realm (escape → `403`); a non-file → `404`; an unsupported or
 /// unparseable file → `415`. `truncated` is `true` when any row/column/sheet
 /// cap clipped the data, so the UI can show a "preview clipped" note.
-pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub(crate) fn fs_sheet(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -59,6 +59,12 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
 
     let ext = target.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
 
+    if matches!(ext.as_str(), "xlsx" | "xlsm")
+        && let Some(reply) = univer_reply(&target)
+    {
+        return reply;
+    }
+
     let parsed = match ext.as_str() {
         "csv" => parse_delimited(&target, b','),
         "tsv" => parse_delimited(&target, b'\t'),
@@ -73,6 +79,71 @@ pub(crate) fn fs_sheet(state: &Mutex<Backend>, agent_id: &str, query: &str) -> H
         })),
         None => HttpReply::error(415, "could not parse spreadsheet"),
     }
+}
+
+/// `POST /api/fleet/{id}/fs/sheet/save?path=` — body = Univer snapshot JSON.
+///
+/// Patches the original `xlsx`/`xlsm` in place with only what the snapshot
+/// changed, so formatting Univer doesn't model survives (see `univer::save`).
+/// Replies `{ written, path, patched }`; `415` for other formats, `400` for a
+/// malformed or mismatched snapshot, `413` over the preview size cap.
+pub(crate) fn fs_sheet_save(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
+        Ok(f) => f,
+        Err(reply) => return reply,
+    };
+    let relative = match extract_param(query, "path") {
+        Some(p) if !p.is_empty() => p,
+        _ => return HttpReply::error(400, "missing path parameter"),
+    };
+    let Some(target) = confined_path(&folder, &relative) else {
+        return HttpReply::error(403, "path outside agent realm");
+    };
+    if let Some(reply) = save_guard(&target) {
+        return reply;
+    }
+    let Ok(snapshot) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return HttpReply::error(400, "body is not a JSON snapshot");
+    };
+    match super::univer::save(&target, &snapshot) {
+        Ok(patched) => HttpReply::ok(&serde_json::json!({
+            "written": target.metadata().map_or(0, |m| m.len()),
+            "path": relative,
+            "patched": patched,
+        })),
+        Err(msg) => HttpReply::error(400, msg),
+    }
+}
+
+/// Refuse what can't be patched: missing file (`404`), non-xlsx (`415`),
+/// over the size cap (`413`).
+fn save_guard(target: &std::path::Path) -> Option<HttpReply> {
+    if !target.is_file() {
+        return Some(HttpReply::error(404, "file not found"));
+    }
+    let ext = target.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !matches!(ext.as_str(), "xlsx" | "xlsm") {
+        return Some(HttpReply::error(415, "only xlsx/xlsm can be patched"));
+    }
+    (target.metadata().map_or(0, |m| m.len()) > super::univer::MAX_FILE_BYTES)
+        .then(|| HttpReply::error(413, "workbook too large"))
+}
+
+/// Full-fidelity `xlsx`/`xlsm` reply: `413` over [`super::univer::MAX_FILE_BYTES`],
+/// else the Univer snapshot (`workbook` + `activeSheet`, empty `sheets`).
+/// `None` when umya can't read the file, so the caller falls back to calamine.
+fn univer_reply(target: &std::path::Path) -> Option<HttpReply> {
+    let size = target.metadata().map_or(0, |m| m.len());
+    if size > super::univer::MAX_FILE_BYTES {
+        return Some(HttpReply::error(413, "workbook too large to preview"));
+    }
+    let out = super::univer::convert_cached(target)?;
+    Some(HttpReply::ok(&serde_json::json!({
+        "sheets": [],
+        "truncated": out.truncated,
+        "workbook": &out.workbook,
+        "activeSheet": &out.active_sheet,
+    })))
 }
 
 /// A parsed spreadsheet: named sheets of stringified cell grids + a clip flag.

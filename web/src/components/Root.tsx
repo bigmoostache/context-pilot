@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { TopBar } from "@/components/shell/TopBar"
 import { CostsView } from "@/components/shell/costs/CostsView"
 import { StatusBar } from "@/components/shell/StatusBar"
-import { ThreadsView } from "@/components/threads/ThreadsView"
-import { FleetDashboard } from "@/components/agents/FleetDashboard"
-import { AgentModal } from "@/components/agents/AgentModal"
+import { AgentsView } from "@/components/agents/AgentsView"
+import { FleetDashboard } from "@/components/fleets/FleetDashboard"
+import { FleetModal } from "@/components/fleets/FleetModal"
 import { Finder } from "@/components/finder/Finder"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -16,10 +16,10 @@ import { DevModeProvider } from "@/lib/providers/toggles/DevModeProvider"
 import { ShowOverlayProvider } from "@/lib/providers/toggles/ShowOverlayProvider"
 import { AsideDefaultProvider } from "@/lib/providers/toggles/AsideDefaultProvider"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
-import { useFleet, useAgentMeta, useSseConnected, useRestartFlow } from "@/lib/live"
+import { useFleet, useFleetMeta, useSseConnected, useRestartFlow } from "@/lib/live"
 import { TelemetryProfiler } from "@/lib/support/telemetry"
 import { TelemetryHud } from "@/components/shell/widgets/TelemetryHud"
-import type { ViewMode, Agent } from "@/lib/types"
+import type { ViewMode, Fleet } from "@/lib/types"
 import "@/App.css"
 
 /**
@@ -53,15 +53,15 @@ function Root() {
 }
 
 /** The navigation atoms browser Back / Next restore (T636). One degree finer
- *  than view+agent: the accessed THREAD (threads view) rides along, so Back
+ *  than view+agent: the accessed THREAD (agents view) rides along, so Back
  *  steps through the pages actually visited.
  *  Coarser below that (finder tab/split stays in localStorage; rail toggles are
- *  never entries). `threadId` is optional — only the field relevant to
+ *  never entries). `agentId` is optional — only the field relevant to
  *  `view` is recorded, and an entry lacking it decodes fine. */
 interface NavState {
   view: ViewMode
-  agentId: string
-  threadId?: string | undefined
+  fleetId: string
+  agentId?: string | undefined
 }
 
 /** Narrow the `any`-typed `history.state` / `PopStateEvent.state` down to a
@@ -74,32 +74,32 @@ function readNav(state: unknown): NavState | undefined {
   if (typeof state !== "object" || state === null) return undefined
   const nav: unknown = (state as { nav?: unknown }).nav
   if (typeof nav !== "object" || nav === null) return undefined
-  const { view, agentId, threadId } = nav as {
+  const { view, fleetId, agentId } = nav as {
     view?: unknown
+    fleetId?: unknown
     agentId?: unknown
-    threadId?: unknown
   }
-  if (typeof view !== "string" || typeof agentId !== "string") return undefined
+  if (typeof view !== "string" || typeof fleetId !== "string") return undefined
   return {
     view: view as ViewMode,
-    agentId,
-    threadId: typeof threadId === "string" ? threadId : undefined,
+    fleetId,
+    agentId: typeof agentId === "string" ? agentId : undefined,
   }
 }
 
 /** Whether two nav entries point at the same surface — the dedupe test that
  *  keeps a redundant push (which would make one Back a no-op) off the stack. */
 function sameNav(a: NavState, b: NavState): boolean {
-  return a.view === b.view && a.agentId === b.agentId && a.threadId === b.threadId
+  return a.view === b.view && a.fleetId === b.fleetId && a.agentId === b.agentId
 }
 
-/** localStorage key holding an agent's last-selected thread. Module-scoped (no
+/** localStorage key holding a fleet's last-selected agent. Module-scoped (no
  *  closure over shell state) so it seeds the state initializer, the persist
  *  effect, and the nav-restore fallback from one place. */
-const threadKeyFor = (id: string) => `cp-thread-${id}`
+const agentKeyFor = (id: string) => `cp-agent-sel-${id}`
 
 /**
- * Wire browser Back / Next to the (view, agent, thread) tuple via
+ * Wire browser Back / Next to the (view, agent, agent) tuple via
  * the History API directly — the app has no router and needs none here.
  *
  * Three effects: (1) PUSH on change — each tuple change pushes a state-only
@@ -116,12 +116,12 @@ const threadKeyFor = (id: string) => `cp-thread-${id}`
 function useNavHistory(
   current: {
     view: ViewMode
-    agentId: string
-    threadId: string | undefined
+    fleetId: string
+    agentId: string | undefined
   },
   apply: (s: NavState) => void,
 ) {
-  const { view, agentId, threadId } = current
+  const { view, fleetId, agentId } = current
   const applyingRef = useRef(false)
   const bootRef = useRef(false)
 
@@ -132,14 +132,14 @@ function useNavHistory(
       applyingRef.current = false
       return
     }
-    // Record only the atom relevant to the current view: a threads entry
-    // carries its thread and every other view carries none, so a stale thread
+    // Record only the atom relevant to the current view: a agents entry
+    // carries its agent and every other view carries none, so a stale agent
     // never leaks into a settings/finder entry (which would break both the
     // dedupe test and the restore).
     const nav: NavState = {
       view,
-      agentId,
-      ...(view === "threads" && threadId && { threadId }),
+      fleetId,
+      ...(view === "agents" && agentId && { agentId }),
     }
     if (!bootRef.current) {
       // Seed the current location as the base entry rather than pushing a
@@ -151,7 +151,7 @@ function useNavHistory(
     const cur = readNav(history.state)
     if (cur && sameNav(cur, nav)) return
     history.pushState({ nav }, "")
-  }, [view, agentId, threadId])
+  }, [view, fleetId, agentId])
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
@@ -172,19 +172,19 @@ function useNavHistory(
  *  router, all behaviour lives in the handlers passed down. */
 interface ShellViewsProps {
   effectiveView: ViewMode
-  agents: Agent[]
-  activeAgent: ReturnType<typeof useAgentMeta>["data"] | undefined
-  activeAgentId: string
-  openAgent: (id: string) => void
+  fleets: Fleet[]
+  activeFleet: ReturnType<typeof useFleetMeta>["data"] | undefined
+  activeFleetId: string
+  openFleet: (id: string) => void
   showInFinder: (path: string) => void
   disconnected: boolean
   onReconnect: () => void
-  threadsRailOpen: boolean
-  selectedThreadId: string
-  onThreadChange: (id: string) => void
-  newThreadOpen: boolean
+  agentsRailOpen: boolean
+  selectedAgentId: string
+  onAgentChange: (id: string) => void
+  newAgentOpen: boolean
   onNewOpenChange: (v: boolean) => void
-  threadSearchOpen: boolean
+  agentSearchOpen: boolean
   onSearchOpenChange: (v: boolean) => void
   finderRailOpen: boolean
   finderRevealPath: string | null
@@ -195,22 +195,22 @@ interface ShellViewsProps {
  *  so each branch reads cleanly and the fleet fallthrough is explicit. */
 function ShellViews(p: ShellViewsProps) {
   if (p.effectiveView === "fleet") {
-    return <FleetDashboard agents={p.agents} onOpenAgent={p.openAgent} />
+    return <FleetDashboard fleets={p.fleets} onOpenFleet={p.openFleet} />
   }
   if (p.effectiveView === "costs") {
     return (
       <CostsView
-        agentId={p.activeAgentId}
+        fleetId={p.activeFleetId}
         disconnected={p.disconnected}
         onReconnect={p.onReconnect}
       />
     )
   }
-  if (p.effectiveView === "finder" && p.activeAgent) {
+  if (p.effectiveView === "finder" && p.activeFleet) {
     return (
       <Finder
-        key={p.activeAgent.id}
-        agent={p.activeAgent}
+        key={p.activeFleet.id}
+        fleet={p.activeFleet}
         railOpen={p.finderRailOpen}
         revealPath={p.finderRevealPath}
         onRevealConsumed={p.onRevealConsumed}
@@ -220,16 +220,16 @@ function ShellViews(p: ShellViewsProps) {
     )
   }
   return (
-    <ThreadsView
-      key={p.activeAgentId}
-      activeAgentId={p.activeAgentId}
-      selectedThreadId={p.selectedThreadId}
-      onThreadChange={p.onThreadChange}
+    <AgentsView
+      key={p.activeFleetId}
+      activeFleetId={p.activeFleetId}
+      selectedAgentId={p.selectedAgentId}
+      onAgentChange={p.onAgentChange}
       onShowInFinder={p.showInFinder}
-      railOpen={p.threadsRailOpen}
-      newOpen={p.newThreadOpen}
+      railOpen={p.agentsRailOpen}
+      newOpen={p.newAgentOpen}
       onNewOpenChange={p.onNewOpenChange}
-      searchOpen={p.threadSearchOpen}
+      searchOpen={p.agentSearchOpen}
       onSearchOpenChange={p.onSearchOpenChange}
       disconnected={p.disconnected}
       onReconnect={p.onReconnect}
@@ -241,48 +241,49 @@ function ShellViews(p: ShellViewsProps) {
  *  from {@link AppShell} so the open/agent guards cost the shell no complexity
  *  budget: a dialog is dismissed, never routed to, so it takes no history entry
  *  and lives in its own flag rather than in {@link NavState}. */
-function AgentSettingsDialog({
+function FleetSettingsDialog({
   open,
-  agent,
+  fleet,
   onClose,
 }: {
   open: boolean
-  agent: ShellViewsProps["activeAgent"]
+  fleet: ShellViewsProps["activeFleet"]
   onClose: () => void
 }) {
-  if (!open || !agent) return null
-  return <AgentModal modal={{ mode: "manage", agent }} onClose={onClose} />
+  if (!open || !fleet) return null
+  return <FleetModal modal={{ mode: "manage", fleet }} onClose={onClose} />
 }
 
 function AppShell() {
   const { devMode } = useDevMode()
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const [view, setView] = useState<ViewMode>(() => {
     const modes: Record<string, ViewMode> = {
       fleet: "fleet",
-      threads: "threads",
+      agents: "agents",
+      threads: "agents", // pre-T860 persisted value
       finder: "finder",
       costs: "costs",
     }
     return modes[localStorage.getItem("cp-view") ?? ""] ?? "fleet"
   })
-  const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
+  const [activeFleetId, setActiveFleetId] = useState(() => localStorage.getItem("cp-agent") ?? "")
 
   // The accessed THREAD — one degree finer than view+agent — is OWNED HERE so
   // browser Back/Next can step through it (T636). The
-  // thread selection used to live inside ThreadsView's useThreadSelection; it is
-  // lifted so a history entry can carry it and a popstate can restore it. Thread
-  // selection stays persisted per agent under the SAME `cp-thread-<id>` key the
-  // hook used, so a reload still returns to the last thread; the shell is now
+  // agent selection used to live inside AgentsView's useAgentSelection; it is
+  // lifted so a history entry can carry it and a popstate can restore it. Agent
+  // selection stays persisted per agent under the SAME `cp-agent-<id>` key the
+  // hook used, so a reload still returns to the last agent; the shell is now
   // simply the single writer of that key (the hook defers to it when controlled).
-  const [selectedThreadId, setSelectedThreadId] = useState(
-    () => localStorage.getItem(threadKeyFor(activeAgentId)) ?? "",
+  const [selectedAgentId, setSelectedAgentId] = useState(
+    () => localStorage.getItem(agentKeyFor(activeFleetId)) ?? "",
   )
 
-  // Persist the selected thread per agent (single writer — see above).
+  // Persist the selected agent per agent (single writer — see above).
   useEffect(() => {
-    if (selectedThreadId) localStorage.setItem(threadKeyFor(activeAgentId), selectedThreadId)
-  }, [activeAgentId, selectedThreadId])
+    if (selectedAgentId) localStorage.setItem(agentKeyFor(activeFleetId), selectedAgentId)
+  }, [activeFleetId, selectedAgentId])
 
   // Persist view + agent selection across reloads (write-through effects rather
   // than setter wrappers, so the useState setters keep their canonical names).
@@ -290,74 +291,74 @@ function AppShell() {
     localStorage.setItem("cp-view", view)
   }, [view])
   useEffect(() => {
-    localStorage.setItem("cp-agent", activeAgentId)
-  }, [activeAgentId])
+    localStorage.setItem("cp-agent", activeFleetId)
+  }, [activeFleetId])
 
   // Identity + roster come from the polled fleet list; the LIVE vitals (phase,
   // cost, tokens, status) come from the per-agent meta cache, which the SSE
   // bridge folds in real time (T297). Spreading the delta-folded meta over the
   // fleet row makes the always-visible TopBar + StatusBar reactive instead of
-  // riding the 15s fleet poll — the same gold path threads already use.
-  const fleetAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
-  const { data: liveAgent, loading: agentLoading } = useAgentMeta(activeAgentId)
-  const activeAgent = liveAgent ?? fleetAgent
-  const sseConnected = useSseConnected(activeAgentId)
-  const { restart: restartAgent, restarting: agentRestarting } = useRestartFlow(activeAgentId)
+  // riding the 15s fleet poll — the same gold path agents already use.
+  const fleetAgent = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
+  const { data: liveFleet, loading: fleetLoading } = useFleetMeta(activeFleetId)
+  const activeFleet = liveFleet ?? fleetAgent
+  const sseConnected = useSseConnected(activeFleetId)
+  const { restart: restartFleet, restarting: fleetRestarting } = useRestartFlow(activeFleetId)
 
-  // A persisted view of "threads"/"finder" requires a live agent to
+  // A persisted view of "agents"/"finder" requires a live agent to
   // render. If the fleet is still loading, or the stored agent id no longer
   // matches any live agent (stale localStorage — e.g. the agent was removed),
-  // `activeAgent` is undefined and those views would crash on `activeAgent.id`.
+  // `activeFleet` is undefined and those views would crash on `activeFleet.id`.
   // Fall back to the fleet view in that case (private windows never hit this
   // because they start with empty localStorage → default "fleet").
   //
   // Costs is a DEVELOPER-only surface (T301): when dev mode is off,
-  // a persisted (or stale) selection resolves to "threads" so the view can
+  // a persisted (or stale) selection resolves to "agents" so the view can
   // never render a tab the TopBar deliberately hides.
   const effectiveView: ViewMode =
     view === "costs" && !devMode
-      ? activeAgent
-        ? "threads"
+      ? activeFleet
+        ? "agents"
         : "fleet"
-      : view !== "fleet" && !activeAgent
+      : view !== "fleet" && !activeFleet
         ? "fleet"
         : view
 
-  // Open an agent → drop into its threads. Switching agent from the fleet
+  // Open an agent → drop into its agents. Switching agent from the fleet
   // dashboard is the ONLY place an agent is chosen/managed. Load that agent's
-  // last-selected thread synchronously (a direct localStorage read, not a
-  // seed effect — an effect would race a nav restore that sets the thread
+  // last-selected agent synchronously (a direct localStorage read, not a
+  // seed effect — an effect would race a nav restore that sets the agent
   // explicitly).
-  const openAgent = (id: string) => {
-    setActiveAgentId(id)
-    setSelectedThreadId(localStorage.getItem(threadKeyFor(id)) ?? "")
-    setView("threads")
+  const openFleet = (id: string) => {
+    setActiveFleetId(id)
+    setSelectedAgentId(localStorage.getItem(agentKeyFor(id)) ?? "")
+    setView("agents")
   }
 
-  // Whether the threads view's list rail is open. It lives HERE, not in
-  // ThreadsView, because the control that toggles it is the header rail's
-  // Threads tab — a sibling of the view, not a descendant. AppShell is the
+  // Whether the agents view's list rail is open. It lives HERE, not in
+  // AgentsView, because the control that toggles it is the header rail's
+  // Agents tab — a sibling of the view, not a descendant. AppShell is the
   // nearest common ancestor, and it already owns the other cross-cutting shell
   // state (view, active agent, reveal path).
   //
   // Side effect of lifting it: the rail no longer resets when you switch agent
-  // (ThreadsView is keyed by agent id, AppShell is not), so a collapsed rail
+  // (AgentsView is keyed by agent id, AppShell is not), so a collapsed rail
   // stays collapsed across the switch. Deliberate — it is panel state, not
   // per-agent state. Not persisted to localStorage.
-  const [threadsRailOpen, setThreadsRailOpen] = useState(true)
+  const [agentsRailOpen, setAgentsRailOpen] = useState(true)
 
   // The finder view's explorer rail — its OWN flag, same reasoning as above.
   // Re-clicking the Finder tab while finder is active flips it (the activity-bar
-  // idiom the Threads tab already uses).
+  // idiom the Agents tab already uses).
   const [finderRailOpen, setFinderRailOpen] = useState(true)
 
-  // The two thread-list ACTIONS, hoisted for the same reason as the rail above:
-  // their buttons now live in the header rail, a sibling of the threads view.
-  // Only the flags live here — the New Thread dialog and the search palette
-  // both still render down in the view, where the threads + agent they operate
+  // The two agent-list ACTIONS, hoisted for the same reason as the rail above:
+  // their buttons now live in the header rail, a sibling of the agents view.
+  // Only the flags live here — the New Agent dialog and the search palette
+  // both still render down in the view, where the agents + agent they operate
   // on are in scope.
-  const [newThreadOpen, setNewThreadOpen] = useState(false)
-  const [threadSearchOpen, setThreadSearchOpen] = useState(false)
+  const [newAgentOpen, setNewAgentOpen] = useState(false)
+  const [agentSearchOpen, setAgentSearchOpen] = useState(false)
 
   // The agent-settings DIALOG (T760). Restored after T617/T757 turned it into a
   // routed view: it is a command, not a destination, so it must never enter a
@@ -376,23 +377,23 @@ function AppShell() {
     setView("finder")
   }, [])
 
-  // Browser Back / Next restore the (view, agent, thread) tuple (T636).
+  // Browser Back / Next restore the (view, agent, agent) tuple (T636).
   // Declared after `effectiveView` so the entry we record is the surface the
   // user actually sees (the gated one), not the raw pre-gate `view`. `applyNav`
-  // sets the raw atoms and falls back to the agent's persisted thread (a
-  // settings/finder entry carries no threadId), so a restore never blanks a
+  // sets the raw atoms and falls back to the agent's persisted agent (a
+  // settings/finder entry carries no agentId), so a restore never blanks a
   // field the entry simply didn't record. Setters are stable, so the callback
   // never changes identity.
   const applyNav = useCallback((s: NavState) => {
     setView(s.view)
-    setActiveAgentId(s.agentId)
-    setSelectedThreadId(s.threadId ?? localStorage.getItem(threadKeyFor(s.agentId)) ?? "")
+    setActiveFleetId(s.fleetId)
+    setSelectedAgentId(s.agentId ?? localStorage.getItem(agentKeyFor(s.fleetId)) ?? "")
   }, [])
   useNavHistory(
     {
       view: effectiveView,
-      agentId: activeAgentId,
-      threadId: selectedThreadId || undefined,
+      fleetId: activeFleetId,
+      agentId: selectedAgentId || undefined,
     },
     applyNav,
   )
@@ -400,12 +401,12 @@ function AppShell() {
   // When the agent is unreachable (SSE down OR registry-stale) and we're
   // viewing an agent surface, blur+grey the main content and intercept all
   // clicks to trigger reconnect.
-  const agentStale = activeAgent?.status === "disconnected"
+  const fleetStale = activeFleet?.status === "disconnected"
   // Suppress the blur+grey overlay during an active restart — the spinner
   // already communicates the transition, and flashing "Disconnected" during a
   // controlled restart is visual noise, not a genuine failure signal.
   const showDisconnectOverlay =
-    (!sseConnected || agentStale) && effectiveView !== "fleet" && !agentRestarting
+    (!sseConnected || fleetStale) && effectiveView !== "fleet" && !fleetRestarting
 
   return (
     // Column, not row: the FOOTER is the full-width floor of the window, and
@@ -422,14 +423,14 @@ function AppShell() {
         <TopBar
           view={effectiveView}
           onViewChange={setView}
-          activeAgentId={activeAgentId}
-          onSwitchAgent={setActiveAgentId}
-          agents={agents}
-          threadsRailOpen={threadsRailOpen}
-          onToggleThreadsRail={() => setThreadsRailOpen((o) => !o)}
-          onNewThread={() => setNewThreadOpen(true)}
-          onSearchThreads={() => setThreadSearchOpen(true)}
-          onManageAgent={() => setManageOpen(true)}
+          activeFleetId={activeFleetId}
+          onSwitchFleet={setActiveFleetId}
+          fleets={fleets}
+          agentsRailOpen={agentsRailOpen}
+          onToggleAgentsRail={() => setAgentsRailOpen((o) => !o)}
+          onNewAgent={() => setNewAgentOpen(true)}
+          onSearchAgents={() => setAgentSearchOpen(true)}
+          onManageFleet={() => setManageOpen(true)}
           finderRailOpen={finderRailOpen}
           onToggleFinderRail={() => setFinderRailOpen((o) => !o)}
         />
@@ -440,20 +441,20 @@ function AppShell() {
           <TelemetryProfiler id={effectiveView}>
             <ShellViews
               effectiveView={effectiveView}
-              agents={agents}
-              activeAgent={activeAgent}
-              activeAgentId={activeAgentId}
-              openAgent={openAgent}
+              fleets={fleets}
+              activeFleet={activeFleet}
+              activeFleetId={activeFleetId}
+              openFleet={openFleet}
               showInFinder={showInFinder}
               disconnected={showDisconnectOverlay}
-              onReconnect={restartAgent}
-              threadsRailOpen={threadsRailOpen}
-              selectedThreadId={selectedThreadId}
-              onThreadChange={setSelectedThreadId}
-              newThreadOpen={newThreadOpen}
-              onNewOpenChange={setNewThreadOpen}
-              threadSearchOpen={threadSearchOpen}
-              onSearchOpenChange={setThreadSearchOpen}
+              onReconnect={restartFleet}
+              agentsRailOpen={agentsRailOpen}
+              selectedAgentId={selectedAgentId}
+              onAgentChange={setSelectedAgentId}
+              newAgentOpen={newAgentOpen}
+              onNewOpenChange={setNewAgentOpen}
+              agentSearchOpen={agentSearchOpen}
+              onSearchOpenChange={setAgentSearchOpen}
               finderRailOpen={finderRailOpen}
               finderRevealPath={finderRevealPath}
               onRevealConsumed={() => setFinderRevealPath(null)}
@@ -464,13 +465,13 @@ function AppShell() {
 
       <StatusBar
         fleet={effectiveView === "fleet"}
-        agents={agents}
-        activeAgent={activeAgent}
-        activeAgentId={activeAgentId}
-        connected={sseConnected && !agentStale}
-        onRestart={restartAgent}
-        restarting={agentRestarting}
-        loading={agentLoading}
+        fleets={fleets}
+        activeFleet={activeFleet}
+        activeFleetId={activeFleetId}
+        connected={sseConnected && !fleetStale}
+        onRestart={restartFleet}
+        restarting={fleetRestarting}
+        loading={fleetLoading}
       />
 
       {/* The agent-settings DIALOG (T760). Sibling of the row above, never a
@@ -479,9 +480,9 @@ function AppShell() {
           button that opens it lives in that rail, the state that flags it here
           — a dialog is dismissed, never routed to, so it takes no history
           entry. */}
-      <AgentSettingsDialog
+      <FleetSettingsDialog
         open={manageOpen}
-        agent={activeAgent}
+        fleet={activeFleet}
         onClose={() => setManageOpen(false)}
       />
 

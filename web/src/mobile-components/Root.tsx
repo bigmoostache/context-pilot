@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from "react"
 
-import { FleetDashboard } from "@/mobile-components/agents/FleetDashboard"
-import { AgentModal } from "@/mobile-components/agents/AgentModal"
-import { ThreadsView } from "@/mobile-components/threads/ThreadsView"
+import { FleetDashboard } from "@/mobile-components/fleets/FleetDashboard"
+import { FleetModal } from "@/mobile-components/fleets/FleetModal"
+import { AgentsView } from "@/mobile-components/agents/AgentsView"
 import { Finder } from "@/mobile-components/finder/Finder"
 import { TooltipProvider } from "@/mobile-components/ui/tooltip"
 import { AuthGuard } from "@/mobile-components/auth/AuthGuard"
@@ -33,7 +33,7 @@ import "@/App.css"
  *
  * Ancestor-promotion in action (design §3.3): this real `Root` is a promoted
  * ancestor that routes every view child through `@/mobile-components/…` (e.g. the
- * divergent `threads/ThreadsView` leaf) — so a future divergence anywhere beneath
+ * divergent `agents/AgentsView` leaf) — so a future divergence anywhere beneath
  * it is reachable, never bypassed by a stub.
  */
 function Root() {
@@ -90,17 +90,17 @@ function Root() {
 /** The three primary mobile surfaces — the desktop `costs` view is a dev-only
  *  analytics surface and is intentionally omitted from the mobile shell (P4
  *  proof-of-concept scope). */
-type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
+type MobileView = Extract<ViewMode, "fleet" | "agents" | "finder">
 
 /**
  * Mobile app shell — the chrome that diverges from desktop `AppShell`.
  *
- * Same view-routing model as desktop (fleet → threads/finder for a selected
+ * Same view-routing model as desktop (fleet → agents/finder for a selected
  * agent, persisted to the same `cp-view` / `cp-agent` localStorage keys so the
  * two trees agree on last-view across a reload). The mobile chrome is currently
  * minimal to the point of absence: there is no top bar and no bottom tab bar
  * (both removed, T611) — persistent navigation is being reworked, so for now the
- * views are reached contextually (fleet → open agent → threads; show-in-finder
+ * views are reached contextually (fleet → open agent → agents; show-in-finder
  * → finder).
  *
  * The disconnect-overlay + live-vitals plumbing desktop `AppShell` carries is
@@ -109,32 +109,33 @@ type MobileView = Extract<ViewMode, "fleet" | "threads" | "finder">
  * follow-up work, not part of proving the mirror mechanism.
  */
 function MobileShell() {
-  const { data: agents = [] } = useFleet()
+  const { data: fleets = [] } = useFleet()
   const [view, setView] = useState<MobileView>(() => {
     const stored = localStorage.getItem("cp-view")
-    return stored === "threads" || stored === "finder" ? stored : "fleet"
+    if (stored === "threads") return "agents" // pre-T860 persisted value
+    return stored === "agents" || stored === "finder" ? stored : "fleet"
   })
-  const [activeAgentId, setActiveAgentId] = useState(() => localStorage.getItem("cp-agent") ?? "")
+  const [activeFleetId, setActiveFleetId] = useState(() => localStorage.getItem("cp-agent") ?? "")
   const [finderRevealPath, setFinderRevealPath] = useState<string | null>(null)
   // Which agent's full-screen Settings page is open (null = none). It's a
   // transient overlay, NOT a persisted `view` — a reload must never land on it,
   // so it lives in its own state rather than the cp-view union. The origin the
-  // back button returns to is stashed in localStorage (`cameToAgentSettingsFrom`)
-  // per the T636 spec: "agentsList" or the agent id (opened from that thread).
-  const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null)
+  // back button returns to is stashed in localStorage (`cameToFleetSettingsFrom`)
+  // per the T636 spec: "agentsList" or the agent id (opened from that agent).
+  const [settingsFleetId, setSettingsFleetId] = useState<string | null>(null)
 
-  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const activeFleet = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
 
   // Persist view + agent selection (write-through, same keys as desktop).
   const changeView = useCallback((next: MobileView) => {
     setView(next)
     localStorage.setItem("cp-view", next)
   }, [])
-  const openAgent = useCallback(
+  const openFleet = useCallback(
     (id: string) => {
-      setActiveAgentId(id)
+      setActiveFleetId(id)
       localStorage.setItem("cp-agent", id)
-      changeView("threads")
+      changeView("agents")
     },
     [changeView],
   )
@@ -148,21 +149,21 @@ function MobileShell() {
 
   // Open the agent Settings page, stashing where Back should return: "agentsList"
   // when opened from the fleet grid, or the agent id when opened from that
-  // agent's thread page (so Back re-selects that agent's threads). T636 spec.
-  const openAgentSettings = useCallback((agentId: string, fromList: boolean) => {
-    localStorage.setItem("cameToAgentSettingsFrom", fromList ? "agentsList" : agentId)
-    setSettingsAgentId(agentId)
+  // agent's agent page (so Back re-selects that agent's agents). T636 spec.
+  const openFleetSettings = useCallback((fleetId: string, fromList: boolean) => {
+    localStorage.setItem("cameToFleetSettingsFrom", fromList ? "agentsList" : fleetId)
+    setSettingsFleetId(fleetId)
   }, [])
 
   // Close the Settings page and return to origin (read from localStorage): the
-  // fleet grid, or that agent's threads view.
+  // fleet grid, or that agent's agents view.
   const backFromSettings = useCallback(() => {
-    const from = localStorage.getItem("cameToAgentSettingsFrom")
-    setSettingsAgentId(null)
+    const from = localStorage.getItem("cameToFleetSettingsFrom")
+    setSettingsFleetId(null)
     if (from && from !== "agentsList") {
-      setActiveAgentId(from)
+      setActiveFleetId(from)
       localStorage.setItem("cp-agent", from)
-      changeView("threads")
+      changeView("agents")
     } else {
       changeView("fleet")
     }
@@ -170,7 +171,7 @@ function MobileShell() {
 
   // Any non-fleet view needs a live agent; a stale/empty selection falls back to
   // the fleet grid (mirrors desktop's effectiveView guard).
-  const effectiveView: MobileView = view !== "fleet" && !activeAgent ? "fleet" : view
+  const effectiveView: MobileView = view !== "fleet" && !activeFleet ? "fleet" : view
 
   // Signal the top-buttons provider on every page switch so the corner controls
   // re-spring their glyph in lock-step with the transition (T637). Fires on
@@ -180,15 +181,15 @@ function MobileShell() {
 
   // The agent whose Settings page is open, resolved to a live fleet member (a
   // just-retired agent vanishes from the list → the overlay closes itself).
-  const settingsAgent = settingsAgentId ? agents.find((a) => a.id === settingsAgentId) : undefined
+  const settingsFleet = settingsFleetId ? fleets.find((a) => a.id === settingsFleetId) : undefined
 
   const body = () => {
     if (effectiveView === "fleet") {
       return (
         <FleetDashboard
-          agents={agents}
-          onOpenAgent={openAgent}
-          onManageAgent={(id) => openAgentSettings(id, true)}
+          fleets={fleets}
+          onOpenFleet={openFleet}
+          onManageFleet={(id) => openFleetSettings(id, true)}
           autoCreate={false}
           onAutoCreateConsumed={() => {
             /* mobile PoC: auto-create dialog not wired */
@@ -196,11 +197,11 @@ function MobileShell() {
         />
       )
     }
-    if (effectiveView === "finder" && activeAgent) {
+    if (effectiveView === "finder" && activeFleet) {
       return (
         <Finder
-          key={activeAgent.id}
-          agent={activeAgent}
+          key={activeFleet.id}
+          fleet={activeFleet}
           revealPath={finderRevealPath}
           onRevealConsumed={() => setFinderRevealPath(null)}
           disconnected={false}
@@ -211,12 +212,12 @@ function MobileShell() {
       )
     }
     return (
-      <ThreadsView
-        key={activeAgentId}
-        activeAgentId={activeAgentId}
+      <AgentsView
+        key={activeFleetId}
+        activeFleetId={activeFleetId}
         onShowInFinder={showInFinder}
-        onGoToAgents={() => changeView("fleet")}
-        onOpenSettings={activeAgent ? () => openAgentSettings(activeAgent.id, false) : undefined}
+        onGoToFleets={() => changeView("fleet")}
+        onOpenSettings={activeFleet ? () => openFleetSettings(activeFleet.id, false) : undefined}
         disconnected={false}
         onReconnect={() => {
           /* mobile PoC: live reconnect not wired */
@@ -241,7 +242,7 @@ function MobileShell() {
     <div className="mobile-shell flex w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* No persistent chrome on mobile — no top bar, no bottom tab bar (T611).
           View navigation is being reworked; for now views are reached
-          contextually (fleet → open agent → threads; show-in-finder → finder).
+          contextually (fleet → open agent → agents; show-in-finder → finder).
 
           pt safe-area inset: when the app runs as a standalone home-screen web
           app (apple-mobile-web-app-status-bar-style=black-translucent) the web
@@ -252,10 +253,10 @@ function MobileShell() {
           pb-[max(1rem,env(safe-area-inset-bottom))]), so padding it here too
           would double-count. In a plain Safari tab the inset is 0 = no-op. */}
       {/* Fixed-height flex column (NOT overflow-auto): each view is a
-          `flex-1 min-h-0 flex-col` root that owns its OWN scroll (ThreadsView's
+          `flex-1 min-h-0 flex-col` root that owns its OWN scroll (AgentsView's
           conversation ScrollArea, the fleet/finder ScrollAreas). A scrolling
           outer wrapper here was a SECOND scroll layer — it let a view grow to
-          its content height, so ThreadConversation's `absolute bottom-0`
+          its content height, so AgentConversation's `absolute bottom-0`
           composer pinned to the bottom of ALL the messages (below the fold) and
           scrolled with them instead of staying on-screen (T637). As a fixed
           flex column with `overflow-hidden`, the view fills the viewport exactly,
@@ -265,7 +266,7 @@ function MobileShell() {
           NO top safe-area padding here (T639): a shared `pt-[env(safe-area-
           inset-top)]` on this wrapper pushes every view's scroll VIEWPORT below
           the iOS status bar, so content clips at the viewport top and never
-          scrolls UNDER the translucent bar (the "threads doesn't use the top
+          scrolls UNDER the translucent bar (the "agents doesn't use the top
           space" bug). Instead each scrolling view reaches y=0 and pads its own
           scroll CONTENT with env(safe-area-inset-top) — the pattern the Agent
           Settings page already uses (fixed inset-0 + internal header pad) — so
@@ -276,7 +277,7 @@ function MobileShell() {
       {/* Agent Settings page — a full-screen (fixed inset-0) overlay above every
           view. Rendered only when open AND the target agent still exists; its own
           back chevron calls backFromSettings to return to the stashed origin. */}
-      {settingsAgent && <AgentModal agent={settingsAgent} onClose={backFromSettings} />}
+      {settingsFleet && <FleetModal fleet={settingsFleet} onClose={backFromSettings} />}
     </div>
   )
 }

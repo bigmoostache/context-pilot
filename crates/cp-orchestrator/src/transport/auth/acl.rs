@@ -12,50 +12,50 @@ use crate::services::auth::types::{AccessGrant, User};
 
 /// Extract an agent id from URL segments if the route is agent-scoped.
 ///
-/// Matches `["api", "agent", id, ..]` — every route that targets a
+/// Matches `["api", "fleet", id, ..]` — every route that targets a
 /// specific agent.
-pub(crate) fn extract_agent_id<'seg>(segments: &[&'seg str]) -> Option<&'seg str> {
+pub(crate) fn extract_fleet_id<'seg>(segments: &[&'seg str]) -> Option<&'seg str> {
     match *segments {
-        ["api", "agent", id, ..] => Some(id),
+        ["api", "fleet", id, ..] => Some(id),
         _ => None,
     }
 }
 
-/// Check whether `user` is authorized to access `agent_id`.
+/// Check whether `user` is authorized to access `fleet_id`.
 ///
-/// `can_manage_all_agents` (manager+) grants implicit god-mode access to every
+/// `can_manage_all_fleets` (manager+) grants implicit god-mode access to every
 /// agent (FR-09 → FR-v3-09/§13.3). Everyone else needs an explicit ACL entry
 /// (FR-10).  Returns `true` when auth is disabled (backend.auth is `None`).
-pub(crate) fn authorize_agent(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
+pub(crate) fn authorize_fleet(state: &Mutex<Backend>, fleet_id: &str, user: &User) -> bool {
     // Implicit access to all agents bypasses ACL entirely (design §13.3).
-    if user.can_manage_all_agents() {
+    if user.can_manage_all_fleets() {
         return true;
     }
     let Ok(b) = state.lock() else { return false };
     let Some(auth) = b.auth.as_ref() else { return true };
-    auth.check_access(agent_id, &user.id).is_ok_and(|role| role.is_some())
+    auth.check_access(fleet_id, &user.id).is_ok_and(|role| role.is_some())
 }
 
 /// Check whether the caller can manage ACL on an agent (system admin OR
 /// agent-admin on this specific agent — FR-14b/FR-14c).
-fn can_manage_acl(state: &Mutex<Backend>, agent_id: &str, user: &User) -> bool {
-    if user.can_manage_all_agents() {
+fn can_manage_acl(state: &Mutex<Backend>, fleet_id: &str, user: &User) -> bool {
+    if user.can_manage_all_fleets() {
         return true;
     }
     let Ok(b) = state.lock() else { return false };
     let Some(auth) = b.auth.as_ref() else { return false };
-    auth.is_agent_admin(agent_id, &user.id).unwrap_or(false)
+    auth.is_fleet_admin(fleet_id, &user.id).unwrap_or(false)
 }
 
 // ───────────────── ACL CRUD endpoints (Phase 6) ──────────────────────
 
-/// `GET /api/agent/{id}/acl` — list users with access (admin or
+/// `GET /api/fleet/{id}/acl` — list users with access (admin or
 /// agent-admin).
-pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option<&User>) -> HttpReply {
+pub(crate) fn acl_list(state: &Mutex<Backend>, fleet_id: &str, auth_user: Option<&User>) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if !can_manage_acl(state, agent_id, caller) {
+    if !can_manage_acl(state, fleet_id, caller) {
         return HttpReply::error(403, "admin or agent-admin required");
     }
     let Ok(b) = state.lock() else {
@@ -64,28 +64,28 @@ pub(crate) fn acl_list(state: &Mutex<Backend>, agent_id: &str, auth_user: Option
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    auth.list_agent_users(agent_id)
+    auth.list_fleet_users(fleet_id)
         .map_or_else(|_| HttpReply::error(500, "database error"), |entries| HttpReply::ok(&entries))
 }
 
-/// `POST /api/agent/{id}/acl` — grant a user access (with role).
+/// `POST /api/fleet/{id}/acl` — grant a user access (with role).
 ///
 /// Body: `{ "user_id": "...", "role": "agent-user" }`
-pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], auth_user: Option<&User>) -> HttpReply {
+pub(crate) fn acl_grant(state: &Mutex<Backend>, fleet_id: &str, body: &[u8], auth_user: Option<&User>) -> HttpReply {
     #[derive(serde::Deserialize)]
     struct Req {
         user_id: String,
         #[serde(default = "default_agent_role")]
-        role: crate::services::auth::types::AgentRole,
+        role: crate::services::auth::types::FleetRole,
     }
-    const fn default_agent_role() -> crate::services::auth::types::AgentRole {
-        crate::services::auth::types::AgentRole::AgentUser
+    const fn default_agent_role() -> crate::services::auth::types::FleetRole {
+        crate::services::auth::types::FleetRole::FleetUser
     }
 
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if !can_manage_acl(state, agent_id, caller) {
+    if !can_manage_acl(state, fleet_id, caller) {
         return HttpReply::error(403, "admin or agent-admin required");
     }
 
@@ -100,7 +100,7 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
         return HttpReply::error(501, "auth not enabled");
     };
     match auth.grant_access(AccessGrant {
-        agent_id,
+        fleet_id,
         user_id: &req.user_id,
         role: req.role,
         granted_by: Some(&caller.id),
@@ -110,7 +110,7 @@ pub(crate) fn acl_grant(state: &Mutex<Backend>, agent_id: &str, body: &[u8], aut
     }
 }
 
-/// `PATCH /api/agent/{id}/acl/{userId}` — change a user's per-agent role.
+/// `PATCH /api/fleet/{id}/acl/{userId}` — change a user's per-agent role.
 ///
 /// Body: `{ "role": "agent-admin" }`
 pub(crate) fn acl_update_role(
@@ -121,14 +121,14 @@ pub(crate) fn acl_update_role(
 ) -> HttpReply {
     #[derive(serde::Deserialize)]
     struct Req {
-        role: crate::services::auth::types::AgentRole,
+        role: crate::services::auth::types::FleetRole,
     }
 
-    let (agent_id, target_user_id) = ids;
+    let (fleet_id, target_user_id) = ids;
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if !can_manage_acl(state, agent_id, caller) {
+    if !can_manage_acl(state, fleet_id, caller) {
         return HttpReply::error(403, "admin or agent-admin required");
     }
 
@@ -142,24 +142,24 @@ pub(crate) fn acl_update_role(
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.update_agent_role(agent_id, target_user_id, req.role) {
+    match auth.update_fleet_role(fleet_id, target_user_id, req.role) {
         Ok(true) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Ok(false) => HttpReply::error(404, "access entry not found"),
         Err(_) => HttpReply::error(500, "role update failed"),
     }
 }
 
-/// `DELETE /api/agent/{id}/acl/{userId}` — revoke a user's access.
+/// `DELETE /api/fleet/{id}/acl/{userId}` — revoke a user's access.
 pub(crate) fn acl_revoke(
     state: &Mutex<Backend>,
-    agent_id: &str,
+    fleet_id: &str,
     target_user_id: &str,
     auth_user: Option<&User>,
 ) -> HttpReply {
     let Some(caller) = auth_user else {
         return HttpReply::error(501, "auth not enabled");
     };
-    if !can_manage_acl(state, agent_id, caller) {
+    if !can_manage_acl(state, fleet_id, caller) {
         return HttpReply::error(403, "admin or agent-admin required");
     }
     let Ok(b) = state.lock() else {
@@ -168,7 +168,7 @@ pub(crate) fn acl_revoke(
     let Some(auth) = b.auth.as_ref() else {
         return HttpReply::error(501, "auth not enabled");
     };
-    match auth.revoke_access(agent_id, target_user_id) {
+    match auth.revoke_access(fleet_id, target_user_id) {
         Ok(true) => HttpReply::ok(&serde_json::json!({ "ok": true })),
         Ok(false) => HttpReply::error(404, "access entry not found"),
         Err(_) => HttpReply::error(500, "revoke failed"),
@@ -177,22 +177,22 @@ pub(crate) fn acl_revoke(
 
 /// Filter a fleet of agent IDs to only those the user can access.
 ///
-/// `can_manage_all_agents` holders (manager+) see everything; regular users see
+/// `can_manage_all_fleets` holders (manager+) see everything; regular users see
 /// only agents with an ACL entry. When auth is disabled (`auth_user` is `None`),
 /// all agents pass.
-pub(crate) fn filter_fleet(state: &Mutex<Backend>, agent_ids: &[String], auth_user: Option<&User>) -> Vec<String> {
+pub(crate) fn filter_fleet(state: &Mutex<Backend>, fleet_ids: &[String], auth_user: Option<&User>) -> Vec<String> {
     let Some(user) = auth_user else {
-        return agent_ids.to_vec();
+        return fleet_ids.to_vec();
     };
-    if user.can_manage_all_agents() {
-        return agent_ids.to_vec();
+    if user.can_manage_all_fleets() {
+        return fleet_ids.to_vec();
     }
     let Ok(b) = state.lock() else {
         return Vec::new();
     };
     let Some(auth) = b.auth.as_ref() else {
-        return agent_ids.to_vec();
+        return fleet_ids.to_vec();
     };
-    let accessible = auth.list_user_agents(&user.id).unwrap_or_default();
-    agent_ids.iter().filter(|id| accessible.contains(id)).cloned().collect()
+    let accessible = auth.list_user_fleets(&user.id).unwrap_or_default();
+    fleet_ids.iter().filter(|id| accessible.contains(id)).cloned().collect()
 }

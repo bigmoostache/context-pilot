@@ -9,7 +9,7 @@
 //! reading, status codes, the ticket gate, and reconnect-replay-by-`rev` all
 //! work end-to-end on the wire.
 //!
-//! * **REST envelopes.** `GET /api/fleet` and `/api/agent/{id}` carry the
+//! * **REST envelopes.** `GET /api/fleets` and `/api/fleet/{id}` carry the
 //!   `rev` they reflect; an unknown agent is a real `404`.
 //! * **Actions.** `POST /api/ticket` mints a token; `POST .../command` is a
 //!   real `400` on malformed input.
@@ -33,6 +33,7 @@ use cp_mod_utilities as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use flate2 as _;
 use minisign_verify as _;
 use nix as _;
 use notify as _;
@@ -43,6 +44,7 @@ use rusqlite as _;
 use serde as _;
 use serde_yaml as _;
 use sha2 as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use std::path::Path;
@@ -58,7 +60,7 @@ use cp_orchestrator::transport::serve_bound;
 
 use cp_wire::types::ContentHash;
 use cp_wire::types::oplog::{OpEntry, OpEntryKind};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tiny_http::Server;
 
@@ -85,7 +87,7 @@ mod tests {
             tee_socket_path: oplog_dir.join("tee.sock").to_string_lossy().into_owned(),
             cap_token: "cap-token".to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 
@@ -98,7 +100,7 @@ mod tests {
     /// A `MessageCreated` head keyed by `byte`.
     fn message(byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: "T1".to_owned(),
+            agent_id: "T1".to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -125,7 +127,7 @@ mod tests {
 
     /// Boot a backend serving one discoverable agent whose oplog holds `n_msgs`
     /// message entries, on a freshly-claimed ephemeral port.
-    fn harness(agent_id: &str, n_msgs: u8) -> Harness {
+    fn harness(fleet_id: &str, n_msgs: u8) -> Harness {
         let agents = tempdir().expect("agents dir");
         let oplog = tempdir().expect("oplog dir");
 
@@ -136,7 +138,7 @@ mod tests {
         }
         writer.sync().expect("sync");
 
-        let entry = make_entry(agent_id, oplog.path());
+        let entry = make_entry(fleet_id, oplog.path());
         write_entry(agents.path(), &entry);
 
         let mut backend = Backend::new(
@@ -148,7 +150,7 @@ mod tests {
             None,
             Duration::from_hours(1),
         );
-        backend.view_mut().apply_batch(agent_id, &replay_entries(oplog.path()));
+        backend.view_mut().apply_batch(fleet_id, &replay_entries(oplog.path()));
         let state = Arc::new(Mutex::new(backend));
 
         let server = Server::http("127.0.0.1:0").expect("bind ephemeral");
@@ -174,16 +176,16 @@ mod tests {
     fn rest_fleet_and_agent_carry_rev_envelopes() {
         let h = harness("agent-a", 3);
 
-        let fleet = common::get(&h.addr, "/api/fleet", &[]);
+        let fleet = common::get(&h.addr, "/api/fleets", &[]);
         assert_eq!(fleet.status, 200, "fleet served");
         assert!(fleet.body.contains("\"rev\""), "fleet wraps a rev envelope");
         assert!(fleet.body.contains("agent-a"), "the agent appears in the fleet");
 
-        let agent = common::get(&h.addr, "/api/agent/agent-a", &[]);
+        let agent = common::get(&h.addr, "/api/fleet/agent-a", &[]);
         assert_eq!(agent.status, 200);
         assert!(agent.body.contains("\"rev\""), "agent view wraps a rev");
 
-        let missing = common::get(&h.addr, "/api/agent/ghost", &[]);
+        let missing = common::get(&h.addr, "/api/fleet/ghost", &[]);
         assert_eq!(missing.status, 404, "unknown agent is a real 404");
     }
 
@@ -211,7 +213,7 @@ mod tests {
         assert_eq!(ticket.status, 200);
         assert!(ticket.body.contains("\"ticket\""), "a ticket token is minted");
 
-        let bad = common::post_json(&h.addr, "/api/agent/agent-b/command", b"{not json");
+        let bad = common::post_json(&h.addr, "/api/fleet/agent-b/command", b"{not json");
         assert_eq!(bad.status, 400, "a malformed command is a real 400");
     }
 

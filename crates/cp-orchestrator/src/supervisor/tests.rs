@@ -119,7 +119,7 @@ fn adopt_and_detect_vanish() {
         tee_socket_path: String::new(),
         cap_token: String::new(),
         started_at_ms: 0,
-        status: cp_wire::types::registry::AgentStatus::Running,
+        status: cp_wire::types::registry::FleetStatus::Running,
     };
 
     sup.adopt("a2".into(), &entry, PathBuf::from("/bin/sleep")).unwrap_or_else(|e| panic!("adopt: {e}"));
@@ -128,7 +128,7 @@ fn adopt_and_detect_vanish() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(events.first(), Some(Event::Vanished { agent_id }) if agent_id == "a2"),
+        matches!(events.first(), Some(Event::Vanished { fleet_id }) if fleet_id == "a2"),
         "expected Vanished, got {events:?}"
     );
     assert!(sup.is_empty(), "dead agent should be removed");
@@ -176,7 +176,7 @@ fn check_liveness_reaps_exited_child() {
     let events = sup.check_liveness();
     assert_eq!(events.len(), 1);
     assert!(
-        matches!(events.first(), Some(Event::Exited { agent_id, .. }) if agent_id == "a4"),
+        matches!(events.first(), Some(Event::Exited { fleet_id, .. }) if fleet_id == "a4"),
         "expected Exited, got {events:?}"
     );
     assert!(sup.is_empty());

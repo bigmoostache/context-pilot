@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
@@ -7,6 +8,7 @@ use cp_base::state::watchers::carriers::{DeferredPanel, WatcherResult};
 use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
+use crate::monitor::spec::Record;
 use crate::tools::truncate_str;
 
 /// Serializable metadata for a console session (used for persistence across reloads).
@@ -74,7 +76,14 @@ pub struct ConsoleState {
     pub sessions: HashMap<String, SessionHandle>,
     /// Monotonic counter for generating unique session keys.
     pub next_session_id: usize,
+    /// Monitors registered by this agent (alive + recently ended), shared with their watchers.
+    pub monitors: Vec<Arc<Mutex<Record>>>,
+    /// Counter behind monitor ids (`M<n>`).
+    pub next_monitor_id: usize,
 }
+
+/// Ended monitors kept for the Monitor panel.
+const ENDED_MONITORS_KEPT: usize = 10;
 
 impl Default for ConsoleState {
     fn default() -> Self {
@@ -86,7 +95,41 @@ impl ConsoleState {
     /// Create an empty console state with session counter at 1.
     #[must_use]
     pub fn new() -> Self {
-        Self { sessions: HashMap::new(), next_session_id: 1 }
+        Self { sessions: HashMap::new(), next_session_id: 1, monitors: Vec::new(), next_monitor_id: 1 }
+    }
+
+    /// Next monitor id (`M<n>`).
+    pub fn alloc_monitor_id(&mut self) -> String {
+        let id = format!("M{}", self.next_monitor_id);
+        self.next_monitor_id = self.next_monitor_id.saturating_add(1);
+        id
+    }
+
+    /// Keep every alive monitor and only the most recently ended ones.
+    pub fn prune_monitors(&mut self) {
+        let mut ended: Vec<u64> = self
+            .monitors
+            .iter()
+            .filter_map(|m| m.lock().unwrap_or_else(PoisonError::into_inner).ended_at_ms())
+            .collect();
+        if ended.len() <= ENDED_MONITORS_KEPT {
+            return;
+        }
+        ended.sort_unstable_by(|a, b| b.cmp(a));
+        let cutoff = ended.get(ENDED_MONITORS_KEPT.saturating_sub(1)).copied().unwrap_or(0);
+        let mut kept_at_cutoff = ended.iter().take(ENDED_MONITORS_KEPT).filter(|&&t| t == cutoff).count();
+        self.monitors.retain(|m| {
+            let ended_at = m.lock().unwrap_or_else(PoisonError::into_inner).ended_at_ms();
+            match ended_at {
+                None => true,
+                Some(t) if t > cutoff => true,
+                Some(t) if t == cutoff && kept_at_cutoff > 0 => {
+                    kept_at_cutoff = kept_at_cutoff.saturating_sub(1);
+                    true
+                }
+                Some(_) => false,
+            }
+        });
     }
 
     /// Get shared ref from State's `TypeMap`.
@@ -108,11 +151,40 @@ impl ConsoleState {
         state.ext_mut::<Self>()
     }
 
+    /// Allocate a session key unique across the whole project: `{prefix}_{agent}_{n}`.
+    ///
+    /// The counter is per agent, but log files and the console server's session map
+    /// are shared by every agent, so the agent id must be part of the key — a bare
+    /// `c_2` from two agents would point at the same log and server session.
+    pub fn alloc_key(state: &mut State, prefix: &str) -> String {
+        let agent = state.executing_agent_id().unwrap_or("root").to_owned();
+        let cs = Self::get_mut(state);
+        let key = format!("{prefix}_{agent}_{}", cs.next_session_id);
+        cs.next_session_id = cs.next_session_id.saturating_add(1);
+        key
+    }
+
     /// Kill a session by name and update its panel metadata.
     pub fn kill_session(state: &mut State, name: &str) {
         let cs = Self::get_mut(state);
         if let Some(handle) = cs.sessions.get(name) {
             handle.kill();
+        }
+    }
+
+    /// Kill every session without waiting for the server (agent teardown).
+    ///
+    /// Each kill runs on a detached thread ([`SessionHandle::kill`]); the
+    /// blocking variant made deleting an agent stall the main loop for one
+    /// server round-trip per console.
+    pub fn kill_all(state: &mut State) {
+        let cs = Self::get_mut(state);
+        let mut keys: Vec<_> = cs.sessions.keys().cloned().collect();
+        keys.sort();
+        for key in keys {
+            if let Some(handle) = cs.sessions.remove(&key) {
+                handle.kill();
+            }
         }
     }
 
@@ -147,7 +219,7 @@ pub fn format_wait_result(name: &str, exit_code: Option<i32>, panel_id: &str, la
 /// SOLE gate: output at or under this size returns inline, anything larger spills
 /// to a panel. Byte size (not line count) is what actually bloats the
 /// conversation — a few huge lines (e.g. minified JSON) cost as much as many.
-const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
+pub(crate) const EASY_BASH_INLINE_MAX_BYTES: usize = 8_000;
 
 /// A watcher that monitors a console session for a condition.
 #[derive(Debug)]
@@ -326,7 +398,7 @@ impl Watcher for ConsoleWatcher {
         None
     }
 
-    fn thread_id(&self) -> Option<&str> {
+    fn agent_id(&self) -> Option<&str> {
         None
     }
 

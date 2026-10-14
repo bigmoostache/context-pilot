@@ -54,7 +54,7 @@ pub struct ToolText {
 pub struct ToolUse {
     /// Unique ID assigned by the LLM (used to correlate with [`ToolResult`]).
     pub id: String,
-    /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
+    /// Tool identifier (e.g., `"Open"`, `"Git"`).
     pub name: String,
     /// JSON object of tool parameters.
     pub input: Value,
@@ -204,7 +204,7 @@ impl ToolParam {
 /// Serialized to JSON Schema for the LLM API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
-    /// Tool identifier (e.g., `"Open"`, `"git_execute"`).
+    /// Tool identifier (e.g., `"Open"`, `"Git"`).
     pub id: String,
     /// Display name (may differ from id for UI).
     pub name: String,
@@ -223,7 +223,7 @@ pub struct ToolDefinition {
     /// Whether this tool opts into task declaration: when `true`, a compulsory
     /// `task_id` parameter is injected into the LLM-facing schema (like
     /// `intent`/`verb`) and validated non-blockingly (warn on missing / unknown
-    /// / cross-thread when a thread is focused). Default `false` (opt-out).
+    /// / cross-thread when an agent is focused). Default `false` (opt-out).
     pub declares_task: bool,
 }
 
@@ -338,7 +338,7 @@ impl ToolDefBuilder<'_> {
 
     /// Opt this tool into task declaration — a compulsory `task_id` parameter is
     /// injected into the LLM-facing schema and validated non-blockingly (warn on
-    /// missing / unknown / cross-thread when a thread is focused).
+    /// missing / unknown / cross-thread when an agent is focused).
     #[must_use]
     pub const fn declares_task(mut self) -> Self {
         self.declares_task = true;

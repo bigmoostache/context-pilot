@@ -54,7 +54,7 @@ use cp_wire::PROTOCOL_VERSION;
 use cp_wire::heartbeat::DEFAULT_CADENCE;
 use cp_wire::types::LifecycleState;
 use cp_wire::types::oplog::OpEntryKind;
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use crate::error::{BootResult, Error};
 use crate::heartbeat::Beacon;
@@ -85,7 +85,7 @@ pub(crate) const TEE_SOCKET: &str = "tee.sock";
 /// A booted agent bridge: the held resources plus the registry record that
 /// advertises them.
 ///
-/// Dropping it releases the folder lock, stops the oplog commit thread, and
+/// Dropping it releases the folder lock, stops the oplog commit agent, and
 /// removes the registry record and socket file.
 #[derive(Debug)]
 pub struct Boot {
@@ -93,7 +93,7 @@ pub struct Boot {
     /// underscore documents that it is owned for its `Drop`, not read.
     _lock: Flock<File>,
 
-    /// The agent's durable oplog plus its group-commit thread.
+    /// The agent's durable oplog plus its group-commit agent.
     oplog: OplogService,
 
     /// The bound stream socket the publisher/intake will accept on.
@@ -105,7 +105,7 @@ pub struct Boot {
     /// The bound socket's path (for drop cleanup).
     socket_path: PathBuf,
 
-    /// The liveness beacon thread — stopped and joined on drop. The leading
+    /// The liveness beacon agent — stopped and joined on drop. The leading
     /// underscore documents that it is owned for its `Drop`, not read.
     _heartbeat: Beacon,
 }
@@ -246,7 +246,7 @@ impl Boot {
             tee_socket_path: sync_dir.join(TEE_SOCKET).to_string_lossy().into_owned(),
             cap_token,
             started_at_ms: now_ms(),
-            status: AgentStatus::Starting,
+            status: FleetStatus::Starting,
         };
         let _written = registry::write_entry(agents_dir, &entry)?;
 
@@ -311,7 +311,7 @@ impl Drop for Boot {
     /// only mechanism that removes a registry record for good.
     ///
     /// The append is the non-blocking durable path; the `oplog` field drops
-    /// *after* this body, and its commit thread drains every queued job before
+    /// *after* this body, and its commit agent drains every queued job before
     /// joining (`Service::drop`), so the Stopping record is `fdatasync`'d
     /// before exit. On a hard kill (`SIGKILL`) this body never runs — the
     /// backend then falls back to liveness (flock release + stale heartbeat),

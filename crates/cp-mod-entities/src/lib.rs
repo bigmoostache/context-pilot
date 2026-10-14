@@ -71,20 +71,34 @@ fn dump_if_changed(db_path: &std::path::Path, dump_path: &std::path::Path) {
         return;
     }
     // Checked before `open`, which itself touches the -wal/-shm files.
-    let before = db_fingerprint(db_path, dump_path);
+    let before = {
+        let _p = cp_base::perf_span!("ent_save_fingerprint");
+        db_fingerprint(db_path, dump_path)
+    };
     if LAST_DUMP.lock().ok().is_some_and(|last| *last == Some(before)) {
         return;
     }
-    let Ok(conn) = db::open(db_path) else { return };
+    let Ok(conn) = ({
+        let _p = cp_base::perf_span!("ent_open");
+        db::open(db_path)
+    }) else {
+        return;
+    };
     if !db::has_user_tables(&conn) {
         log::info!("save_module_data: DB has no user tables, skipping dump");
         db::checkpoint(&conn);
         return;
     }
     log::info!("save_module_data: dumping DB");
-    let _r = db::dump_to_file(&conn, dump_path);
-    db::checkpoint(&conn);
-    drop(conn);
+    {
+        let _p = cp_base::perf_span!("ent_dump");
+        let _r = db::dump_to_file(&conn, dump_path);
+    }
+    {
+        let _p = cp_base::perf_span!("ent_checkpoint_close");
+        db::checkpoint(&conn);
+        drop(conn);
+    }
     // Taken after close: closing may checkpoint and remove the WAL.
     if let Ok(mut last) = LAST_DUMP.lock() {
         *last = Some(db_fingerprint(db_path, dump_path));

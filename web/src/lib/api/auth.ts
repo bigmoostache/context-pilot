@@ -18,19 +18,19 @@ import type {
   SessionInfo,
 } from "./generated/types.gen"
 import {
-  deleteApiAgentByIdAclByUserId,
+  deleteApiFleetByIdAclByUserId,
   deleteApiAuthSessionsById,
   deleteApiAuthUsersByUserId,
-  getApiAgentByIdAcl,
+  getApiFleetByIdAcl,
   getApiAuthMe,
   getApiAuthSessions,
   getApiAuthStatus,
   getApiAuthUsers,
   getApiFeatures,
   getApiSettings,
-  patchApiAgentByIdAclByUserId,
+  patchApiFleetByIdAclByUserId,
   patchApiAuthMe,
-  postApiAgentByIdAcl,
+  postApiFleetByIdAcl,
   postApiAuthLogin,
   postApiAuthLogout,
   postApiAuthPassword,
@@ -158,36 +158,36 @@ export function forceLogoutUser(userId: string): Promise<ForceLogoutResponse> {
 
 // ── Per-agent ACL management ─────────────────────────────────────────
 
-export function fetchAgentAcl(agentId: string): Promise<AclEntry[]> {
-  return sdk(getApiAgentByIdAcl({ path: { id: agentId } }))
+export function fetchFleetAcl(fleetId: string): Promise<AclEntry[]> {
+  return sdk(getApiFleetByIdAcl({ path: { id: fleetId } }))
 }
 
 export function grantAccess(
-  agentId: string,
+  fleetId: string,
   userId: string,
   role: "agent-admin" | "agent-user" = "agent-user",
 ): Promise<OkResponse> {
   return sdk(
-    postApiAgentByIdAcl({
-      path: { id: agentId },
+    postApiFleetByIdAcl({
+      path: { id: fleetId },
       body: { user_id: userId, role },
     }),
   )
 }
 
-export function updateAgentRole(
-  agentId: string,
+export function updateFleetRole(
+  fleetId: string,
   userId: string,
   role: "agent-admin" | "agent-user",
 ): Promise<OkResponse> {
   return sdk(
-    patchApiAgentByIdAclByUserId({
-      path: { id: agentId, userId },
+    patchApiFleetByIdAclByUserId({
+      path: { id: fleetId, userId },
       body: { role },
     }),
   )
 }
 
-export function revokeAccess(agentId: string, userId: string): Promise<OkResponse> {
-  return sdk(deleteApiAgentByIdAclByUserId({ path: { id: agentId, userId } }))
+export function revokeAccess(fleetId: string, userId: string): Promise<OkResponse> {
+  return sdk(deleteApiFleetByIdAclByUserId({ path: { id: fleetId, userId } }))
 }

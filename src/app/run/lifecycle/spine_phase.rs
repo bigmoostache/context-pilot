@@ -1,0 +1,53 @@
+//! Spine step of the main loop: focused-thread spine check, API-check results,
+//! then one advancement round of the background agents. Each call carries its
+//! own perf span so `loop.spine` self time is attributable.
+
+use crate::app::App;
+
+#[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
+impl App {
+    /// Run the `Step::Spine` body for this tick.
+    pub(super) fn run_spine_phase(&mut self, current_ms: u64) {
+        {
+            let _g = crate::profile!("sp_check_spine");
+            self.check_spine();
+        }
+        {
+            let _g = crate::profile!("sp_api_check_results");
+            super::super::streaming::process_api_check_results(self);
+        }
+
+        // === BACKGROUND AGENTS (Phase C) ===
+        // After the focused agent has been stepped, advance every OTHER active
+        // agent one step by making it executing around the same advancement
+        // core (`step_one_agent`). No-op at N=1. Reconcile first: registry vs
+        // roster + promotion decision.
+        {
+            let _g = crate::profile!("sp_reconcile_fleet");
+            self.reconcile_fleet_registry(current_ms);
+        }
+        {
+            let _g = crate::profile!("sp_tick_social");
+            self.tick_social(current_ms);
+        }
+        {
+            let _g = crate::profile!("sp_dispatch_bg");
+            self.dispatch_background_my_turn();
+        }
+        {
+            let _g = crate::profile!("sp_poll_idle_bg");
+            self.poll_idle_agents(current_ms);
+        }
+        {
+            let _g = crate::profile!("sp_advance_bg");
+            self.advance_background_agents();
+        }
+        // G2 display mirror: republish AFTER the step loop so it reflects
+        // post-step derivations; the loop is at rest, so `state` is the focused
+        // agent again.
+        {
+            let _g = crate::profile!("sp_publish_fleet_view");
+            self.publish_fleet_view_states();
+        }
+    }
+}

@@ -12,6 +12,8 @@ publish = false
 
 [dependencies]
 cp-base.workspace = true
+cp-groups.workspace = true
+cp-macros.workspace = true
 cp-render.workspace = true
 cp-mod-utilities.workspace = true
 serde.workspace = true

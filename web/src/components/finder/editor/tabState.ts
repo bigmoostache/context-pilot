@@ -106,12 +106,12 @@ interface PersistedGroups {
   readonly activeGroupId: string
 }
 
-/** Read a saved layout for `agentId`, or null when absent/unparseable. A stored
+/** Read a saved layout for `fleetId`, or null when absent/unparseable. A stored
  *  layout with no groups is treated as absent so hydration always yields at
  *  least one group. */
-function loadGroups(agentId: string): PersistedGroups | null {
+function loadGroups(fleetId: string): PersistedGroups | null {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + agentId)
+    const raw = localStorage.getItem(STORAGE_PREFIX + fleetId)
     if (raw === null) return null
     const parsed = JSON.parse(raw) as PersistedGroups
     if (!Array.isArray(parsed.groups) || parsed.groups.length === 0) return null
@@ -123,11 +123,11 @@ function loadGroups(agentId: string): PersistedGroups | null {
   }
 }
 
-/** Best-effort write of the current layout for `agentId`. A full or denied
+/** Best-effort write of the current layout for `fleetId`. A full or denied
  *  localStorage is swallowed: persistence is a convenience, not a requirement. */
-function saveGroups(agentId: string, value: PersistedGroups): void {
+function saveGroups(fleetId: string, value: PersistedGroups): void {
   try {
-    localStorage.setItem(STORAGE_PREFIX + agentId, JSON.stringify(value))
+    localStorage.setItem(STORAGE_PREFIX + fleetId, JSON.stringify(value))
   } catch {
     // quota exceeded / storage denied — nothing to do, the layout simply
     // won't survive this session.
@@ -191,24 +191,24 @@ function withMovedInto(group: EditorGroup, tab: OpenTab, beforePath: string | nu
 }
 
 /**
- * @param agentId The owning agent — the persistence key. The consumer MUST
+ * @param fleetId The owning agent — the persistence key. The consumer MUST
  *   remount this hook when the agent changes (Finder keys its body by
- *   `agent.id`), so `agentId` is stable for the hook's whole life and the
+ *   `agent.id`), so `fleetId` is stable for the hook's whole life and the
  *   saved layout is hydrated once, at mount, from a clean slate.
  */
-export function useEditorGroups(agentId: string): GroupsState {
+export function useEditorGroups(fleetId: string): GroupsState {
   const [groups, setGroups] = useState<readonly EditorGroup[]>(
-    () => loadGroups(agentId)?.groups ?? [{ id: nextGroupId(), tabs: [], activePath: null }],
+    () => loadGroups(fleetId)?.groups ?? [{ id: nextGroupId(), tabs: [], activePath: null }],
   )
   const [activeGroupId, setActiveGroupId] = useState<string>(
-    () => loadGroups(agentId)?.activeGroupId ?? groups[0]?.id ?? nextGroupId(),
+    () => loadGroups(fleetId)?.activeGroupId ?? groups[0]?.id ?? nextGroupId(),
   )
 
-  // Write-through persist. `agentId` is stable for the mount (keyed remount), so
+  // Write-through persist. `fleetId` is stable for the mount (keyed remount), so
   // it never races a save under the wrong key; listing it keeps deps honest.
   useEffect(() => {
-    saveGroups(agentId, { groups, activeGroupId })
-  }, [agentId, groups, activeGroupId])
+    saveGroups(fleetId, { groups, activeGroupId })
+  }, [fleetId, groups, activeGroupId])
 
   /** Map over one group by id, leaving the rest untouched. */
   const mapGroup = useCallback((id: string, fn: (g: EditorGroup) => EditorGroup) => {

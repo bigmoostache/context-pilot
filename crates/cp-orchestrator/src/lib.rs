@@ -23,7 +23,7 @@
 //!   on-disk persistence files (tier-② state: config, workers, shared,
 //!   messages, panels).
 //!
-//! * [`channel`] — the per-agent [`AgentHandle`](channel::AgentHandle): oplog
+//! * [`channel`] — the per-agent [`FleetHandle`](channel::FleetHandle): oplog
 //!   tail ([`Tailer`](tailer::Tailer)), rev-pinned body hydrate, and command
 //!   send.
 //! * [`supervisor`] — the

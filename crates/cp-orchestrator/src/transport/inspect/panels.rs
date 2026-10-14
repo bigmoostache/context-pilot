@@ -6,11 +6,11 @@
 //! that back **non-cockpit** surfaces:
 //!
 //! * [`usage`]   — the Usage/Costs page's per-worker cost snapshot.
-//! * [`library`] — the fleet dashboard's prompt-library listing (agents /
+//! * [`library`] — the fleet dashboard's prompt-library listing (systems /
 //!   skills / commands).
 //!
 //! Both read the agent's tier-② persistence (`states/<worker>.json`,
-//! `.context-pilot/{agents,skills,commands}/`) and reshape it to JSON. They
+//! `.context-pilot/{systems,skills,commands}/`) and reshape it to JSON. They
 //! reach the shared [`Backend`](crate::transport::Backend) and
 //! [`HttpReply`](crate::transport::rest::HttpReply) via absolute `crate::` paths.
 
@@ -20,14 +20,14 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::helpers::{agent_folder, extract_worker_param};
+use super::helpers::{extract_worker_param, fleet_folder};
 
-/// `GET /api/agent/{id}/usage` — current session cost data from worker state.
+/// `GET /api/fleet/{id}/usage` — current session cost data from worker state.
 ///
 /// Returns the cumulative token counts and cost from the agent's active
 /// worker. The web client can poll this to build a time series.
-pub fn usage(state: &Mutex<Backend>, agent_id: &str, query: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub fn usage(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
@@ -67,28 +67,28 @@ fn resolve_worker_id(folder_path: &Path, query: &str) -> Result<String, HttpRepl
     Ok(first.clone())
 }
 
-/// `GET /api/agent/{id}/library` — prompt library items.
+/// `GET /api/fleet/{id}/library` — prompt library items.
 ///
-/// Scans the agent's `.context-pilot/{agents,skills,commands}/` directories
+/// Scans the agent's `.context-pilot/{systems,skills,commands}/` directories
 /// for `.md` files with YAML frontmatter and returns them as `LibraryItem[]`.
-pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let folder = match agent_folder(state, agent_id) {
+pub fn library(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
     };
 
     // The active behaviour agent is persisted at config.json
-    // `modules.system.active_agent_id` (the PromptModule's global module data —
+    // `modules.system.active_system_id` (the PromptModule's global module data —
     // it is `is_global()`, so `build_module_data_maps` writes it under
     // `Shared.modules["system"]`). Read it via the mtime-cached inspector so
     // the footer selector can mark which agent is loaded, the same disk-read
     // mechanism `usage()` uses. Absent (older state / never switched) → None.
-    let active_agent_id: Option<String> = {
+    let active_system_id: Option<String> = {
         match state.lock() {
             Ok(mut b) => b.inspect_mut().read_config(Path::new(&folder)).ok().and_then(|cfg| {
                 cfg.get("modules")
                     .and_then(|m| m.get("system"))
-                    .and_then(|s| s.get("active_agent_id"))
+                    .and_then(|s| s.get("active_system_id").or_else(|| s.get("active_agent_id")))
                     .and_then(|v| v.as_str())
                     .map(str::to_owned)
             }),
@@ -103,8 +103,12 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
     let cp_dir = cp_base::config::constants::home_behaviours_dir();
     let mut items: Vec<serde_json::Value> = Vec::new();
 
-    for (kind, subdir) in [("agent", "agents"), ("skill", "skills"), ("command", "commands")] {
-        collect_kind_items(kind, &cp_dir.join(subdir), active_agent_id.as_deref(), &mut items);
+    for (kind, dir) in [
+        ("system", cp_base::config::constants::home_systems_dir()),
+        ("skill", cp_dir.join("skills")),
+        ("command", cp_dir.join("commands")),
+    ] {
+        collect_kind_items(kind, &dir, active_system_id.as_deref(), &mut items);
     }
 
     HttpReply::ok(&items)
@@ -116,7 +120,7 @@ pub fn library(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
 ///
 /// Mirrors the tui-side `cp_mod_prompt::storage::load_prompts_for` merge — one
 /// seed source (`yamls/library.yaml` via `cp_base`), disk wins on id.
-fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, items: &mut Vec<serde_json::Value>) {
+fn collect_kind_items(kind: &str, dir: &Path, active_system_id: Option<&str>, items: &mut Vec<serde_json::Value>) {
     let seeds = seed_entries(kind);
 
     let mut disk_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -141,7 +145,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
                 name: &name,
                 description: &description,
                 content: &content,
-                active_agent_id,
+                active_system_id,
                 is_builtin,
             }));
         }
@@ -153,7 +157,7 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
         if disk_ids.contains(&seed.id) {
             continue;
         }
-        let active = (kind == "agent" && active_agent_id == Some(seed.id.as_str())).then_some(true);
+        let active = (kind == "system" && active_system_id == Some(seed.id.as_str())).then_some(true);
         let body = (kind == "command").then(|| seed.content.clone());
         items.push(serde_json::json!({
             "id": seed.id,
@@ -167,13 +171,13 @@ fn collect_kind_items(kind: &str, dir: &Path, active_agent_id: Option<&str>, ite
     }
 }
 
-/// The compiled-in seed entries for a library `kind` (`"agent"`/`"skill"`/
+/// The compiled-in seed entries for a library `kind` (`"system"`/`"skill"`/
 /// `"command"`) — the same `yamls/library.yaml` source the tui loader uses, so
 /// the orchestrator's list mirrors the agent's own built-in set exactly.
 fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
     use cp_base::config::accessors::library;
     match kind {
-        "agent" => library::agents(),
+        "system" => library::systems(),
         "skill" => library::skills(),
         "command" => library::commands(),
         _ => &[],
@@ -184,7 +188,7 @@ fn seed_entries(kind: &str) -> &'static [cp_base::config::SeedEntry] {
 /// the argument-count cap. Built by struct literal at the single call site in
 /// [`collect_kind_items`].
 struct LibraryItemParts<'parts> {
-    /// Library kind (`"agent"` / `"skill"` / `"command"`).
+    /// Library kind (`"system"` / `"skill"` / `"command"`).
     kind: &'parts str,
     /// The item's id (file stem).
     id: &'parts str,
@@ -195,7 +199,7 @@ struct LibraryItemParts<'parts> {
     /// Raw `.md` file contents (command body is parsed from this).
     content: &'parts str,
     /// The currently loaded behaviour agent id, if any.
-    active_agent_id: Option<&'parts str>,
+    active_system_id: Option<&'parts str>,
     /// Whether this id also exists as a compiled-in seed.
     is_builtin: bool,
 }
@@ -209,7 +213,7 @@ struct LibraryItemParts<'parts> {
 /// file is a local OVERRIDE of a built-in).
 fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
     let body = (parts.kind == "command").then(|| parse_command_body(parts.content));
-    let active = (parts.kind == "agent" && parts.active_agent_id == Some(parts.id)).then_some(true);
+    let active = (parts.kind == "system" && parts.active_system_id == Some(parts.id)).then_some(true);
     serde_json::json!({
         "id": parts.id,
         "name": parts.name,
@@ -225,7 +229,7 @@ fn library_item(parts: &LibraryItemParts<'_>) -> serde_json::Value {
 /// YAML frontmatter block.
 ///
 /// This is the text a `/command` expands to (the prompt that replaces the
-/// `/cmd` literal). The web thread composer seeds it into the textarea when a
+/// `/cmd` literal). The web agent composer seeds it into the textarea when a
 /// suggestion bubble is clicked (T350), so a `/boss-hunt` bubble fills with the
 /// command's actual prompt rather than the bare `/boss-hunt` token.
 ///

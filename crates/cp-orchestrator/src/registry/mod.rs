@@ -34,7 +34,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use cp_wire::heartbeat::{DEFAULT_MAX_AGE, Heartbeat};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 pub mod channel;
 pub mod liveness;
@@ -81,7 +81,7 @@ pub enum Event {
 
     /// A known agent's registry `status` field changed (e.g. `Starting` →
     /// `Running`).
-    StatusChanged(String, AgentStatus),
+    StatusChanged(String, FleetStatus),
 
     /// A known agent's liveness transitioned from [`Live`](Liveness::Live) to a
     /// non-live verdict — it died, hung, or its pid was recycled.

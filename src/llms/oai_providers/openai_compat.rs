@@ -171,7 +171,7 @@ pub(crate) fn build_messages(
 
 /// Push the leading system message (system prompt + optional provider suffix).
 fn push_system_message(out: &mut Vec<OaiMessage>, opts: &BuildOptions) {
-    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_agent_content().to_owned());
+    let mut system_content = opts.system_prompt.clone().unwrap_or_else(|| library::default_system_content().to_owned());
     if let Some(suffix) = opts.system_suffix.as_ref() {
         system_content.push_str("\n\n");
         system_content.push_str(suffix);

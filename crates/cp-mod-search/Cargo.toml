@@ -16,7 +16,7 @@ cp-env.workspace = true
 cp-base.workspace = true
 cp-vault = { path = "../cp-vault" }
 cp-mod-logs = { path = "../cp-mod-logs" }
-cp-mod-threads = { path = "../cp-mod-threads" }
+cp-mod-agents = { path = "../cp-mod-agents" }
 cp-wire = { path = "../cp-wire" }
 cp-render.workspace = true
 crossterm.workspace = true
@@ -25,6 +25,7 @@ serde_json.workspace = true
 cp-mod-utilities.workspace = true
 reqwest = { workspace = true }
 notify.workspace = true
+ignore.workspace = true
 tree-sitter.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter-python.workspace = true

@@ -1,5 +1,7 @@
 /// Character constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::chars;
+/// Agents view: dedicated layout for agent management.
+mod agents_view;
 /// Help subsystem: config overlay, command palette, input overlays.
 pub(crate) mod help;
 /// Shared UI helper functions: truncation, formatting, syntax highlighting.
@@ -12,8 +14,6 @@ pub(crate) mod markdown;
 pub(crate) mod perf;
 /// Meilisearch indexing status overlay (Ctrl+I).
 pub(crate) mod search_overlay;
-/// Threads view: dedicated layout for thread management.
-mod threads_view;
 /// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
 /// Typewriter animation buffer re-exported from helpers.
@@ -27,16 +27,16 @@ use crate::infra::constants::STATUS_BAR_HEIGHT;
 use crate::state::{Kind, State};
 use crate::ui::perf::PERF;
 
-/// Whether the threads-list surface should be painted this frame: the Threads
-/// view mode is active **and** the human has not drilled into a specific thread.
+/// Whether the threads-list surface should be painted this frame: the Agents
+/// view mode is active **and** the human has not drilled into a specific agent.
 ///
-/// When drilled (G3), the renderer paints the drilled thread's full panel body
-/// (sidebar + panels) instead of the list — `render_frame` has already swapped
-/// that thread's runtime into `state`, so the normal body renders it
+/// When drilled (G3), the renderer paints the drilled agent's full panel body
+/// (sidebar + panels) instead of the list — `render_frame` has already made
+/// that agent the executing one, so the normal body renders it
 /// pixel-identically to its own main view.
-fn showing_threads_list(state: &State) -> bool {
-    state.view_mode == cp_base::state::data::config::ViewMode::Threads
-        && cp_mod_threads::types::FocusState::get(state).drilled_thread_id.is_none()
+fn showing_agents_list(state: &State) -> bool {
+    state.view_mode == cp_base::state::data::config::ViewMode::Agents
+        && cp_mod_agents::types::FocusState::get(state).drilled_agent_id.is_none()
 }
 
 /// Top-level render entry point: draws the entire TUI frame.
@@ -50,7 +50,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     // Phase 5 progressively replaces direct-render code paths below.
     let ir_frame = {
         let _build = crate::profile!("ir_build_frame");
-        ir::build_frame(state, !showing_threads_list(state))
+        ir::build_frame(state, !showing_agents_list(state))
     };
 
     // Fill base background
@@ -79,12 +79,11 @@ pub(crate) fn render(frame: &mut Frame<'_>, state: &mut State) {
     }
 
     // Render autocomplete popup if active (via IR overlays).
-    // In Threads mode the input lives inside the right pane (past the thread
-    // list), so offset by THREAD_LIST_WIDTH instead of the sidebar width.
+    // In Agents mode the input lives inside the right pane (past the agent
+    // list), so offset by AGENT_LIST_WIDTH instead of the sidebar width.
     {
         let _g = crate::profile!("autocomplete");
-        let offset =
-            if showing_threads_list(state) { threads_view::THREAD_LIST_WIDTH } else { state.view_mode.width() };
+        let offset = if showing_agents_list(state) { agents_view::AGENT_LIST_WIDTH } else { state.view_mode.width() };
         let content_x = area.x.saturating_add(offset);
         let content_width = area.width.saturating_sub(offset);
         let content_height = area.height.saturating_sub(STATUS_BAR_HEIGHT);
@@ -115,6 +114,7 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
             | cp_render::conversation::Overlay::SearchIndex(_) => None,
         })
     }) {
+        let _g = crate::profile!("perf_overlay_draw");
         perf::render_perf_overlay_from_ir(frame, area, perf_overlay);
     }
 
@@ -148,14 +148,14 @@ fn render_modal_overlays(frame: &mut Frame<'_>, area: Rect, overlays: &[cp_rende
 }
 
 /// Render the body area: sidebar (if visible) and main content panel,
-/// or the threads view when `ViewMode::Threads` is active.
+/// or the agents view when `ViewMode::Agents` is active.
 fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &ir::FrameChrome) {
-    // Threads mode: completely different layout (no sidebar, no panels) —
-    // unless the human has drilled into a thread (G3), in which case fall
-    // through to the normal body to paint that thread's full panel view.
-    if showing_threads_list(state) {
-        let _threads = crate::profile!("threads_view");
-        threads_view::render_threads_view(frame, state, area);
+    // Agents mode: completely different layout (no sidebar, no panels) —
+    // unless the human has drilled into an agent (G3), in which case fall
+    // through to the normal body to paint that agent's full panel view.
+    if showing_agents_list(state) {
+        let _agents = crate::profile!("threads_view");
+        agents_view::render_agents_view(frame, state, area);
         return;
     }
 
@@ -195,8 +195,9 @@ fn render_main_content(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
 fn render_content_panel(frame: &mut Frame<'_>, state: &mut State, area: Rect) {
     let _guard = crate::profile!("ui::render_panel");
     let context_type = state
+        .agent()
         .context
-        .get(state.selected_context)
+        .get(state.agent().selected_context)
         .map_or_else(|| Kind::new(Kind::CONVERSATION), |c| c.context_type.clone());
 
     // ConversationPanel renders from its multi-level cached content builder,

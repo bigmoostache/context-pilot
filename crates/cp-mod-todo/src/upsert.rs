@@ -80,21 +80,21 @@ fn str_field(obj: &serde_json::Map<String, serde_json::Value>, key: &str) -> Opt
 // Entry point
 // =============================================================================
 
-/// Apply `items` to `thread_id`'s task list, returning the ids of tasks created.
+/// Apply `items` to `agent_id`'s task list, returning the ids of tasks created.
 ///
 /// Validation runs over the whole payload first; on any problem nothing is
 /// mutated and the error names every issue at once.
 ///
 /// # Errors
 /// Returns `Err` when a nested item carries an `id` (children are
-/// creation-only), an `id` does not resolve to a task of this thread, an `id`
+/// creation-only), an `id` does not resolve to a task of this agent, an `id`
 /// repeats within the call, a creation is missing its `title`, or a `status`
 /// string is not one of the four accepted values.
-pub fn upsert(state: &mut State, thread_id: &str, items: &[Item]) -> Result<Vec<String>, String> {
-    validate(state, thread_id, items)?;
+pub fn upsert(state: &mut State, agent_id: &str, items: &[Item]) -> Result<Vec<String>, String> {
+    validate(state, agent_id, items)?;
     let mut created: Vec<String> = Vec::new();
-    apply_group(state, items, Loc { thread_id, parent: None }, &mut created);
-    renumber_orders(state, thread_id);
+    apply_group(state, items, Loc { agent_id, parent: None }, &mut created);
+    renumber_orders(state, agent_id);
     Ok(created)
 }
 
@@ -106,8 +106,8 @@ pub fn upsert(state: &mut State, thread_id: &str, items: &[Item]) -> Result<Vec<
 struct Ctx<'ctx> {
     /// Live state, read-only during validation.
     state: &'ctx State,
-    /// Thread whose tasks the payload targets.
-    thread_id: &'ctx str,
+    /// Agent whose tasks the payload targets.
+    agent_id: &'ctx str,
     /// Ids already claimed by an earlier item in this same call.
     seen: HashSet<String>,
     /// Every problem found so far (reported together).
@@ -115,8 +115,8 @@ struct Ctx<'ctx> {
 }
 
 /// Validate the whole payload, returning `Err` listing every problem at once.
-fn validate(state: &State, thread_id: &str, items: &[Item]) -> Result<(), String> {
-    let mut ctx = Ctx { state, thread_id, seen: HashSet::new(), errors: Vec::new() };
+fn validate(state: &State, agent_id: &str, items: &[Item]) -> Result<(), String> {
+    let mut ctx = Ctx { state, agent_id, seen: HashSet::new(), errors: Vec::new() };
     validate_group(&mut ctx, items, false);
     if ctx.errors.is_empty() {
         return Ok(());
@@ -144,12 +144,12 @@ fn validate_one(ctx: &mut Ctx<'_>, item: &Item, nested: bool) {
     validate_status(ctx, item);
 }
 
-/// An `id` must resolve to a task of this thread, and appear only once.
+/// An `id` must resolve to a task of this agent, and appear only once.
 fn validate_existing(ctx: &mut Ctx<'_>, id: &str) {
-    let exists = TodoState::get(ctx.state).todos.iter().any(|t| t.id == id && t.thread_id == ctx.thread_id);
+    let exists = TodoState::get(ctx.state).todos.iter().any(|t| t.id == id && t.agent_id == ctx.agent_id);
     if !exists {
         ctx.errors.push(format!(
-            "item id `{id}` does not exist on this thread \u{2014} ids are backend-assigned; omit `id` to create"
+            "item id `{id}` does not exist on this agent \u{2014} ids are backend-assigned; omit `id` to create"
         ));
         return;
     }
@@ -179,11 +179,11 @@ fn validate_status(ctx: &mut Ctx<'_>, item: &Item) {
 // Apply
 // =============================================================================
 
-/// A sibling group's location: owning thread + parent id (`None` = root group).
+/// A sibling group's location: owning agent + parent id (`None` = root group).
 #[derive(Clone, Copy)]
 struct Loc<'loc> {
-    /// Owning thread id.
-    thread_id: &'loc str,
+    /// Owning agent id.
+    agent_id: &'loc str,
     /// Parent task id, or `None` for the root group.
     parent: Option<&'loc str>,
 }
@@ -194,7 +194,7 @@ fn apply_group(state: &mut State, items: &[Item], loc: Loc<'_>, created: &mut Ve
         let Some(id) = apply_one(state, item, loc, created) else {
             continue;
         };
-        apply_group(state, &item.children, Loc { thread_id: loc.thread_id, parent: Some(&id) }, created);
+        apply_group(state, &item.children, Loc { agent_id: loc.agent_id, parent: Some(&id) }, created);
     }
 }
 
@@ -240,7 +240,7 @@ fn create(state: &mut State, item: &Item, loc: Loc<'_>) -> Option<String> {
     ts.next_todo_id = ts.next_todo_id.saturating_add(1);
     ts.todos.push(TodoItem {
         id: id.clone(),
-        thread_id: loc.thread_id.to_owned(),
+        agent_id: loc.agent_id.to_owned(),
         parent_id: loc.parent.map(str::to_owned),
         name,
         description,
@@ -255,7 +255,7 @@ fn next_order(state: &State, loc: Loc<'_>) -> i32 {
     TodoState::get(state)
         .todos
         .iter()
-        .filter(|t| t.thread_id == loc.thread_id && t.parent_id.as_deref() == loc.parent)
+        .filter(|t| t.agent_id == loc.agent_id && t.parent_id.as_deref() == loc.parent)
         .map(|t| t.order)
         .max()
         .map_or(0i32, |m| m.saturating_add(1))
@@ -268,16 +268,16 @@ fn next_order(state: &State, loc: Loc<'_>) -> i32 {
 /// One row of the renumber snapshot: (id, `parent_id`, current order, cancelled).
 type OrderRow = (String, Option<String>, i32, bool);
 
-/// Renumber `order` densely (0..n) within every parent group of `thread_id`,
+/// Renumber `order` densely (0..n) within every parent group of `agent_id`,
 /// cancelled tasks placed last — the single source of truth both the canonical
 /// render and the wire projection sort by.
-pub fn renumber_orders(state: &mut State, thread_id: &str) {
+pub fn renumber_orders(state: &mut State, agent_id: &str) {
     let ts = TodoState::get_mut(state);
     // Snapshot the sort inputs so the borrow ends before we mutate each order.
     let mut rows: Vec<OrderRow> = ts
         .todos
         .iter()
-        .filter(|t| t.thread_id == thread_id)
+        .filter(|t| t.agent_id == agent_id)
         .map(|t| (t.id.clone(), t.parent_id.clone(), t.order, t.status == TodoStatus::Cancelled))
         .collect();
     // Group by parent, then cancelled-last, then existing order, then id.

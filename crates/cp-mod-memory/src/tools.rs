@@ -86,9 +86,12 @@ fn apply_one_edit(edit: &serde_json::Value, state: &mut State) -> EditOutcome {
     if let Some(imp) = importance_in {
         slot.importance = imp;
     }
-    // A slot with neither title nor contents is FREE (the "no delete tool"
-    // path: edit to empty → renders **empty** again).
-    slot.occupied = !(slot.title.trim().is_empty() && slot.contents.trim().is_empty());
+    // Editing contents to empty frees the slot, title included (the "no delete
+    // tool" path: edit to empty → renders **empty** again). A slot with neither
+    // title nor contents is free too.
+    let contents_cleared = contents_in.is_some_and(|c| c.trim().is_empty());
+    let nothing_left = slot.title.trim().is_empty() && slot.contents.trim().is_empty();
+    slot.occupied = !(contents_cleared || nothing_left);
     if !slot.occupied {
         slot.title.clear();
         slot.contents.clear();

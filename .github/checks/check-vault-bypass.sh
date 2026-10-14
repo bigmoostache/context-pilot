@@ -48,10 +48,11 @@ if [ $# -gt 0 ]; then
     check_file "$file"
   done
 else
-  # CI mode: scan the entire repo.
+  # CI mode: scan the entire repo. .worktrees/ holds other agents' branch
+  # checkouts (gitignored) — each is checked from its own root, never here.
   while IFS= read -r file; do
     check_file "$file"
-  done < <(find . -name '*.rs' -not -path './target/*' -not -path '*/target/*')
+  done < <(find . -type d \( -name target -o -path './.worktrees' \) -prune -o -name '*.rs' -print)
 fi
 
 if [ $exit_code -ne 0 ]; then

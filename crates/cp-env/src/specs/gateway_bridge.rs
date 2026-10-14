@@ -27,7 +27,7 @@ pub(super) static SPECS: &[Spec] = &[
         name: "CP_BRIDGE",
         kind: Kind::Bool,
         fallback: Fallback::Literal("0"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Bridge,
         doc: "Activate the orchestration bridge module and the bridge-backed vault. The orchestrator sets 1 on every agent it spawns; `cpilot --bridge` is the CLI equivalent.",
         ..Spec::BASE
@@ -36,7 +36,7 @@ pub(super) static SPECS: &[Spec] = &[
         name: "CP_BRIDGE_URL",
         kind: Kind::Url,
         fallback: Fallback::Literal("http://127.0.0.1:7878"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Bridge,
         doc: "The orchestrator API as seen by the agent.",
         ..Spec::BASE

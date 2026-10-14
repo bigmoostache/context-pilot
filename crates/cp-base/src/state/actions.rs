@@ -156,33 +156,33 @@ pub enum Action {
     /// Jump to first dynamic panel on the previous page (Shift+Left).
     PageDynamicPrev,
 
-    /// Cycle view mode (Normal → Collapsed → Hidden → Threads → Normal).
+    /// Cycle view mode (Normal → Collapsed → Hidden → Agents → Normal).
     CycleViewMode,
-    /// Navigate to next thread in Threads view (↓ / Tab).
-    ThreadSelectNext,
-    /// Navigate to previous thread in Threads view (↑ / Shift+Tab).
-    ThreadSelectPrev,
-    /// Start creating a new thread — switches input to thread-naming mode.
-    ThreadCreateStart,
-    /// Cancel thread creation — clears naming mode without creating.
-    ThreadCreateCancel,
-    /// Start archiving (deleting) the selected thread — shows confirmation.
-    ThreadArchiveStart,
-    /// Confirm thread archive — removes the selected thread.
-    ThreadArchiveConfirm,
-    /// Cancel thread archive — dismisses the confirmation.
-    ThreadArchiveCancel,
-    /// Toggle between the active and archived thread lists in the
+    /// Navigate to next agent in Agents view (↓ / Tab).
+    AgentSelectNext,
+    /// Navigate to previous agent in Agents view (↑ / Shift+Tab).
+    AgentSelectPrev,
+    /// Start creating a new agent — switches input to thread-naming mode.
+    AgentCreateStart,
+    /// Cancel agent creation — clears naming mode without creating.
+    AgentCreateCancel,
+    /// Start archiving (deleting) the selected agent — shows confirmation.
+    AgentArchiveStart,
+    /// Confirm agent archive — removes the selected agent.
+    AgentArchiveConfirm,
+    /// Cancel agent archive — dismisses the confirmation.
+    AgentArchiveCancel,
+    /// Toggle between the active and archived agent lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
-    ThreadToggleArchivedView,
-    /// Drill into the selected thread's full panel view (G3, read-only
-    /// inspection — Right arrow). Sets `FocusState::drilled_thread_id`; the
-    /// renderer swaps that thread's parked runtime in for the paint without
+    AgentToggleArchivedView,
+    /// Drill into the selected agent's full panel view (G3, read-only
+    /// inspection — Right arrow). Sets `FocusState::drilled_agent_id`; the
+    /// renderer makes that agent executing for the paint without
     /// moving execution (Model 2).
-    ThreadDrillIn,
-    /// Exit the drilled panel view back to the thread list (G3 — Left/Esc).
-    /// Clears `FocusState::drilled_thread_id`.
-    ThreadDrillOut,
+    AgentDrillIn,
+    /// Exit the drilled panel view back to the agent list (G3 — Left/Esc).
+    /// Clears `FocusState::drilled_agent_id`.
+    AgentDrillOut,
     /// Open the Ctrl+P command palette.
     OpenCommandPalette,
     /// Reset the session cost counters to zero.

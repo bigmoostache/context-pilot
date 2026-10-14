@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react"
 import { ThemeToggle } from "./widgets/ThemeToggle"
-import { AgentSwitcher } from "./widgets/AgentSwitcher"
+import { FleetSwitcher } from "./widgets/FleetSwitcher"
 import { UsageButton } from "./widgets/UsageButton"
 import { HintBadge } from "./chrome/HintBadge"
 import { ConfigModal } from "./config/ConfigModal"
@@ -19,28 +19,28 @@ import { Tip } from "@/components/ui/tip"
 import { useDevMode } from "@/lib/providers/toggles/devMode"
 import { useFeatures } from "@/lib/providers/toggles/features"
 import { useModifierShortcuts } from "@/lib/support/a11y"
-import type { Agent, ViewMode } from "@/lib/types"
+import type { Fleet, ViewMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface TopBarProps {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
-  activeAgentId: string
-  onSwitchAgent: (id: string) => void
-  agents: Agent[]
-  /** Whether the threads view's list rail is open — drives the Threads tab's
+  activeFleetId: string
+  onSwitchFleet: (id: string) => void
+  fleets: Fleet[]
+  /** Whether the agents view's list rail is open — drives the Agents tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
-  threadsRailOpen: boolean
-  /** Collapse ↔ expand the threads list rail. Fired by clicking the Threads
-   *  tab when threads is ALREADY the active view. */
-  onToggleThreadsRail: () => void
-  /** Open the New Thread dialog. Rail-hosted, so shown only on the threads view. */
-  onNewThread: () => void
-  /** Open the thread search palette. Same gating as {@link onNewThread}. */
-  onSearchThreads: () => void
+  agentsRailOpen: boolean
+  /** Collapse ↔ expand the agents list rail. Fired by clicking the Agents
+   *  tab when agents is ALREADY the active view. */
+  onToggleAgentsRail: () => void
+  /** Open the New Agent dialog. Rail-hosted, so shown only on the agents view. */
+  onNewAgent: () => void
+  /** Open the agent search palette. Same gating as {@link onNewAgent}. */
+  onSearchAgents: () => void
   /** Open the focused agent's settings DIALOG. The rail owns the trigger, so
    *  the flag it flips has to live in the shell — see `manageOpen` in Root. */
-  onManageAgent: () => void
+  onManageFleet: () => void
   /** Whether the finder view's explorer rail is open — drives the Finder tab's
    *  `aria-expanded` and its tooltip wording while that view is active. */
   finderRailOpen: boolean
@@ -50,28 +50,28 @@ interface TopBarProps {
 }
 
 /** Slim macOS-style side rail — app mark (→ fleet), workspace switcher,
- *  per-agent view tabs (Threads · Finder), theme, usage, account. Vertical: it
+ *  per-agent view tabs (Agents · Finder), theme, usage, account. Vertical: it
  *  hugs the window's left edge, full height, account cluster pinned to the floor. */
 export function TopBar({
   view,
   onViewChange,
-  activeAgentId,
-  onSwitchAgent,
-  agents,
-  threadsRailOpen,
-  onToggleThreadsRail,
-  onNewThread,
-  onSearchThreads,
-  onManageAgent,
+  activeFleetId,
+  onSwitchFleet,
+  fleets,
+  agentsRailOpen,
+  onToggleAgentsRail,
+  onNewAgent,
+  onSearchAgents,
+  onManageFleet,
   finderRailOpen,
   onToggleFinderRail,
 }: TopBarProps) {
-  const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0]
+  const activeFleet = fleets.find((a) => a.id === activeFleetId) ?? fleets[0]
   // OAuth usage/login widget: only for the OAuth providers (`anthropic` uses an
   // API key), and only where the deployment offers the subscription at all.
   const isClaudeOAuth =
     useFeatures().claude_oauth &&
-    (activeAgent?.provider === "claudecode" || activeAgent?.provider === "claudecodev2")
+    (activeFleet?.provider === "claudecode" || activeFleet?.provider === "claudecodev2")
   const inFleet = view === "fleet"
   const { devMode } = useDevMode()
   const [configOpen, setConfigOpen] = useState(false)
@@ -92,25 +92,25 @@ export function TopBar({
       <header className="flex w-14 shrink-0 flex-col items-center gap-3 p-2">
         <Tip
           title="Workspace"
-          body="The agent you're working in — one agent, one folder. Switch or manage from here."
+          body="The fleet you're working in — one fleet, one folder. Switch or manage from here."
           side="right"
         >
-          <AgentSwitcher
+          <FleetSwitcher
             rail
             open={switcherOpen}
             onOpenChange={setSwitcherOpen}
             shortcutHint="A"
             hintShown={switcherModHeld}
-            agents={agents}
-            activeId={inFleet ? undefined : activeAgentId}
-            onManageAgents={() => onViewChange("fleet")}
+            fleets={fleets}
+            activeId={inFleet ? undefined : activeFleetId}
+            onManageFleets={() => onViewChange("fleet")}
             onSwitch={
               inFleet
                 ? (id) => {
-                    onSwitchAgent(id)
-                    onViewChange("threads")
+                    onSwitchFleet(id)
+                    onViewChange("agents")
                   }
-                : onSwitchAgent
+                : onSwitchFleet
             }
           />
         </Tip>
@@ -120,23 +120,23 @@ export function TopBar({
             view={view}
             onViewChange={onViewChange}
             devMode={devMode}
-            threadsRailOpen={threadsRailOpen}
-            onToggleThreadsRail={onToggleThreadsRail}
+            agentsRailOpen={agentsRailOpen}
+            onToggleAgentsRail={onToggleAgentsRail}
             finderRailOpen={finderRailOpen}
             onToggleFinderRail={onToggleFinderRail}
           />
         )}
 
-        {/* The threads view's own list actions. Gated on the threads view being
-            SELECTED: they act on the thread list, so on Finder or Costs they
+        {/* The agents view's own list actions. Gated on the agents view being
+            SELECTED: they act on the agent list, so on Finder or Costs they
             would be controls for a surface that is not on screen. */}
-        {!inFleet && view === "threads" && (
-          <ThreadActions onNewThread={onNewThread} onSearchThreads={onSearchThreads} />
+        {!inFleet && view === "agents" && (
+          <AgentActions onNewAgent={onNewAgent} onSearchAgents={onSearchAgents} />
         )}
 
         <TopBarActions
           isClaudeOAuth={isClaudeOAuth}
-          onManageAgent={onManageAgent}
+          onManageFleet={onManageFleet}
           setConfigOpen={setConfigOpen}
           setProfileOpen={setProfileOpen}
           setUsersOpen={setUsersOpen}
@@ -161,31 +161,31 @@ export function TopBar({
  *  and the eye reaches for the appearance controls at the very bottom. */
 function TopBarActions({
   isClaudeOAuth,
-  onManageAgent,
+  onManageFleet,
   setConfigOpen,
   setProfileOpen,
   setUsersOpen,
 }: {
   isClaudeOAuth: boolean
-  onManageAgent: () => void
+  onManageFleet: () => void
   setConfigOpen: (v: boolean) => void
   setProfileOpen: (v: boolean) => void
   setUsersOpen: (v: boolean) => void
 }) {
   // ⌘/Ctrl+I opens the agent settings dialog. Bound HERE, beside the button, so
   // the key listener's lifetime matches the control it drives — the same
-  // rule {@link ThreadActions} follows for C and P.
-  const modHeld = useModifierShortcuts({ i: onManageAgent })
+  // rule {@link AgentActions} follows for C and P.
+  const modHeld = useModifierShortcuts({ i: onManageFleet })
 
   return (
     <div className="mt-auto flex flex-col items-center gap-3">
-      <Tip title="Agent settings" body="This agent's name, model and service vitals." side="right">
+      <Tip title="Fleet settings" body="This fleet's name, model and service vitals." side="right">
         <RailAction
-          label="Agent settings"
+          label="Fleet settings"
           icon={SlidersHorizontal}
           hint="I"
           hintShown={modHeld}
-          onClick={onManageAgent}
+          onClick={onManageFleet}
         />
       </Tip>
       <Tip title="Appearance" body="Switch between light and dark." side="right">
@@ -206,7 +206,7 @@ function TopBarActions({
 }
 
 /**
- * The threads view's list actions — New thread · Search — as a standalone
+ * The agents view's list actions — New agent · Search — as a standalone
  * cluster under the view tabs.
  *
  * DELIBERATELY UNLIKE {@link ViewTabs} ABOVE IT. That is a segmented selector,
@@ -216,45 +216,45 @@ function TopBarActions({
  * border and no fill — only a hover wash, the same affordance every other bare
  * glyph in the rail uses.
  *
- * They live here rather than in the thread list because the list can be
- * collapsed (the Threads tab hides it), and an action that disappears with the
+ * They live here rather than in the agent list because the list can be
+ * collapsed (the Agents tab hides it), and an action that disappears with the
  * panel it acts on is an action the user has to restore the panel to reach.
  *
  * The ⌘/Ctrl shortcuts are bound HERE rather than in the shell, so the key
  * listener mounts and unmounts with the buttons — see {@link
  * useModifierShortcuts}, which explains why that matters.
  */
-function ThreadActions({
-  onNewThread,
-  onSearchThreads,
+function AgentActions({
+  onNewAgent,
+  onSearchAgents,
 }: {
-  onNewThread: () => void
-  onSearchThreads: () => void
+  onNewAgent: () => void
+  onSearchAgents: () => void
 }) {
-  const modHeld = useModifierShortcuts({ c: onNewThread, p: onSearchThreads })
+  const modHeld = useModifierShortcuts({ c: onNewAgent, p: onSearchAgents })
 
   return (
     <div className="flex w-full flex-col items-center gap-0.5">
-      <Tip title="New thread" body="Start a fresh conversation or task in this agent." side="right">
+      <Tip title="New agent" body="Start a fresh conversation or task in this fleet." side="right">
         <RailAction
-          label="New thread"
+          label="New agent"
           icon={Plus}
           hint="C"
           hintShown={modHeld}
-          onClick={onNewThread}
+          onClick={onNewAgent}
         />
       </Tip>
       <Tip
-        title="Search threads"
-        body="Find a thread by name, or search across every message in this agent."
+        title="Search agents"
+        body="Find a agent by name, or search across every message in this fleet."
         side="right"
       >
         <RailAction
-          label="Search threads"
+          label="Search agents"
           icon={Search}
           hint="P"
           hintShown={modHeld}
-          onClick={onSearchThreads}
+          onClick={onSearchAgents}
         />
       </Tip>
     </div>
@@ -348,7 +348,7 @@ function ViewTab({
  * definition for both, so a shortcut is "as if you clicked the tab". Each is
  * DUAL-PURPOSE like the tab click: off the view navigate there, on the view
  * toggle that view's rail (L/K stay live on their own view). L not C drives
- * Threads — C is the new-thread shortcut in sibling {@link ThreadActions}.
+ * Agents — C is the new-agent shortcut in sibling {@link AgentActions}.
  * Settings is absent by design: it stopped being a view in T760 and is now the
  * ⌘I dialog trigger in {@link TopBarActions}, so it claims no slot here.
  * Args one object (max-params 4); `useModifierShortcuts` reads the map via
@@ -357,28 +357,27 @@ function ViewTab({
 function useViewShortcuts(a: {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
-  onToggleThreadsRail: () => void
+  onToggleAgentsRail: () => void
   onToggleFinderRail: () => void
 }): {
   modHeld: boolean
-  threadsClick: () => void
+  agentsClick: () => void
   finderClick: () => void
 } {
-  const threadsClick =
-    a.view === "threads" ? a.onToggleThreadsRail : () => a.onViewChange("threads")
+  const agentsClick = a.view === "agents" ? a.onToggleAgentsRail : () => a.onViewChange("agents")
   const finderClick = a.view === "finder" ? a.onToggleFinderRail : () => a.onViewChange("finder")
 
-  const modHeld = useModifierShortcuts({ l: threadsClick, k: finderClick })
+  const modHeld = useModifierShortcuts({ l: agentsClick, k: finderClick })
 
-  return { modHeld, threadsClick, finderClick }
+  return { modHeld, agentsClick, finderClick }
 }
 
-/** Per-agent view switcher (Threads · Finder · Costs). Costs
+/** Per-agent view switcher (Agents · Finder · Costs). Costs
  *  is dev-mode only. Extracted from {@link TopBar} so its tab cluster + the
  *  `devMode` gate don't count against the bar's complexity budget. Each tab
  *  carries a tooltip since the names aren't obvious to a first-time user.
  *
- *  The Threads tab is DUAL-PURPOSE: it switches to the threads view, and once
+ *  The Agents tab is DUAL-PURPOSE: it switches to the agents view, and once
  *  that view is already active, a further click collapses ↔ expands its list
  *  rail. This is the activity-bar idiom (macOS, VS Code) — clicking the icon of
  *  the panel you are already in hides it — and it replaces the two dedicated
@@ -388,29 +387,29 @@ function ViewTabs({
   view,
   onViewChange,
   devMode,
-  threadsRailOpen,
-  onToggleThreadsRail,
+  agentsRailOpen,
+  onToggleAgentsRail,
   finderRailOpen,
   onToggleFinderRail,
 }: {
   view: ViewMode
   onViewChange: (v: ViewMode) => void
   devMode: boolean
-  threadsRailOpen: boolean
-  onToggleThreadsRail: () => void
+  agentsRailOpen: boolean
+  onToggleAgentsRail: () => void
   finderRailOpen: boolean
   onToggleFinderRail: () => void
 }) {
-  const onThreads = view === "threads"
+  const onAgents = view === "agents"
   const onFinder = view === "finder"
 
-  // ⌘/Ctrl shortcuts (L Threads · K Finder) share ONE handler each with the tab
+  // ⌘/Ctrl shortcuts (L Agents · K Finder) share ONE handler each with the tab
   // click — the hook builds them, so a shortcut and a click are the same action.
   // Both stay bound on their own view (toggle the rail).
-  const { modHeld, threadsClick, finderClick } = useViewShortcuts({
+  const { modHeld, agentsClick, finderClick } = useViewShortcuts({
     view,
     onViewChange,
-    onToggleThreadsRail,
+    onToggleAgentsRail,
     onToggleFinderRail,
   })
 
@@ -421,25 +420,25 @@ function ViewTabs({
     // the opt-in token that survives the transparent `--border`.
     <div className="flex w-full flex-col items-center gap-0.5 rounded-lg border border-(--border-strong) bg-muted/60 p-0.5">
       <Tip
-        title="Threads"
+        title="Agents"
         body={
-          onThreads
-            ? `Click again to ${threadsRailOpen ? "hide" : "show"} the thread list.`
-            : "Chat with this agent. Each thread is a separate conversation or task it can run in parallel."
+          onAgents
+            ? `Click again to ${agentsRailOpen ? "hide" : "show"} the agent list.`
+            : "Chat with this fleet. Each agent is a separate conversation or task it can run in parallel."
         }
         side="right"
       >
         <ViewTab
-          active={onThreads}
+          active={onAgents}
           // Same handler as the ⌘/Ctrl+L shortcut: navigate here, or toggle the
           // list rail once already here.
-          onClick={threadsClick}
+          onClick={agentsClick}
           // Only meaningful while this tab controls the rail; on the other
           // views the button is a plain navigation control.
-          expanded={onThreads ? threadsRailOpen : undefined}
+          expanded={onAgents ? agentsRailOpen : undefined}
           icon={MessagesSquare}
-          label="Threads"
-          // L (not C — C is the new-thread shortcut in ThreadActions).
+          label="Agents"
+          // L (not C — C is the new-agent shortcut in AgentActions).
           hint="L"
           hintShown={modHeld}
         />
@@ -449,7 +448,7 @@ function ViewTabs({
         body={
           onFinder
             ? `Click again to ${finderRailOpen ? "hide" : "show"} the explorer.`
-            : "Browse this agent's files — the project folder it lives in and is confined to."
+            : "Browse this fleet's files — the project folder it lives in and is confined to."
         }
         side="right"
       >

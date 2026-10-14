@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 
 use cp_base::state::context::{Kind, estimate_tokens};
 use cp_base::state::runtime::State;
@@ -197,9 +196,15 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // Check if file is open in context (canonicalize for consistent comparison)
-    let path = Path::new(path_str);
-    let canonical = path.canonicalize().map_or_else(|_| path_str.to_owned(), |p| p.to_string_lossy().to_string());
+    let resolved = match state.try_resolve_path(path_str) {
+        Ok(p) => p,
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
+    let path = resolved.as_path();
+    let canonical =
+        path.canonicalize().map_or_else(|_| path.to_string_lossy().to_string(), |p| p.to_string_lossy().to_string());
     let is_open = state
+        .agent()
         .context
         .iter()
         .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));
@@ -207,9 +212,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     // Read file
     let mut content = match fs::read_to_string(path) {
         Ok(c) => c,
-        Err(e) => {
-            return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true);
-        }
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true),
     };
 
     // Try normalized matching (handles trailing whitespace differences).
@@ -227,6 +230,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
 
     // Update the context element's token count
     if let Some(ctx) = state
+        .agent_mut()
         .context
         .iter_mut()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
@@ -238,6 +242,7 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let lines_changed = new_string.lines().count().max(old_string.lines().count());
 
     let panel_ref = state
+        .agent()
         .context
         .iter()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))

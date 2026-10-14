@@ -34,7 +34,7 @@ pub struct Frame {
 pub enum SidebarMode {
     /// Full sidebar with entries, token bar, help hints.
     Normal,
-    /// Completely hidden (used in Threads view).
+    /// Completely hidden (used in Agents view).
     Hidden,
 }
 
@@ -162,14 +162,13 @@ pub struct HelpHint {
 pub struct StatusBar {
     /// Primary status badge (e.g. "Streaming", "Ready").
     pub badge: Badge,
-    /// Active agent card.
-    pub agent: Option<AgentCard>,
+    /// Active system (persona) card.
+    pub system: Option<SystemCard>,
     /// Loaded skills.
     pub skills: Vec<SkillCard>,
     /// Git branch + changes summary.
     pub git: Option<GitChanges>,
-    /// Auto-continuation indicator.
-    pub auto_continue: Option<AutoContinue>,
+
     /// Active reverie sub-agent cards (multiple concurrent possible).
     pub reveries: Vec<ReverieCard>,
     /// Queue status.
@@ -206,9 +205,9 @@ pub struct StopReason {
     pub semantic: Semantic,
 }
 
-/// Active agent indicator.
+/// Active system (persona) indicator.
 #[derive(Debug, Clone, Serialize)]
-pub struct AgentCard {
+pub struct SystemCard {
     /// Agent display name.
     pub name: String,
 }
@@ -233,20 +232,11 @@ pub struct GitChanges {
     pub deletions: u32,
 }
 
-/// Auto-continuation status.
-#[derive(Debug, Clone, Copy, Serialize)]
-pub struct AutoContinue {
-    /// Current continuation count.
-    pub count: u32,
-    /// Maximum allowed continuations (if set).
-    pub max: Option<u32>,
-}
-
 /// Active reverie sub-agent indicator.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReverieCard {
-    /// Agent name driving the reverie.
-    pub agent: String,
+    /// System (persona) name driving the reverie.
+    pub system: String,
     /// Tool calls completed so far.
     pub tool_count: u32,
 }

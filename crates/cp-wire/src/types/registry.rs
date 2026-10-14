@@ -63,7 +63,7 @@ pub struct Entry {
     pub started_at_ms: u64,
 
     /// Current agent status.
-    pub status: AgentStatus,
+    pub status: FleetStatus,
 }
 
 /// Coarse agent status as recorded in the registry.
@@ -73,7 +73,7 @@ pub struct Entry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
-pub enum AgentStatus {
+pub enum FleetStatus {
     /// Agent is booting (bridge init in progress).
     Starting,
     /// Fully operational.
@@ -105,7 +105,7 @@ mod tests {
             tee_socket_path: "/home/user/project/.context-pilot/tee.sock".into(),
             cap_token: "tok-secret-256bit".into(),
             started_at_ms: 1_718_000_000_000,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 
@@ -119,9 +119,9 @@ mod tests {
 
     #[test]
     fn agent_status_round_trip() {
-        for status in [AgentStatus::Starting, AgentStatus::Running, AgentStatus::Stopping, AgentStatus::Down] {
+        for status in [FleetStatus::Starting, FleetStatus::Running, FleetStatus::Stopping, FleetStatus::Down] {
             let json = serde_json::to_string(&status).expect("serialize");
-            let back: AgentStatus = serde_json::from_str(&json).expect("deserialize");
+            let back: FleetStatus = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(status, back);
         }
     }
@@ -146,7 +146,7 @@ mod tests {
             "future_field": 42
         }"#;
         let entry: Entry = serde_json::from_str(json).expect("tolerant decode");
-        assert_eq!(entry.status, AgentStatus::Running);
+        assert_eq!(entry.status, FleetStatus::Running);
         // An entry written by an older agent (pre-T713) has no `tee_socket_path`;
         // `#[serde(default)]` must decode it to `""` so the orchestrator falls
         // back to reconstructing the tee path from `folder`.

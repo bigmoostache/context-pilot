@@ -34,7 +34,11 @@ pub(crate) fn execute_open(tool: &ToolUse, state: &mut State) -> ToolResult {
 /// Open a single file and add it as a context element, returning a status message.
 fn open_single_file(path: &str, state: &mut State) -> String {
     // Check if file exists (quick metadata check, not a full read)
-    let path_obj = Path::new(path);
+    let resolved = match state.try_resolve_path(path) {
+        Ok(p) => p,
+        Err(e) => return format!("Error: {e}"),
+    };
+    let path_obj = resolved.as_path();
     if !path_obj.exists() {
         return format!("Error: File '{path}' not found");
     }
@@ -47,7 +51,7 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     let canonical = path_obj.canonicalize().map_or_else(|_| path.to_owned(), |p| p.to_string_lossy().to_string());
 
     // Check if file is already open (using canonical path)
-    if state.context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
+    if state.agent().context.iter().any(|c| c.get_meta_str("file_path") == Some(&canonical)) {
         return format!("File '{path}' is already open in context");
     }
 
@@ -63,22 +67,22 @@ fn open_single_file(path: &str, state: &mut State) -> String {
     let mut elem = cp_base::state::context::make_default_entry(&context_id, Kind::new(Kind::FILE), &file_name, true);
     elem.uid = Some(uid);
     elem.set_meta("file_path", &canonical);
-    state.context.push(elem);
+    state.agent_mut().context.push(elem);
 
     // Auto-expand parent folders in the tree so the opened file is visible
     if state.active_modules.contains("tree")
-        && let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize())
+        && let Ok(cwd) = state.workdir().canonicalize()
         && let Ok(rel) = Path::new(&canonical).strip_prefix(&cwd)
     {
-        let ts = cp_mod_tree::types::TreeState::get_mut(state);
+        let tv = cp_mod_tree::types::TreeView::get_mut(state);
         let mut accumulator = String::new();
         for component in rel.parent().into_iter().flat_map(Path::components) {
             if !accumulator.is_empty() {
                 accumulator.push('/');
             }
             accumulator.push_str(&component.as_os_str().to_string_lossy());
-            if !ts.open_folders.contains(&accumulator) {
-                ts.open_folders.push(accumulator.clone());
+            if !tv.open_folders.contains(&accumulator) {
+                tv.open_folders.push(accumulator.clone());
             }
         }
         cp_base::panels::mark_panels_dirty(state, Kind::TREE);

@@ -35,7 +35,7 @@ export function FinderPreview({
   node,
   onClose,
   variant = "pane",
-  agentId,
+  fleetId,
 }: {
   node: FinderNode | null
   onClose: () => void
@@ -43,7 +43,7 @@ export function FinderPreview({
   variant?: "pane" | "full"
   /** agent realm the file lives in — enables live content fetch for files
    *  whose preview payload isn't inlined (the live Finder). Omit for the mock. */
-  agentId?: string | undefined
+  fleetId?: string | undefined
 }) {
   const full = variant === "full"
   return (
@@ -56,7 +56,7 @@ export function FinderPreview({
               <IconBtn
                 icon={Download}
                 title="Download"
-                onClick={agentId ? () => void downloadFile(agentId, node.path) : undefined}
+                onClick={fleetId ? () => void downloadFile(fleetId, node.path) : undefined}
               />
             )}
             <IconBtn icon={X} title="Close" onClick={onClose} />
@@ -67,7 +67,7 @@ export function FinderPreview({
       {node ? (
         <div key={node.path} className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-auto">
-            <Body node={node} agentId={agentId} />
+            <Body node={node} fleetId={fleetId} />
           </div>
         </div>
       ) : (
@@ -100,22 +100,22 @@ function inlinePreview(node: FinderNode): ReactElement | null {
 /**
  * Render a live-fetched preview for a node whose payload isn't inlined (the live
  * Finder), through the mobile live renderers (touch zoom / copy / save). Returns
- * null without an agentId or for an unpreviewable kind so {@link Body} falls
+ * null without a fleetId or for an unpreviewable kind so {@link Body} falls
  * through to {@link Generic}.
  */
-function livePreview(node: FinderNode, agentId: string | undefined): ReactElement | null {
-  if (!agentId) return null
-  if (node.kind === "image") return <LiveImagePreview agentId={agentId} node={node} />
-  if (node.kind === "pdf") return <LivePdfPreview agentId={agentId} node={node} />
-  if (node.kind === "sheet") return <LiveSheetPreview agentId={agentId} node={node} />
-  if (TEXT_KINDS.has(node.kind)) return <LivePreview agentId={agentId} node={node} />
+function livePreview(node: FinderNode, fleetId: string | undefined): ReactElement | null {
+  if (!fleetId) return null
+  if (node.kind === "image") return <LiveImagePreview fleetId={fleetId} node={node} />
+  if (node.kind === "pdf") return <LivePdfPreview fleetId={fleetId} node={node} />
+  if (node.kind === "sheet") return <LiveSheetPreview fleetId={fleetId} node={node} />
+  if (TEXT_KINDS.has(node.kind)) return <LivePreview fleetId={fleetId} node={node} />
   return null
 }
 
 /**
  * Route a node to its bespoke preview: an inlined maquette payload first, then a
- * live backend fetch (given an agentId), then the generic no-preview fallback.
+ * live backend fetch (given a fleetId), then the generic no-preview fallback.
  */
-function Body({ node, agentId }: { node: FinderNode; agentId?: string | undefined }) {
-  return inlinePreview(node) ?? livePreview(node, agentId) ?? <Generic node={node} />
+function Body({ node, fleetId }: { node: FinderNode; fleetId?: string | undefined }) {
+  return inlinePreview(node) ?? livePreview(node, fleetId) ?? <Generic node={node} />
 }

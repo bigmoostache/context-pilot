@@ -614,7 +614,7 @@ export default defineConfig([
     // rule — the config-level analog of the Rust `allowed-lint-exceptions.yaml`
     // registry (never an inline `eslint-disable`, which the P4 anti-cheat layer
     // forbids). It is NOT a blanket downgrade: every other rule stays at error.
-    files: ["src/components/agents/MarkdownEditor.tsx"],
+    files: ["src/components/fleets/MarkdownEditor.tsx"],
     rules: {
       "@typescript-eslint/no-deprecated": "off",
       // The editor SEEDS its contentEditable surface once on mount via

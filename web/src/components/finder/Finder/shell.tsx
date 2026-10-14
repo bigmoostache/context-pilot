@@ -1,4 +1,4 @@
-import type { Agent, FinderNode } from "@/lib/types"
+import type { Fleet, FinderNode } from "@/lib/types"
 import {
   DndContext,
   PointerSensor,
@@ -45,26 +45,26 @@ const pointerFirst: CollisionDetection = (args) => {
  * served.
  */
 export function FinderShell({
-  agent,
+  fleet,
   tree,
   groups,
   railOpen = true,
   disconnected,
   onReconnect,
 }: {
-  agent: Agent
+  fleet: Fleet
   tree: TreeState
   groups: GroupsState
   /** Whether the explorer rail is expanded. When false the tree slides off the
    *  left edge (the {@link FinderShell} root clips it) and the editor reclaims
-   *  the width — the Finder twin of the Threads/Settings rail collapse. */
+   *  the width — the Finder twin of the Agents/Settings rail collapse. */
   railOpen?: boolean
   disconnected?: boolean | undefined
   onReconnect?: (() => void) | undefined
 }) {
   // The agent's tree descriptions (realm-relative path → text), for the ⓘ badge
   // on described rows. One fetch per agent, shared across the whole tree.
-  const { data: descriptions } = useFsDescriptions(agent.id)
+  const { data: descriptions } = useFsDescriptions(fleet.id)
 
   // ONE DndContext spanning the explorer AND every editor group (T630 P1–P3).
   // It hosts three drag systems: each group's tab SortableContext (reorder),
@@ -88,14 +88,14 @@ export function FinderShell({
         {disconnected && (
           <div
             {...clickable(() => onReconnect?.())}
-            aria-label="Reconnect agent"
+            aria-label="Reconnect fleet"
             className="absolute inset-0 z-40 cursor-pointer bg-background/30"
           />
         )}
 
         {/* Slide wrapper (T624): the tree stays MOUNTED and slides off the left
             edge via a transitioned negative margin when the rail is collapsed —
-            the same mechanism the Threads/Settings rails use, so tree expansion
+            the same mechanism the Agents/Settings rails use, so tree expansion
             state and the lazily-fetched folder listings survive a hide/show. A
             `flex` wrapper (not a plain block) so the aside inside keeps its
             flex-stretch height. `motion-reduce` snaps instead of sliding. */}
@@ -105,8 +105,8 @@ export function FinderShell({
           aria-hidden={!railOpen}
         >
           <ExplorerTree
-            agentId={agent.id}
-            agentFolder={agent.folder}
+            fleetId={fleet.id}
+            fleetFolder={fleet.folder}
             tree={tree}
             descriptions={descriptions}
             activePath={groups.activePath}
@@ -121,7 +121,7 @@ export function FinderShell({
           />
         </div>
 
-        <TabHost groups={groups} agentId={agent.id} />
+        <TabHost groups={groups} fleetId={fleet.id} />
       </div>
     </DndContext>
   )

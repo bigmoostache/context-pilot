@@ -27,8 +27,12 @@ fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
     if !std::path::Path::new(file_path).exists() {
         return None;
     }
-    let cwd = std::env::current_dir().and_then(|d| d.canonicalize()).ok()?;
+    let cwd = state.workdir().canonicalize().ok()?;
     let rel = std::path::Path::new(file_path).strip_prefix(&cwd).ok()?;
+    // Another worktree's copy of a file: descriptions belong to the root tree, not to it.
+    if rel.starts_with(cp_base::config::constants::WORKTREES_DIR) {
+        return None;
+    }
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);
     let needs_skip = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()).map_or_else(
@@ -49,7 +53,7 @@ fn file_panel_needs_describe(state: &State, ctx: &Entry) -> Option<String> {
 /// `(index, id)` in `state.context`.
 fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Module>], tally: &mut CloseTally) {
     let (idx, id) = at;
-    let ctx = state.context.remove(idx);
+    let ctx = state.agent_mut().context.remove(idx);
     let mut close_result: Option<Result<String, String>> = None;
     for module in modules {
         if let Some(result) = module.on_close_context(&ctx, state) {
@@ -60,7 +64,7 @@ fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Modu
     match close_result {
         Some(Ok(desc)) => tally.closed.push(format!("{id} ({desc})")),
         Some(Err(msg)) => {
-            state.context.insert(idx, ctx);
+            state.agent_mut().context.insert(idx, ctx);
             tally.skipped.push(msg);
         }
         None => {
@@ -73,11 +77,11 @@ fn close_one_panel(state: &mut State, at: (usize, &str), modules: &[Box<dyn Modu
 /// Route one requested id to its outcome: not-found, protected, describe-skip,
 /// or an actual close.
 fn process_close_id(state: &mut State, id: &str, modules: &[Box<dyn Module>], tally: &mut CloseTally) {
-    let Some(idx) = state.context.iter().position(|c| c.id == id) else {
+    let Some(idx) = state.agent().context.iter().position(|c| c.id == id) else {
         tally.not_found.push(id.to_owned());
         return;
     };
-    let Some(ctx_elem) = state.context.get(idx) else {
+    let Some(ctx_elem) = state.agent().context.get(idx) else {
         tally.not_found.push(id.to_owned());
         return;
     };

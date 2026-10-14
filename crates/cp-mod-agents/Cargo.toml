@@ -1,0 +1,24 @@
+[package]
+name = "cp-mod-agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Context Pilot module"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+[dependencies]
+cp-base.workspace = true
+cp-render.workspace = true
+cp-groups.workspace = true
+cp-fleet = { path = "../cp-fleet" }
+cp-mod-spine = { path = "../cp-mod-spine" }
+crossterm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

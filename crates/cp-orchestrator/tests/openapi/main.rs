@@ -27,6 +27,7 @@ use cp_vault as _;
 use cp_wire as _;
 use csv as _;
 use dotenvy as _;
+use flate2 as _;
 use minisign_verify as _;
 use nix as _;
 use notify as _;
@@ -39,6 +40,7 @@ use serde_yaml as _;
 use sha2 as _;
 use tempfile as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use serde_json::{Map, Value, json};

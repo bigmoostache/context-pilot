@@ -44,7 +44,7 @@ struct DriverState {
     /// Per-agent live stream-plane readers (tee.sock → hub republish).
     tee_readers: BTreeMap<String, TeeReader>,
     /// Per-agent working-directory paths, seeded from `Appeared` events.
-    agent_folders: BTreeMap<String, PathBuf>,
+    fleet_folders: BTreeMap<String, PathBuf>,
     /// Per-agent last-seen `config.json` mtime, for change detection.
     config_mtimes: BTreeMap<String, SystemTime>,
 }
@@ -74,7 +74,7 @@ pub(super) fn driver_loop(
         // 1. Registry scan — discover/lose agents, then sync liveness.
         if let Ok(events) = registry.scan() {
             process_registry_events(events, backend, &mut ds);
-            sync_liveness(backend, &registry, &ds.agent_folders);
+            sync_liveness(backend, &registry, &ds.fleet_folders);
         }
 
         // 2. Detect tier-② INSPECTION-resource changes by checking config.json
@@ -141,7 +141,7 @@ fn process_registry_events(events: Vec<Event>, backend: &Arc<Mutex<Backend>>, ds
                 if let Some(reader) = ds.tee_readers.remove(&id) {
                     reader.stop();
                 }
-                drop(ds.agent_folders.remove(&id));
+                drop(ds.fleet_folders.remove(&id));
                 let _: Option<SystemTime> = ds.config_mtimes.remove(&id);
                 if let Ok(mut b) = backend.lock() {
                     drop(b.view_mut().remove(&id));
@@ -177,7 +177,7 @@ fn handle_appeared(entry: &Entry, backend: &Arc<Mutex<Backend>>, ds: &mut Driver
     if let Some(old) = ds.tee_readers.insert(entry.id.clone(), reader) {
         old.stop();
     }
-    drop(ds.agent_folders.insert(entry.id.clone(), folder));
+    drop(ds.fleet_folders.insert(entry.id.clone(), folder));
     if let Ok(mut b) = backend.lock() {
         let _: Option<crate::liveness::Liveness> = b.liveness.insert(entry.id.clone(), crate::liveness::Liveness::Live);
     }
@@ -205,11 +205,11 @@ fn resolve_tee_path(entry: &Entry) -> PathBuf {
 /// recovers (heartbeat resumes, PID alive) would stay "disconnected" in the
 /// backend forever. Recovered agents are marked dirty so the SSE invalidate
 /// fires promptly.
-fn sync_liveness(backend: &Arc<Mutex<Backend>>, registry: &FleetScanner, agent_folders: &BTreeMap<String, PathBuf>) {
+fn sync_liveness(backend: &Arc<Mutex<Backend>>, registry: &FleetScanner, fleet_folders: &BTreeMap<String, PathBuf>) {
     let Ok(mut b) = backend.lock() else {
         return;
     };
-    for id in agent_folders.keys() {
+    for id in fleet_folders.keys() {
         if let Some(live) = registry.liveness(id) {
             let prev = b.liveness.get(id).copied();
             let _: Option<crate::liveness::Liveness> = b.liveness.insert(id.clone(), live);
@@ -266,9 +266,9 @@ fn check_config_mtimes(backend: &Arc<Mutex<Backend>>, ds: &mut DriverState) {
     // mtimes (mutable) — two different maps, so the split borrow is sound and
     // needs no struct pattern (which would trip pattern_type_mismatch on the
     // `&mut DriverState`).
-    let agent_folders = &ds.agent_folders;
+    let fleet_folders = &ds.fleet_folders;
     let config_mtimes = &mut ds.config_mtimes;
-    for (id, folder) in agent_folders {
+    for (id, folder) in fleet_folders {
         let config_path = folder.join(CP_DIR).join(CONFIG_FILE);
         let Ok(current) = std::fs::metadata(&config_path).and_then(|m| m.modified()) else {
             continue;

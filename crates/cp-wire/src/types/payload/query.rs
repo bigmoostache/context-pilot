@@ -76,9 +76,10 @@ pub enum Kind {
         query: String,
         /// Maximum number of hits to return.
         limit: u32,
-        /// Optional single-thread scope (filters on `thread_id`). `None`
-        /// searches every thread.
-        thread_id: Option<String>,
+        /// Optional single-thread scope (filters on `agent_id`). `None`
+        /// searches every agent.
+        #[serde(rename = "agent_id", alias = "thread_id")]
+        agent_id: Option<String>,
     },
 
     /// Catch-all for variants added in a newer protocol version.
@@ -134,10 +135,10 @@ impl Frame {
     reason = "borrowed builder params for ConvHit: built by struct literal cross-crate (the agent maps a Meilisearch row into it); a constructor would take six positional arguments and re-trip too_many_arguments, which is exactly what this params struct exists to avoid, so #[non_exhaustive] is impossible"
 )]
 pub struct HitParts<'src> {
-    /// Owning thread id — the navigation target.
-    pub thread_id: &'src str,
-    /// Owning thread's display name.
-    pub thread_name: &'src str,
+    /// Owning agent id — the navigation target.
+    pub agent_id: &'src str,
+    /// Owning agent's display name.
+    pub agent_name: &'src str,
     /// `"user"` or `"assistant"`.
     pub author: &'src str,
     /// The matched message body.
@@ -151,16 +152,18 @@ pub struct HitParts<'src> {
 /// One conversation-search hit returned to the backend.
 ///
 /// A flattened, transport-ready view of a Meilisearch conversation document:
-/// enough to render a palette result row (thread name + author + snippet) and
-/// to navigate to the source thread (`thread_id`).
+/// enough to render a palette result row (agent name + author + snippet) and
+/// to navigate to the source agent (`agent_id`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[non_exhaustive]
 pub struct ConvHit {
-    /// Owning thread id — the navigation target.
-    pub thread_id: String,
-    /// Owning thread's display name.
-    pub thread_name: String,
+    /// Owning agent id — the navigation target.
+    #[serde(rename = "agent_id", alias = "thread_id")]
+    pub agent_id: String,
+    /// Owning agent's display name.
+    #[serde(rename = "agent_name", alias = "thread_name")]
+    pub agent_name: String,
     /// `"user"` or `"assistant"`.
     pub author: String,
     /// The matched message body.
@@ -180,8 +183,8 @@ impl ConvHit {
     #[must_use]
     pub fn from_parts(p: &HitParts<'_>) -> Self {
         Self {
-            thread_id: p.thread_id.to_owned(),
-            thread_name: p.thread_name.to_owned(),
+            agent_id: p.agent_id.to_owned(),
+            agent_name: p.agent_name.to_owned(),
             author: p.author.to_owned(),
             text: p.text.to_owned(),
             ts_ms: p.ts_ms,
@@ -272,7 +275,7 @@ mod tests {
             "tok".to_owned(),
             Query::new(
                 "q-1".to_owned(),
-                Kind::SearchConversations { query: "auth bug".to_owned(), limit: 10, thread_id: None },
+                Kind::SearchConversations { query: "auth bug".to_owned(), limit: 10, agent_id: None },
             ),
         )
     }
@@ -291,8 +294,8 @@ mod tests {
             "q-1".to_owned(),
             Outcome::Hits {
                 hits: vec![ConvHit::from_parts(&HitParts {
-                    thread_id: "T3",
-                    thread_name: "Auth",
+                    agent_id: "T3",
+                    agent_name: "Auth",
                     author: "user",
                     text: "the token check",
                     ts_ms: 42,

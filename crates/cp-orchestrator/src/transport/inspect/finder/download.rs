@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{agent_folder, confined_path, extract_param};
+use super::support::{confined_path, extract_param, fleet_folder, previewable_path};
 
 /// Maximum file size for downloads (100 MiB).
 const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
@@ -14,7 +14,7 @@ const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
 /// Maximum zip archive size for folder downloads (500 MiB).
 const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 
-/// `GET /api/agent/{id}/fs/download?path=` — file or folder download.
+/// `GET /api/fleet/{id}/fs/download?path=` — file or folder download.
 ///
 /// **Files** are returned as raw bytes with `Content-Disposition: attachment`,
 /// capped at [`MAX_DOWNLOAD_BYTES`].
@@ -30,8 +30,8 @@ const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 /// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
 /// escaping the realm, `404` for a non-file/dir, `413` when the file or zipped
 /// folder exceeds its size cap, and `502` for a read or zip fault.
-pub(crate) fn fs_download(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
-    let folder = agent_folder(state, agent_id)?;
+pub(crate) fn fs_download(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+    let folder = fleet_folder(state, fleet_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
         _ => return Err(HttpReply::error(400, "missing path parameter")),
@@ -96,7 +96,7 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
     Ok((bytes, zip_name))
 }
 
-/// `GET /api/agent/{id}/fs/raw?path=` — serve a file's raw bytes **inline**.
+/// `GET /api/fleet/{id}/fs/raw?path=` — serve a file's raw bytes **inline**.
 ///
 /// Unlike [`fs_download`] (which forces `Content-Disposition: attachment`), this
 /// serves the bytes with an inferred `Content-Type` and no attachment header, so
@@ -111,13 +111,13 @@ fn zip_and_download(dir: &Path) -> Result<(Vec<u8>, String), HttpReply> {
 /// Returns an [`HttpReply`] error: `400` for a missing path, `403` for a path
 /// escaping the realm, `404` for a non-file, `413` when the file exceeds the
 /// preview cap, and `502` for a read fault.
-pub(crate) fn fs_raw(state: &Mutex<Backend>, agent_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
-    let folder = agent_folder(state, agent_id)?;
+pub(crate) fn fs_raw(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<(Vec<u8>, String), HttpReply> {
+    let folder = fleet_folder(state, fleet_id)?;
     let relative = match extract_param(query, "path") {
         Some(p) if !p.is_empty() => p,
         _ => return Err(HttpReply::error(400, "missing path parameter")),
     };
-    let Some(target) = confined_path(&folder, &relative) else {
+    let Some(target) = previewable_path(&folder, &relative) else {
         return Err(HttpReply::error(403, "path outside agent realm"));
     };
     if !target.is_file() {

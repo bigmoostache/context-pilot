@@ -6,14 +6,14 @@ import { fetchVitals, type Vital } from "@/lib/api"
  * Service vitals — on-demand connectivity board, as an **embeddable section**
  * (no dialog chrome of its own).
  *
- * Rendered inside the Agent Configuration dialog ({@link AgentModal} manage
- * mode) right column. The backend (`GET /api/agent/{id}/vitals`) runs the checks
+ * Rendered inside the Agent Configuration dialog ({@link FleetModal} manage
+ * mode) right column. The backend (`GET /api/fleet/{id}/vitals`) runs the checks
  * it can reach; we prepend the two only the browser can observe (this app is
  * alive, and the measured round-trip), so the board covers the whole dependency
  * chain end to end. Healthy rows stay quiet (a coloured dot + latency); a
  * degraded/unreachable service raises a loud status chip so problems pop.
  */
-export function SessionVitals({ agentId }: { agentId: string }) {
+export function SessionVitals({ fleetId }: { fleetId: string }) {
   // ── Check Vitals (on-demand connectivity probe) ────────────────────
   const [vitals, setVitals] = useState<Vital[] | null>(null)
   const [checking, setChecking] = useState(false)
@@ -24,7 +24,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
     setVitalsErr(null)
     const t0 = performance.now()
     try {
-      const rows = await fetchVitals(agentId)
+      const rows = await fetchVitals(fleetId)
       const rtt = Math.round(performance.now() - t0)
       // The two checks only the browser can observe: that this app is running
       // (we are executing) and the measured round-trip to the orchestrator.
@@ -45,7 +45,7 @@ export function SessionVitals({ agentId }: { agentId: string }) {
     } finally {
       setChecking(false)
     }
-  }, [agentId])
+  }, [fleetId])
 
   // Group the flat probe list by category (first-seen order preserved) so the
   // grid reads as labelled sections rather than a homogeneous wall of rows.

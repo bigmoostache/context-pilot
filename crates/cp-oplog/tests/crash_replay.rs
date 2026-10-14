@@ -108,7 +108,7 @@ mod tests {
         let mut byte: u8 = 0;
         loop {
             let kind = OpEntryKind::MessageCreated {
-                thread_id: "T1".to_owned(),
+                agent_id: "T1".to_owned(),
                 message_id: format!("m{byte}"),
                 head: cp_wire::types::ContentHash::new([byte; 32]),
                 inline_body: None,

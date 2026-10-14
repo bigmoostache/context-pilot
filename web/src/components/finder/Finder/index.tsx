@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import type { Agent, FinderNode } from "@/lib/types"
+import type { Fleet, FinderNode } from "@/lib/types"
 import { useTreeState } from "../explorer/treeState"
 import { useEditorGroups } from "../editor/tabState"
 import { kindOf } from "../support/kind"
@@ -21,12 +21,12 @@ import { FinderShell } from "./shell"
  * This component is the thin seam: {@link Finder} keys the body by agent id so
  * each agent mounts fresh, and {@link FinderBody} owns the two pieces of UI
  * state the explorer + tabs need ({@link useTreeState}, {@link useEditorGroups}
- * — the latter persists its open-tab / split layout per agent), threads the
+ * — the latter persists its open-tab / split layout per agent), agents the
  * "Show in Finder" reveal into the tree, and hands everything to
  * {@link FinderShell} for render.
  */
 export function Finder(props: {
-  agent: Agent
+  fleet: Fleet
   /** Whether the explorer rail is expanded. Toggled from the header rail's
    *  Finder tab (T624); the tree slides out when false. */
   railOpen?: boolean
@@ -41,18 +41,18 @@ export function Finder(props: {
   // that agent's own saved layout with no cross-agent state bleed and no
   // effect-ordering race on the persisted groups (T630 — tabs were lost on view
   // switch + reload because this state lived only in unmounting `useState`).
-  return <FinderBody key={props.agent.id} {...props} />
+  return <FinderBody key={props.fleet.id} {...props} />
 }
 
 function FinderBody({
-  agent,
+  fleet,
   railOpen = true,
   revealPath,
   onRevealConsumed,
   disconnected,
   onReconnect,
 }: {
-  agent: Agent
+  fleet: Fleet
   railOpen?: boolean
   revealPath?: string | null | undefined
   onRevealConsumed?: (() => void) | undefined
@@ -60,7 +60,7 @@ function FinderBody({
   onReconnect?: () => void
 }) {
   const tree = useTreeState()
-  const groups = useEditorGroups(agent.id)
+  const groups = useEditorGroups(fleet.id)
 
   // "Show in Finder": expand every ancestor of the target so its row renders,
   // then open it pinned (the user asked to SEE this file, not to glance at it).
@@ -70,16 +70,16 @@ function FinderBody({
   // nulls `revealPath` on consume, so the reveal runs exactly once.
   useEffect(() => {
     if (!revealPath) return
-    tree.reveal(revealPath, agent.folder)
+    tree.reveal(revealPath, fleet.folder)
     const name = revealPath.split("/").at(-1) ?? revealPath
     const node: FinderNode = { name, path: revealPath, kind: kindOf(name), modified: "" }
     groups.openPinned(node)
     onRevealConsumed?.()
-  }, [revealPath, agent.folder, tree, groups, onRevealConsumed])
+  }, [revealPath, fleet.folder, tree, groups, onRevealConsumed])
 
   return (
     <FinderShell
-      agent={agent}
+      fleet={fleet}
       tree={tree}
       groups={groups}
       railOpen={railOpen}

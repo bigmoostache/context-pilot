@@ -2,16 +2,16 @@ import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
 import type { ChatMessage } from "@/lib/types"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
-import { MessageFileChip } from "@/components/threads/fileUpload"
-import { splitMessageSegments, type UploadedFile } from "@/components/threads/fileUpload/helpers"
+import { MessageFileChip } from "@/components/agents/fileUpload"
+import { splitMessageSegments, type UploadedFile } from "@/components/agents/fileUpload/helpers"
 import { cn } from "@/lib/utils"
 
 /**
  * Props every message renderer accepts.
  *
- * `agentId` + `onOpenFile` are threaded through so a ` ```file-upload ` block
+ * `fleetId` + `onOpenFile` are threaded through so a ` ```file-upload ` block
  * embedded in the body can render its clickable attachment chip **inline** (via
- * {@link MessageBody}): `agentId` lets the chip verify the file still exists,
+ * {@link MessageBody}): `fleetId` lets the chip verify the file still exists,
  * `onOpenFile` opens the shared Quick Look drawer for it. Both optional — a
  * surface that doesn't wire them still renders prose (and static, existence-
  * unchecked chips) unchanged.
@@ -19,20 +19,20 @@ import { cn } from "@/lib/utils"
 interface MessageProps {
   msg: ChatMessage
   /** owning agent — enables the inline attachment chip's existence check */
-  agentId?: string | undefined
+  fleetId?: string | undefined
   /** open the shared Quick Look drawer for an inline attachment */
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   /** navigate the Finder to a file's parent and select it */
   onShowInFinder?: ((path: string) => void) | undefined
-  /** permanently delete this message from the thread */
+  /** permanently delete this message from the agent */
   onDelete?: (() => void) | undefined
-  /** branch a new thread out of the conversation at this message */
+  /** branch a new agent out of the conversation at this message */
   onBranch?: (() => void) | undefined
 }
 
 export function Message({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -43,7 +43,7 @@ export function Message({
     return (
       <UserMessage
         msg={msg}
-        agentId={agentId}
+        fleetId={fleetId}
         onOpenFile={onOpenFile}
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
@@ -53,7 +53,7 @@ export function Message({
   return (
     <AssistantMessage
       msg={msg}
-      agentId={agentId}
+      fleetId={fleetId}
       onOpenFile={onOpenFile}
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
@@ -75,13 +75,13 @@ export function Message({
 function MessageBody({
   text,
   variant,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
 }: {
   text: string
   variant: MarkdownVariant
-  agentId?: string | undefined
+  fleetId?: string | undefined
   onOpenFile?: ((file: UploadedFile) => void) | undefined
   onShowInFinder?: ((path: string) => void) | undefined
 }) {
@@ -99,7 +99,7 @@ function MessageBody({
           <div key={i} className="my-1">
             <MessageFileChip
               file={seg.file}
-              agentId={agentId}
+              fleetId={fleetId}
               onAccent={variant === "onAccent"}
               onOpen={onOpenFile ? () => onOpenFile(seg.file) : undefined}
               onShowInFinder={onShowInFinder ? () => onShowInFinder(seg.file.path) : undefined}
@@ -113,7 +113,7 @@ function MessageBody({
 
 /**
  * Discrete "branch out" affordance beside copy/delete: opens the Branch dialog
- * to start a new thread inheriting the conversation up to this message. Same
+ * to start a new agent inheriting the conversation up to this message. Same
  * quiet style as the copy button, brightening to the signal colour on hover.
  */
 function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: () => void }) {
@@ -121,8 +121,8 @@ function BranchButton({ align, onBranch }: { align: "start" | "end"; onBranch: (
     <button
       type="button"
       onClick={onBranch}
-      aria-label="Branch a new thread from this message"
-      title="Branch a new thread from here"
+      aria-label="Branch a new agent from this message"
+      title="Branch a new agent from here"
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5 text-[10px] transition-colors",
         "opacity-50 outline-none hover:opacity-100 focus-visible:opacity-100",
@@ -163,7 +163,7 @@ function DeleteButton({ align, onDelete }: { align: "start" | "end"; onDelete: (
 
 function UserMessage({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -175,7 +175,7 @@ function UserMessage({
         <MessageBody
           text={msg.text ?? ""}
           variant="onAccent"
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
         />
@@ -195,7 +195,7 @@ function UserMessage({
 
 function AssistantMessage({
   msg,
-  agentId,
+  fleetId,
   onOpenFile,
   onShowInFinder,
   onDelete,
@@ -214,7 +214,7 @@ function AssistantMessage({
         <MessageBody
           text={msg.text ?? ""}
           variant="default"
-          agentId={agentId}
+          fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
         />

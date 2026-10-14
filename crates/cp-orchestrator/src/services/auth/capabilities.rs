@@ -16,7 +16,7 @@ use super::types::{User, UserRole};
 
 impl User {
     /// Implicit access & management on **every** agent (design §13.3). Manager+.
-    pub(crate) fn can_manage_all_agents(&self) -> bool {
+    pub(crate) fn can_manage_all_fleets(&self) -> bool {
         self.role >= UserRole::Manager
     }
 
@@ -79,16 +79,16 @@ mod tests {
     /// V0.2a — the exact truth table of design §13.3: 4 roles × 5 capabilities.
     #[test]
     fn capabilities_by_role() {
-        // (role, all_agents, manage_users, manage_it, manage_secrets)
+        // (role, all_fleets, manage_users, manage_it, manage_secrets)
         let matrix = [
             (Superadmin, true, true, true, true),
             (Admin, true, true, true, false),
             (Manager, true, true, false, false),
             (Regular, false, false, false, false),
         ];
-        for (role, all_agents, users, it, secrets) in matrix {
+        for (role, all_fleets, users, it, secrets) in matrix {
             let u = user(role);
-            assert_eq!(u.can_manage_all_agents(), all_agents, "all_agents {role:?}");
+            assert_eq!(u.can_manage_all_fleets(), all_fleets, "all_agents {role:?}");
             assert_eq!(u.can_manage_users(), users, "manage_users {role:?}");
             assert_eq!(u.can_manage_it(), it, "manage_it {role:?}");
             assert_eq!(u.can_manage_secrets(), secrets, "manage_secrets {role:?}");

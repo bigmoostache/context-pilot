@@ -1,29 +1,17 @@
-//! Per-thread runtime bundle — the mutable context a single thread owns.
+//! Per-thread runtime bundle — the mutable context a single agent owns.
 //!
-//! The multi-thread model keeps [`State`] *flat*: the whole existing pipeline
-//! (stream processing, tool execution, the cache/freeze engine) reads and writes
-//! `state.messages` / `state.context` / `state.stream` directly and must
-//! stay untouched. Instead of threading a per-thread context parameter through
-//! all of it, the loop keeps one thread *resident* in `State` and swaps a
-//! different thread in/out around a single advancement step.
-//!
-//! [`ThreadRuntime`] is the carrier for that swap: it mirrors exactly the subset
-//! of `State` fields that belong to one thread (conversation, editor/view state,
-//! token+cost telemetry, the cache/freeze engine snapshots, per-thread module
-//! data). [`ThreadRuntime::swap_with`] exchanges every one of those fields with a
-//! `State` in O(1) via [`std::mem::swap`] — no clone, no pipeline change. Fields
-//! NOT present here (tools, active modules, theme, provider/model, the shared
-//! module `TypeMap`, `global_next_uid`, the highlight fn, reveries) are
-//! fleet-shared and never move.
-//!
-//! This module is purely additive until the loop is wired (Phase C): nothing
-//! calls [`swap_with`](ThreadRuntime::swap_with) yet, so behaviour at a single
-//! resident thread is unchanged.
+//! [`AgentRuntime`] holds everything that belongs to one agent: conversation,
+//! panels, editor/view state, stream phase, token+cost telemetry, the
+//! cache/freeze engine snapshots and per-agent module data. Every agent's
+//! runtime lives permanently in [`AgentStore`](super::agents::AgentStore),
+//! keyed by agent id; code reaches the executing one through
+//! [`State::agent`](super::State::agent) / [`State::agent_mut`](super::State::agent_mut).
+//! Fleet-shared data (tools, modules, theme, provider/model, shared module
+//! data, `global_next_uid`, reveries) stays on [`State`](super::State).
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-use super::State;
 use crate::panels::ContextItem;
 use crate::state::context::Entry;
 use crate::state::data::TickTelemetry;
@@ -32,13 +20,11 @@ use crate::state::flags::{StreamState, StreamingTool};
 use crate::state::runtime::textarea::TextArea;
 use crate::ui::render_cache::{FullCache, InputCache, MessageCache};
 
-/// The complete mutable context owned by one thread.
+/// The complete mutable context owned by one agent.
 ///
-/// Every field mirrors a per-thread field of [`State`] (same name, same type);
-/// [`swap_with`](Self::swap_with) exchanges them all with a `State`. The resident
-/// thread's values live in `State`; every non-resident thread parks its values
-/// here inside the fleet registry.
-pub struct ThreadRuntime {
+/// Stored per agent in [`AgentStore`](super::agents::AgentStore); see the
+/// module docs.
+pub struct AgentRuntime {
     // === Conversation + panels ===
     /// Active context panels (dynamic + fixed), ordered for LLM injection.
     pub context: Vec<Entry>,
@@ -62,7 +48,7 @@ pub struct ThreadRuntime {
     pub max_scroll: f32,
 
     // === Stream lifecycle ===
-    /// Current [`StreamState`] (phase + scroll tracking) for this thread.
+    /// Current [`StreamState`] (phase + scroll tracking) for this agent.
     pub stream: StreamState,
     /// Tool call currently being streamed (advisory, for UI rendering).
     pub streaming_tool: Option<StreamingTool>,
@@ -70,7 +56,7 @@ pub struct ThreadRuntime {
     pub last_stop_reason: Option<String>,
     /// Estimated tokens added during the current streaming session.
     pub streaming_estimated_tokens: usize,
-    /// Whether this thread is waiting for file panels before continuing its stream.
+    /// Whether this agent is waiting for file panels before continuing its stream.
     pub waiting_for_panels: bool,
 
     // === Per-conversation message-ID counters ===
@@ -83,7 +69,7 @@ pub struct ThreadRuntime {
     /// Next result message ID (R1, R2, …).
     pub next_result_id: usize,
 
-    // === Token accumulators (per-thread budget) ===
+    // === Token accumulators (per-agent budget) ===
     /// Accumulated `prompt_cache_hit_tokens` across API calls.
     pub cache_hit_tokens: usize,
     /// Accumulated `prompt_cache_miss_tokens` across API calls.
@@ -137,7 +123,7 @@ pub struct ThreadRuntime {
     /// Sleep timer: the tool pipeline waits until this ms timestamp.
     pub tool_sleep_until_ms: u64,
 
-    // === Cache / freeze engine state (duplicated verbatim per thread) ===
+    // === Cache / freeze engine state (duplicated verbatim per agent) ===
     /// Previous panel hash list for cache cost tracking.
     pub previous_panel_hash_list: Vec<String>,
     /// Saved panel ID order from the last emitted tick (freeze stability).
@@ -169,16 +155,21 @@ pub struct ThreadRuntime {
     /// Full content cache (entire conversation output).
     pub full_content_cache: Option<FullCache>,
 
+    // === Working directory ===
+    /// Git worktree this agent works in (set by the `Worktree` tool).
+    /// `None` = the project root. Read through [`State::workdir`](super::State::workdir),
+    /// never the process cwd: concurrent agents share one process.
+    pub workdir: Option<std::path::PathBuf>,
+
     // === Per-thread module data ===
-    /// The resident thread's per-thread module `TypeMap` (spine inbox, queue,
+    /// This agent's per-agent module `TypeMap` (spine inbox, queue,
     /// console ownership, watcher registry, search/git views, …).
-    pub thread_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    pub agent_module_data: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
-impl Default for ThreadRuntime {
+impl Default for AgentRuntime {
     fn default() -> Self {
-        // Mirrors the per-thread field defaults in `State::default` so a freshly
-        // created thread starts exactly like today's single resident thread.
+        // A freshly created thread starts empty, at single-thread defaults.
         Self {
             context: vec![],
             messages: vec![],
@@ -237,100 +228,27 @@ impl Default for ThreadRuntime {
             message_cache: HashMap::new(),
             input_cache: None,
             full_content_cache: None,
-            thread_module_data: HashMap::new(),
+            workdir: None,
+            agent_module_data: HashMap::new(),
         }
     }
 }
 
-impl std::fmt::Debug for ThreadRuntime {
+impl std::fmt::Debug for AgentRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ThreadRuntime")
             .field("context_len", &self.context.len())
             .field("messages_len", &self.messages.len())
             .field("stream_phase", &self.stream.phase)
-            .field("thread_module_data_keys", &self.thread_module_data.len())
+            .field("thread_module_data_keys", &self.agent_module_data.len())
             .finish_non_exhaustive()
     }
 }
 
-impl ThreadRuntime {
+impl AgentRuntime {
     /// A fresh, empty thread runtime (every field at its single-thread default).
     #[must_use]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Exchange this bundle with the resident thread currently loaded in `state`
-    /// in O(1).
-    ///
-    /// Since every per-thread field now lives on [`ThreadRuntime`] (and `State`
-    /// holds the resident as a single [`resident`](State::resident) field), the
-    /// swap is one whole-struct [`mem::swap`](std::mem::swap) rather than a
-    /// field-by-field exchange. Symmetric: calling it once makes `self` resident
-    /// (parking the previous resident back into `self`); calling it again with
-    /// the same pair restores the original arrangement.
-    ///
-    /// Fleet-shared fields on `State` (tools, model, theme, `shared_module_data`,
-    /// `global_next_uid`, the highlight fn, reveries, `resident_thread_id`) are
-    /// untouched — they are not part of `ThreadRuntime`.
-    pub const fn swap_with(&mut self, state: &mut State) {
-        std::mem::swap(self, &mut state.resident);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn swap_loads_into_state() {
-        let mut rt = ThreadRuntime::new();
-        rt.composer.text = "hello".to_owned();
-        rt.next_user_id = 42;
-        rt.total_output_tokens = 1000;
-        rt.tempo = false;
-
-        let mut state = State::default();
-        rt.swap_with(&mut state);
-
-        // State now holds the runtime's values, and the runtime holds what State
-        // used to hold (the defaults). Tuple compares keep this one branch.
-        assert_eq!(
-            (state.composer.text.as_str(), state.next_user_id, state.total_output_tokens, state.tempo),
-            ("hello", 42, 1000, false)
-        );
-        assert_eq!((rt.composer.text.as_str(), rt.next_user_id, rt.tempo), ("", 1, true));
-    }
-
-    #[test]
-    fn swap_is_symmetric() {
-        let mut rt = ThreadRuntime::new();
-        rt.composer.text = "hello".to_owned();
-        rt.next_user_id = 42;
-
-        let mut state = State::default();
-        rt.swap_with(&mut state);
-        rt.swap_with(&mut state);
-
-        // Two swaps restore the original arrangement.
-        assert_eq!((state.composer.text.as_str(), state.next_user_id), ("", 1));
-        assert_eq!((rt.composer.text.as_str(), rt.next_user_id), ("hello", 42));
-    }
-
-    #[test]
-    fn thread_module_data_travels() {
-        let mut rt = ThreadRuntime::new();
-        let mut state = State::default();
-        state.set_ext_thread(99u32);
-        assert_eq!(state.get_ext::<u32>(), Some(&99));
-
-        // Swapping moves the per-thread module data out of state…
-        rt.swap_with(&mut state);
-        let parked = rt.thread_module_data.get(&TypeId::of::<u32>()).and_then(|b| b.downcast_ref::<u32>());
-        assert_eq!((state.get_ext::<u32>(), parked), (None, Some(&99)));
-
-        // …and swapping back restores it.
-        rt.swap_with(&mut state);
-        assert_eq!(state.get_ext::<u32>(), Some(&99));
     }
 }

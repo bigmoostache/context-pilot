@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use cp_base::state::runtime::bundle::ThreadRuntime;
+use cp_base::state::runtime::bundle::AgentRuntime;
 
 use crate::infra::config::set_active_theme;
 use crate::state::{Message, SharedConfig, State};
@@ -24,7 +24,25 @@ pub(crate) struct BootModuleData {
 /// Extract module data maps from `BootConfig` before it is consumed by `boot_assemble_state`.
 /// Returns the maps needed by `boot_init_modules`.
 pub(crate) fn boot_extract_module_data(cfg: &BootConfig) -> BootModuleData {
-    BootModuleData { global: cfg.shared.modules.clone(), worker: cfg.worker.modules.clone() }
+    let mut global = cfg.shared.modules.clone();
+    overlay_module_files(&mut global);
+    BootModuleData { global, worker: cfg.worker.modules.clone() }
+}
+
+/// Replace inline `config.json` entries with `modules/<id>.json` where present.
+/// An install saved before own-file modules keeps its inline copy (migration:
+/// the next save writes the file and drops the inline entry).
+fn overlay_module_files(global: &mut HashMap<String, serde_json::Value>) {
+    let dir = std::path::Path::new(crate::infra::constants::STORE_DIR).join(super::save::MODULES_DIR);
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()).map(str::to_owned) else { continue };
+        let Ok(bytes) = std::fs::read(&path) else { continue };
+        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            let _prev = global.insert(id, value);
+        }
+    }
 }
 
 /// Merge the `.env` files into the process environment - project-local first,
@@ -49,7 +67,7 @@ fn load_dotenv_files() {
 /// The rendered report when the environment is invalid.
 pub(crate) fn preflight_env() -> Result<(), String> {
     load_dotenv_files();
-    let loaded = cp_env::load(cp_env::spec::Target::Agent).map_err(|report| report.to_string())?;
+    let loaded = cp_env::load(cp_env::spec::Target::Fleet).map_err(|report| report.to_string())?;
     if cp_env::install(loaded.env) { Ok(()) } else { Err("environment installed twice".to_owned()) }
 }
 
@@ -57,7 +75,7 @@ pub(crate) fn preflight_env() -> Result<(), String> {
 /// for the terminal, with the exit status to use.
 pub(crate) fn check_env() -> (String, bool) {
     load_dotenv_files();
-    cp_env::check(cp_env::spec::Target::Agent)
+    cp_env::check(cp_env::spec::Target::Fleet)
 }
 
 /// Trigger vault initialization (the `.env` files were merged by
@@ -79,7 +97,7 @@ fn load_one_module_data(module: &dyn crate::modules::Module, module_data: &BootM
         module_data.worker.get(module.id()).unwrap_or(&null)
     };
     // Route first-inserts into the correct scope map: a module's main state
-    // follows its is_global(); its worker-data slice is always per-thread.
+    // follows its is_global(); its worker-data slice is always per-agent.
     state.set_init_scope(Some(module.is_global()));
     module.load_module_data(data, state);
 
@@ -140,7 +158,7 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
     let meili_handle = std::thread::spawn(cp_mod_search::pre_start_daemon);
     let console_handle = std::thread::spawn(cp_mod_console::manager::find_or_create_server);
 
-    // Join both — each thread has internal timeouts so this won't
+    // Join both — each agent has internal timeouts so this won't
     // block indefinitely.  Log results without aborting.
     for (name, result) in [("Meilisearch", meili_handle.join()), ("Console", console_handle.join())] {
         match result {
@@ -151,20 +169,19 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
     }
 }
 
-/// Initialise and load ONLY the per-thread (`is_global() == false`) modules into
-/// a throwaway background-thread `State`, from that thread's persisted worker
-/// module map — the per-thread half of [`boot_init_modules`], for
-/// [`boot_load_thread_runtime`].
+/// Initialise and load ONLY the per-agent (`is_global() == false`) modules into
+/// a throwaway background-thread `State`, from that agent's persisted worker
+/// module map — the per-agent half of [`boot_init_modules`], for
+/// [`boot_load_agent_runtime`].
 ///
 /// Global modules are deliberately skipped: they are fleet-shared singletons
-/// that already live in the focused (resident) state's `shared_module_data`;
+/// that already live in the live state's `shared_module_data`;
 /// re-initialising them here would create a second, discarded copy. Only the
-/// per-thread module data (spine inbox, queue, console ownership, watcher
-/// registry, search/git views, …) is built, so the subsequent
-/// [`ThreadRuntime::swap_with`] carries exactly that thread's per-thread state
-/// out. Mirrors [`load_one_module_data`]'s per-thread branch (two passes: all
+/// per-agent module data (spine inbox, queue, console ownership, watcher
+/// registry, search/git views, …) is built, so the runtime taken out of the
+/// throwaway state carries exactly that agent's per-agent state. Mirrors [`load_one_module_data`]'s per-agent branch (two passes: all
 /// inits, then all loads) restricted to non-global modules.
-fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, serde_json::Value>) {
+fn boot_init_agent_modules(state: &mut State, worker_modules: &HashMap<String, serde_json::Value>) {
     let null = serde_json::Value::Null;
     let modules = crate::modules::all_modules();
     for module in &modules {
@@ -176,6 +193,7 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
     }
     for module in &modules {
         if module.is_global() {
+            load_agent_scoped_worker_data(module.as_ref(), worker_modules, state);
             continue;
         }
         let data = worker_modules.get(module.id()).unwrap_or(&null);
@@ -189,24 +207,40 @@ fn boot_init_thread_modules(state: &mut State, worker_modules: &HashMap<String, 
     state.set_init_scope(None);
 }
 
-/// Load one background thread's persisted per-thread context into a
-/// [`ThreadRuntime`] (the registry payload for a non-focused thread), or `None`
-/// when the thread has no `states/<thread_id>.json` yet (a *cold* thread — e.g.
-/// one never advanced since the per-thread save landed, or a brand-new thread;
+/// Restore a global module's per-agent `_worker` slice (e.g. the git workdir)
+/// into a background-thread `State`, when the module declares that slice
+/// thread-scoped. Its shared half is never touched here.
+fn load_agent_scoped_worker_data(
+    module: &dyn crate::modules::Module,
+    worker_modules: &HashMap<String, serde_json::Value>,
+    state: &mut State,
+) {
+    if !module.worker_data_is_agent_scoped() {
+        return;
+    }
+    let null = serde_json::Value::Null;
+    let worker_data = worker_modules.get(&format!("{}_worker", module.id())).unwrap_or(&null);
+    state.set_init_scope(Some(false));
+    module.load_worker_data(worker_data, state);
+}
+
+/// Load one background agent's persisted per-agent context into a
+/// [`AgentRuntime`] (the registry payload for a non-focused agent), or `None`
+/// when the agent has no `states/<agent_id>.json` yet (a *cold* agent — e.g.
+/// one never advanced since the per-agent save landed, or a brand-new agent;
 /// it boots empty and the reconcile pass gives it a fresh runtime).
 ///
 /// It reuses the focused boot loaders ([`boot_load_panels`] /
 /// [`boot_load_messages`], which read only `cfg.worker`, ignoring `cfg.shared`)
-/// to rebuild the thread's panels + conversation, then assembles a throwaway
-/// background `State` and [`swap_with`](ThreadRuntime::swap_with)s its per-thread
-/// fields out into the returned runtime. The composer draft comes from the
-/// thread's own `states/<tid>.json`, so each thread restores its own unsent text.
-pub(crate) fn boot_load_thread_runtime(
-    thread_id: &str,
+/// to rebuild the agent's panels + conversation, then assembles a throwaway
+/// background `State` and takes its (unbound) runtime out as the returned one. The composer draft comes from the
+/// agent's own `states/<tid>.json`, so each agent restores its own unsent text.
+pub(crate) fn boot_load_agent_runtime(
+    agent_id: &str,
     next_uid: &mut usize,
     active_modules: &std::collections::HashSet<String>,
-) -> Option<ThreadRuntime> {
-    let worker = super::worker::load_worker(thread_id)?;
+) -> Option<AgentRuntime> {
+    let worker = super::worker::load_worker(agent_id)?;
     // `shared` is unused by the panel/message loaders — a default is enough.
     let cfg = BootConfig { shared: SharedConfig::default(), worker };
     let panels = boot_load_panels(&cfg);
@@ -223,73 +257,66 @@ pub(crate) fn boot_load_thread_runtime(
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
         .with_draft(cfg.worker.draft_input.clone().unwrap_or_default(), cfg.worker.draft_cursor)
         .with_cache_engine_json(cache_engine_json);
-    boot_init_thread_modules(&mut bg, &cfg.worker.modules);
-    // Ensure this thread owns the fixed base panels (Todo, Overview, Memory,
-    // …) exactly like the focused thread does at boot — otherwise drilling into
-    // a background thread shows a panel-less view. Idempotent: only MISSING
+    boot_init_agent_modules(&mut bg, &cfg.worker.modules);
+    // Ensure this agent owns the fixed base panels (Todo, Overview, Memory,
+    // …) exactly like the focused agent does at boot — otherwise drilling into
+    // a background agent shows a panel-less view. Idempotent: only MISSING
     // fixed panels are added; persisted ones keep their UIDs. UIDs are minted
-    // from the SHARED counter so a background thread's conversation panel can't
-    // collide with another thread's on `panels/<uid>.json`.
-    ensure_thread_fixed_panels(&mut bg, next_uid, active_modules);
+    // from the SHARED counter so a background agent's conversation panel can't
+    // collide with another agent's on `panels/<uid>.json`.
+    ensure_agent_fixed_panels(&mut bg, next_uid, active_modules);
 
-    let mut runtime = ThreadRuntime::new();
-    runtime.swap_with(&mut bg); // runtime now holds this thread's per-thread context
-    Some(runtime)
+    // `bg` never executed an agent, so its runtime is the unbound one.
+    Some(bg.agent_store.take_unbound(AgentRuntime::new()))
 }
 
-/// Build a [`ThreadRuntime`] for a **cold** thread — one in the roster with no
-/// persisted `states/<tid>.json` (brand-new, or never advanced since per-thread
+/// Build a [`AgentRuntime`] for a **cold** agent — one in the roster with no
+/// persisted `states/<tid>.json` (brand-new, or never advanced since per-agent
 /// saves began).
 ///
-/// Unlike [`boot_load_thread_runtime`], there is nothing on disk to load: the
+/// Unlike [`boot_load_agent_runtime`], there is nothing on disk to load: the
 /// conversation, panels and counters start empty. The one thing that must NOT
-/// be empty is the per-thread **module map**. A bare
-/// [`ThreadRuntime::new()`](ThreadRuntime::new) carries an empty
-/// `thread_module_data`, so the moment the scheduler promotes the thread, swaps
-/// it in and steps it, `check_spine`'s first `ext::<SpineState>()` would panic
-/// with "module state not initialized". This runs the same per-thread module
-/// init as a disk load ([`boot_init_thread_modules`] over an empty map) so the
-/// swapped-in state is fully formed.
-pub(crate) fn fresh_thread_runtime(
+/// be empty is the per-agent **module map**. A bare
+/// [`AgentRuntime::new()`](AgentRuntime::new) carries an empty
+/// `agent_module_data`, so the moment the scheduler promotes and steps the
+/// agent, `check_spine`'s first `ext::<SpineState>()` would panic
+/// with "module state not initialized". This runs the same per-agent module
+/// init as a disk load ([`boot_init_agent_modules`] over an empty map) so the
+/// runtime is fully formed.
+pub(crate) fn fresh_agent_runtime(
     next_uid: &mut usize,
     active_modules: &std::collections::HashSet<String>,
-) -> ThreadRuntime {
+) -> AgentRuntime {
     let mut bg = State::default();
-    boot_init_thread_modules(&mut bg, &HashMap::new());
-    // A brand-new thread also needs its fixed base panels (Todo, Overview,
+    boot_init_agent_modules(&mut bg, &HashMap::new());
+    // A brand-new agent also needs its fixed base panels (Todo, Overview,
     // Memory, …) created up front, so switching into it shows the normal
     // panel-centric view rather than an empty one. UIDs are minted from the
     // shared counter (fleet-wide uniqueness for `panels/<uid>.json`).
-    ensure_thread_fixed_panels(&mut bg, next_uid, active_modules);
-    let mut runtime = ThreadRuntime::new();
-    runtime.swap_with(&mut bg);
-    runtime
+    ensure_agent_fixed_panels(&mut bg, next_uid, active_modules);
+    bg.agent_store.take_unbound(AgentRuntime::new())
 }
 
 /// Create the fixed base panels (conversation + Todo/Overview/Memory/… at
-/// P1..P9) on a background thread's throwaway `State`, minting any panel UIDs
+/// P1..P9) on a background agent's throwaway `State`, minting any panel UIDs
 /// from the fleet-wide `next_uid` counter rather than the throwaway state's
-/// own (which starts at 0 and would collide across threads on
+/// own (which starts at 0 and would collide across agents on
 /// `panels/<uid>.json`).
 ///
 /// Seeds `bg.active_modules` from the fleet-shared `active_modules` set FIRST:
 /// [`ensure_default_contexts`](crate::app::ensure_default_contexts) only creates
 /// a non-core fixed panel when its module is active, so on a bare
 /// [`State::default`] (empty `active_modules`) every non-core panel (todo,
-/// memory, tree, entities, callbacks, scratchpad, queue, threads, …) would be
-/// skipped — a cold thread would get only the 3 core panels. Copying the real
-/// active set restores the full fixed-panel layout (bug: cold threads shown
+/// memory, tree, entities, callbacks, scratchpad, queue, agents, …) would be
+/// skipped — a cold agent would get only the 3 core panels. Copying the real
+/// active set restores the full fixed-panel layout (bug: cold agents shown
 /// with 3/12 panels).
 ///
 /// Delegates to [`ensure_default_contexts`](crate::app::ensure_default_contexts)
-/// — the same routine the focused thread uses at boot — after seeding the
+/// — the same routine the focused agent uses at boot — after seeding the
 /// throwaway state's UID cursor from the shared counter, then writes the
-/// advanced cursor back so the next thread keeps minting unique UIDs.
-fn ensure_thread_fixed_panels(
-    bg: &mut State,
-    next_uid: &mut usize,
-    active_modules: &std::collections::HashSet<String>,
-) {
+/// advanced cursor back so the next agent keeps minting unique UIDs.
+fn ensure_agent_fixed_panels(bg: &mut State, next_uid: &mut usize, active_modules: &std::collections::HashSet<String>) {
     bg.active_modules.clone_from(active_modules);
     bg.global_next_uid = *next_uid;
     crate::app::ensure_default_contexts(bg);
@@ -299,9 +326,9 @@ fn ensure_thread_fixed_panels(
 /// Next `(user, assistant)` display-id counters derived from a message list —
 /// the max numeric suffix of each role's ids, plus one (defaulting to 1).
 ///
-/// Shared by [`boot_load_thread_runtime`] and mirrors `boot_assemble_state`'s
-/// counter derivation so a background thread numbers new messages exactly like
-/// the focused thread would.
+/// Shared by [`boot_load_agent_runtime`] and mirrors `boot_assemble_state`'s
+/// counter derivation so a background agent numbers new messages exactly like
+/// the focused agent would.
 fn message_id_counters(messages: &[Message]) -> (usize, usize) {
     let next = |prefix: char| {
         messages

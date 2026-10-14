@@ -164,18 +164,18 @@ pub(crate) fn populate_from_yaml(descriptions: &mut Vec<TreeFileDescription>) {
 /// For each description where the current file hash no longer matches
 /// (i.e. the file content changed — branch switch, external edit), check
 /// whether the YAML has an entry keyed by the **current** content.  If so,
-/// swap the description and hash in-place.  Returns `true` if anything changed.
+/// emit a swap of the description and hash.
 ///
-/// Runs on the cache worker thread: mutates the worker's copy and returns one
-/// [`DescPatch`] per swap so the main thread can replay them cheaply.
-pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) -> Vec<DescPatch> {
+/// Runs on the cache worker thread over the shared snapshot (read-only) and
+/// returns one [`DescPatch`] per swap; callers apply them via [`apply_patches`].
+pub(crate) fn refresh_stale_from_yaml(descriptions: &[TreeFileDescription]) -> Vec<DescPatch> {
     let map = load_cached();
     if map.is_empty() {
         return Vec::new();
     }
 
     let mut patches = Vec::new();
-    for desc in descriptions.iter_mut() {
+    for desc in descriptions {
         let file_path = Path::new(&desc.path);
         let Some(current_hash) = compute_file_hash(file_path) else { continue };
 
@@ -189,13 +189,11 @@ pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) 
         let current_key = compute_description_key(&desc.path, &content);
 
         if let Some(entry) = map.get(&current_key) {
-            let old_hash = std::mem::replace(&mut desc.file_hash, current_hash);
-            desc.description.clone_from(&entry.description);
             patches.push(DescPatch {
                 path: desc.path.clone(),
-                old_hash,
-                description: desc.description.clone(),
-                file_hash: desc.file_hash.clone(),
+                old_hash: desc.file_hash.clone(),
+                description: entry.description.clone(),
+                file_hash: current_hash,
             });
         }
     }
@@ -203,6 +201,7 @@ pub(crate) fn refresh_stale_from_yaml(descriptions: &mut [TreeFileDescription]) 
 }
 
 /// One stale-description swap computed off-thread by [`refresh_stale_from_yaml`].
+#[derive(Clone)]
 pub(crate) struct DescPatch {
     /// Described path.
     pub path: String,

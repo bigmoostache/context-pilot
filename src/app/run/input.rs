@@ -8,7 +8,6 @@ use crate::infra::watcher::FileWatcher;
 use crate::state::cache::CacheUpdate;
 use crate::state::persistence::{build_message_op, build_save_batch};
 use crate::state::{Message, State};
-use crate::ui::TypewriterBuffer;
 use crate::ui::help::CommandPalette;
 use cp_base::panels::now_ms;
 
@@ -19,74 +18,66 @@ impl App {
 
         Self {
             state,
-            typewriter: TypewriterBuffer::new(),
-            pending_done: None,
-            pending_tools: Vec::new(),
             cache_tx,
             file_watcher,
             watched_file_paths: std::collections::HashSet::new(),
             watched_dir_paths: std::collections::HashSet::new(),
+            watch_specs_by_agent: std::collections::BTreeMap::new(),
             last_timer_check_ms: now_ms(),
             last_ownership_check_ms: now_ms(),
-            pending_retry_error: None,
             last_render_ms: 0,
+            last_full_redraw_ms: now_ms(),
+
             last_spinner_ms: 0,
             last_bridge_recover_ms: 0,
             last_chat_drain_ms: 0,
             api_check_rx: None,
             resume_stream,
             command_palette: CommandPalette::new(),
-            wait_started_ms: 0,
-            deferred_tool_sleep_until_ms: 0,
-            deferred_tool_sleeping: false,
             writer: crate::state::persistence::PersistenceWriter::new(),
             last_poll_ms: std::collections::HashMap::new(),
-            pending_console_wait_tool_results: None,
-            accumulated_blocking_results: Vec::new(),
             reverie_streams: std::collections::HashMap::new(),
-            thread_streams: std::collections::HashMap::new(),
+            agent_streams: std::collections::HashMap::new(),
             fleet: cp_fleet::FleetRegistry::new(),
-            stepping_thread: None,
-            parked_stream_runtimes: std::collections::HashMap::new(),
+            stepping_agent: None,
             input_ready: None,
         }
     }
 
-    /// Key identifying the thread whose runtime is currently resident in
-    /// [`state`](crate::app::App::state) — the channel key used for both stream
+    /// Key identifying the executing agent — the channel key used for both stream
     /// *spawn* and stream *drain*, so the two can never diverge.
     ///
     /// During a background advancement step this is
-    /// [`stepping_thread`](crate::app::App::stepping_thread); otherwise it is the
-    /// focused thread (or [`DEFAULT_WORKER_ID`](crate::infra::constants::DEFAULT_WORKER_ID)
-    /// before any thread is focused). Deriving the key from the same source at
+    /// [`stepping_agent`](crate::app::App::stepping_agent); otherwise it is the
+    /// focused agent (or [`DEFAULT_WORKER_ID`](crate::infra::constants::DEFAULT_WORKER_ID)
+    /// before any agent is focused). Deriving the key from the same source at
     /// spawn and drain time is what keeps each thread's stream events on its own
-    /// bundle once several threads advance concurrently.
-    pub(super) fn resident_key(&self) -> String {
-        if let Some(id) = self.stepping_thread.as_ref() {
+    /// bundle once several agents advance concurrently.
+    pub(super) fn executing_key(&self) -> String {
+        if let Some(id) = self.stepping_agent.as_ref() {
             return id.clone();
         }
-        cp_mod_threads::types::FocusState::get(&self.state)
-            .focused_thread_id
+        cp_mod_agents::types::FocusState::get(&self.state)
+            .focused_agent_id
             .clone()
             .unwrap_or_else(|| crate::infra::constants::DEFAULT_WORKER_ID.to_owned())
     }
 
-    /// Start an LLM stream for the resident thread over a fresh per-thread
+    /// Start an LLM stream for the executing agent over a fresh per-agent
     /// channel, storing its receiver in
-    /// [`thread_streams`](crate::app::App::thread_streams) for the loop to drain.
+    /// [`agent_streams`](crate::app::App::agent_streams) for the loop to drain.
     ///
     /// This replaces the former single app-wide stream channel: each stream now
     /// owns its mpsc (mirroring reverie streams), so concurrent threads can each
     /// have a live stream. The channel is keyed by
-    /// [`resident_key`](Self::resident_key) — the thread currently in `state` —
-    /// so a background thread's stream lands under its own id, never colliding
-    /// with the focused thread's.
-    pub(super) fn spawn_thread_stream(&mut self, params: crate::llms::StreamParams) {
+    /// [`executing_key`](Self::executing_key) — the agent currently in `state` —
+    /// so a background agent's stream lands under its own id, never colliding
+    /// with the focused agent's.
+    pub(super) fn spawn_agent_stream(&mut self, params: crate::llms::StreamParams) {
         let (tx, rx) = std::sync::mpsc::channel();
         crate::infra::api::start_streaming(params, tx);
-        let key = self.resident_key();
-        let _prev = self.thread_streams.insert(key, crate::app::ThreadStream { rx });
+        let key = self.executing_key();
+        let _prev = self.agent_streams.insert(key, crate::app::AgentStream { rx });
     }
 
     /// Send state to background writer (debounced, non-blocking).
@@ -159,10 +150,11 @@ impl App {
     /// No-op if the popup was torn down between borrows.
     fn autocomplete_refresh_matches(&mut self) {
         let filter = cp_mod_tree::types::TreeState::get(&self.state).filter.clone();
+        let root = self.state.workdir();
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         let dir = ac.current_dir().to_owned();
         let prefix = ac.current_prefix().to_owned();
-        let entries = cp_mod_tree::tools::list_dir_entries(&filter, &dir, &prefix);
+        let entries = cp_mod_tree::tools::list_dir_entries(&root, &filter, &dir, &prefix);
         let Some(ac_set) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         ac_set.set_matches(entries);
     }
@@ -183,14 +175,14 @@ impl App {
         if is_dir {
             // Folder: complete to "dir/" and show contents — don't close.
             let new_query = format!("{full_path}/");
-            let old_cursor = self.state.composer.cursor;
-            self.state.composer.text = format!(
+            let old_cursor = self.state.agent().composer.cursor;
+            self.state.agent_mut().composer.text = format!(
                 "{}@{}{}",
-                self.state.composer.text.get(..anchor).unwrap_or(""),
+                self.state.agent().composer.text.get(..anchor).unwrap_or(""),
                 new_query,
-                self.state.composer.text.get(old_cursor..).unwrap_or("")
+                self.state.agent().composer.text.get(old_cursor..).unwrap_or("")
             );
-            self.state.composer.cursor = anchor.saturating_add(1).saturating_add(new_query.len()); // +1 for '@'
+            self.state.agent_mut().composer.cursor = anchor.saturating_add(1).saturating_add(new_query.len()); // +1 for '@'
             if let Some(ac_query) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() {
                 ac_query.set_query(new_query);
             }
@@ -198,14 +190,14 @@ impl App {
         } else {
             // File: insert the full path and close.
             ac.deactivate();
-            let cursor = self.state.composer.cursor;
-            self.state.composer.text = format!(
+            let cursor = self.state.agent().composer.cursor;
+            self.state.agent_mut().composer.text = format!(
                 "{}{} {}",
-                self.state.composer.text.get(..anchor).unwrap_or(""),
+                self.state.agent().composer.text.get(..anchor).unwrap_or(""),
                 full_path,
-                self.state.composer.text.get(cursor..).unwrap_or("")
+                self.state.agent().composer.text.get(cursor..).unwrap_or("")
             );
-            self.state.composer.cursor = anchor.saturating_add(full_path.len()).saturating_add(1); // +1 for space
+            self.state.agent_mut().composer.cursor = anchor.saturating_add(full_path.len()).saturating_add(1); // +1 for space
         }
     }
 
@@ -220,27 +212,27 @@ impl App {
         if pop_result {
             let query = ac.query.clone();
             // Update cursor position to match shortened query.
-            self.state.composer.cursor = anchor.saturating_add(1).saturating_add(query.len()); // +1 for '@'
+            self.state.agent_mut().composer.cursor = anchor.saturating_add(1).saturating_add(query.len()); // +1 for '@'
 
             // Rebuild input: before @, then @query, then everything past old cursor.
-            let old_len = self.state.composer.text.len();
+            let old_len = self.state.agent().composer.text.len();
             let after_at = anchor.saturating_add(1); // skip '@'
             let rest_start = after_at.saturating_add(query.len()).saturating_add(1); // +1 for removed char
             if rest_start <= old_len {
-                self.state.composer.text = format!(
+                self.state.agent_mut().composer.text = format!(
                     "{}@{}{}",
-                    self.state.composer.text.get(..anchor).unwrap_or(""),
+                    self.state.agent().composer.text.get(..anchor).unwrap_or(""),
                     query,
-                    self.state.composer.text.get(rest_start..).unwrap_or("")
+                    self.state.agent().composer.text.get(rest_start..).unwrap_or("")
                 );
             }
             self.autocomplete_refresh_matches();
         } else {
             // Query was empty — remove the '@' and deactivate.
             ac.deactivate();
-            if anchor < self.state.composer.text.len() {
-                let _r = self.state.composer.text.remove(anchor);
-                self.state.composer.cursor = anchor;
+            if anchor < self.state.agent().composer.text.len() {
+                let _r = self.state.agent_mut().composer.text.remove(anchor);
+                self.state.agent_mut().composer.cursor = anchor;
             }
         }
     }
@@ -252,14 +244,16 @@ impl App {
         let Some(ac) = self.state.get_ext_mut::<cp_base::state::autocomplete::Suggestions>() else { return };
         if c == ' ' || c == '\n' {
             ac.deactivate();
-            let pos = self.state.composer.cursor;
-            self.state.composer.text.insert(pos, c);
-            self.state.composer.cursor = self.state.composer.cursor.saturating_add(c.len_utf8());
+            let pos = self.state.agent().composer.cursor;
+            self.state.agent_mut().composer.text.insert(pos, c);
+            self.state.agent_mut().composer.cursor =
+                self.state.agent_mut().composer.cursor.saturating_add(c.len_utf8());
         } else {
             ac.push_char(c);
-            let pos = self.state.composer.cursor;
-            self.state.composer.text.insert(pos, c);
-            self.state.composer.cursor = self.state.composer.cursor.saturating_add(c.len_utf8());
+            let pos = self.state.agent().composer.cursor;
+            self.state.agent_mut().composer.text.insert(pos, c);
+            self.state.agent_mut().composer.cursor =
+                self.state.agent_mut().composer.cursor.saturating_add(c.len_utf8());
             self.autocomplete_refresh_matches();
         }
     }
@@ -354,7 +348,7 @@ impl App {
             "config" => Some(Action::ToggleConfigView),
             _ => {
                 // Navigate to any context panel (P-prefixed or special IDs like "chat").
-                if self.state.context.iter().any(|c| c.id == id) {
+                if self.state.agent().context.iter().any(|c| c.id == id) {
                     Some(Action::SelectContextById(id))
                 } else {
                     Some(Action::None)

@@ -132,7 +132,7 @@ impl BackupScheduler {
 /// primary one lives in `db.rs`, already at the file-length cap). Reads
 /// `auth.conn` directly — it is `pub(crate)`.
 ///
-/// Safe to call while other threads read the same connection (WAL mode). The
+/// Safe to call while other agents read the same connection (WAL mode). The
 /// backup is atomic — `dest` is a complete, self-contained database on success.
 ///
 /// # Errors

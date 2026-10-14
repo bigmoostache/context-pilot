@@ -110,7 +110,7 @@ fn sync_dir(dir: &Path) -> BootResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::types::registry::AgentStatus;
+    use cp_wire::types::registry::FleetStatus;
     use std::os::unix::fs::PermissionsExt as _;
     use tempfile::tempdir;
 
@@ -130,7 +130,7 @@ mod tests {
             tee_socket_path: "/proj/.context-pilot/tee.sock".to_owned(),
             cap_token: "secret".to_owned(),
             started_at_ms: 0,
-            status: AgentStatus::Starting,
+            status: FleetStatus::Starting,
         }
     }
 
@@ -142,7 +142,7 @@ mod tests {
         let text = fs::read_to_string(&path).expect("read back");
         let back: Entry = serde_json::from_str(&text).expect("parse");
         assert_eq!(back.id, "abc");
-        assert_eq!(back.status, AgentStatus::Starting);
+        assert_eq!(back.status, FleetStatus::Starting);
     }
 
     #[test]
@@ -174,9 +174,9 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let _first = write_entry(dir.path(), &sample("same")).expect("first");
         let mut updated = sample("same");
-        updated.status = AgentStatus::Running;
+        updated.status = FleetStatus::Running;
         let path = write_entry(dir.path(), &updated).expect("second");
         let back: Entry = serde_json::from_str(&fs::read_to_string(&path).expect("read")).expect("parse");
-        assert_eq!(back.status, AgentStatus::Running, "rename replaces the old record atomically");
+        assert_eq!(back.status, FleetStatus::Running, "rename replaces the old record atomically");
     }
 }

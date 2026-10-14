@@ -40,7 +40,7 @@ pub(super) static DEV: &[Spec] = &[
         name: "CP_FLAMEGRAPH",
         kind: Kind::Bool,
         fallback: Fallback::Literal("0"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Dev,
         doc: "Write flame-graph profiling data (`run.sh --flamegraph`).",
         ..Spec::BASE
@@ -49,7 +49,7 @@ pub(super) static DEV: &[Spec] = &[
         name: "CP_MEASURE_LOOPS",
         kind: Kind::U64,
         fallback: Fallback::Literal("0"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Dev,
         doc: "Set by `run.sh --measure N`: profile N main-loop iterations, write `tmp/loop-profile.html`, then exit (`0` = off).",
         ..Spec::BASE
@@ -58,7 +58,7 @@ pub(super) static DEV: &[Spec] = &[
         name: "CP_RUN_SH",
         kind: Kind::Bool,
         fallback: Fallback::Literal("0"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Dev,
         doc: "Set by `run.sh`: the supervisor script handles reloads, so the agent must not re-exec itself.",
         ..Spec::BASE
@@ -67,7 +67,7 @@ pub(super) static DEV: &[Spec] = &[
         name: "SHOW_CONTEXT_PILOT_IN_TREE",
         kind: Kind::Bool,
         fallback: Fallback::Literal("0"),
-        scope: Scope::Agent,
+        scope: Scope::Fleet,
         group: Group::Dev,
         doc: "Show the `.context-pilot/` directory in the tree tool.",
         ..Spec::BASE

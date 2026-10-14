@@ -17,12 +17,12 @@ use std::fmt::Write as _;
 /// Create and persist a `tool_call` message for a single `ToolUse`.
 /// Used for both direct tool calls and queue-flushed replays.
 fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
-    // Leave an auto tool-activity trace in the focused thread (no-op unfocused).
-    crate::app::run::threads::maybe_append_tool_activity(&mut app.state, tool);
+    // Leave an auto tool-activity trace in the focused agent (no-op unfocused).
+    crate::app::run::agents::maybe_append_tool_activity(&mut app.state, tool);
 
-    let tool_id = format!("T{}", app.state.next_tool_id);
+    let tool_id = format!("T{}", app.state.agent().next_tool_id);
     let tool_global_uid = format!("UID_{}_T", app.state.global_next_uid);
-    app.state.next_tool_id = app.state.next_tool_id.saturating_add(1);
+    app.state.agent_mut().next_tool_id = app.state.agent_mut().next_tool_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
 
     let tool_msg = Message::new_tool_call(
@@ -31,7 +31,7 @@ fn save_tool_call_message(app: &mut App, tool: &cp_base::tools::ToolUse) {
         vec![ToolUseRecord::new(tool.id.clone(), tool.name.clone(), tool.input.clone())],
     );
     app.save_message_async(&tool_msg);
-    app.state.messages.push(tool_msg);
+    app.state.agent_mut().messages.push(tool_msg);
 }
 
 /// Execute one tool through the pre-flight → queue-intercept → execute pipeline.
@@ -201,14 +201,14 @@ fn sync_logs_and_radar(
 /// Start a reverie if any tool result carries a `REVERIE_START:` sentinel
 /// (emitted by `optimize_context`).
 fn maybe_trigger_reverie(app: &mut App, tool_results: &[crate::infra::tools::ToolResult]) {
-    // Sentinel format: REVERIE_START:<agent_id>\n<context_or_empty>\n<human_readable_msg>
+    // Sentinel format: REVERIE_START:<system_id>\n<context_or_empty>\n<human_readable_msg>
     for tr in tool_results {
         if let Some(rest) = tr.content.strip_prefix("REVERIE_START:") {
             let mut lines = rest.lines();
-            let agent_id = lines.next().unwrap_or("cleaner").to_owned();
+            let system_id = lines.next().unwrap_or("cleaner").to_owned();
             let context_line = lines.next().unwrap_or("");
             let context = if context_line.is_empty() { None } else { Some(context_line.to_owned()) };
-            let _r = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, agent_id, context);
+            let _r = crate::app::reverie::trigger::start_manual_reverie(&mut app.state, system_id, context);
             break;
         }
     }
@@ -222,7 +222,7 @@ fn apply_tempo_break(app: &mut App, tool_results: &[crate::infra::tools::ToolRes
             continue; // Deferred — watcher decides later
         }
         if !tr.preserves_tempo {
-            app.state.tempo = false;
+            app.state.agent_mut().tempo = false;
             break; // One break is enough
         }
     }
@@ -245,26 +245,26 @@ struct ToolBatch {
 /// of [`handle_tool_execution`]. Returns `None` when the pipeline should not run
 /// this tick (not streaming, nothing pending, waiting on panels/sleep).
 fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
-    if !app.state.stream.phase.is_streaming()
-        || app.pending_done.is_none()
-        || !app.typewriter.pending_chars.is_empty()
-        || app.pending_tools.is_empty()
+    if !app.state.agent().stream.phase.is_streaming()
+        || app.stream_rt_mut().pending_done.is_none()
+        || !app.stream_rt_mut().typewriter.pending_chars.is_empty()
+        || app.stream_rt_mut().pending_tools.is_empty()
     {
         return None;
     }
     // Don't process new tools while waiting for panels or deferred sleep
-    if app.state.waiting_for_panels || app.deferred_tool_sleeping {
+    if app.state.agent().waiting_for_panels || app.stream_rt_mut().deferred_tool_sleeping {
         return None;
     }
 
     app.state.flags.ui.dirty = true;
-    app.state.stream.phase.transition(StreamPhase::ExecutingTools);
-    let mut tools = std::mem::take(&mut app.pending_tools);
+    app.state.agent_mut().stream.phase.transition(StreamPhase::ExecutingTools);
+    let mut tools = std::mem::take(&mut app.stream_rt_mut().pending_tools);
     let mut tool_results: Vec<crate::infra::tools::ToolResult> = Vec::new();
     let mut flushed_tools: Vec<super::queue_flush::FlushedTool> = Vec::new();
 
     // Finalize current assistant message
-    if let Some(msg) = app.state.messages.last_mut()
+    if let Some(msg) = app.state.agent_mut().messages.last_mut()
         && msg.role == "assistant"
     {
         // Clean any LLM ID prefixes before saving
@@ -276,6 +276,7 @@ fn collect_tool_results(app: &mut App) -> Option<ToolBatch> {
     // Create tool call messages and execute tools
     let pipeline_start = std::time::Instant::now();
     for tool in &tools {
+        let _g = crate::infra::profiler::dyn_guard("tool_exec_", &tool.name);
         save_tool_call_message(app, tool);
         let result = execute_one_tool(app, tool, &mut flushed_tools);
         tool_results.push(result);
@@ -337,12 +338,12 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
 
     {
         let _g = crate::profile!("focus_checks");
-        // Sync the Todo panel's focus filter to the focused thread (forces a fresh
+        // Sync the Todo panel's focus filter to the focused agent (forces a fresh
         // Todo panel on focus change), then evaluate the fire-once hygiene nudge.
         super::checks::sync_todo_focus(app);
         super::checks::maybe_hygiene_nudge(app);
         // Same focus-scoping for the thread-owned Scratchpad panel — a focus change
-        // (or a scratchpad edit) forces a fresh panel showing the focused thread's
+        // (or a scratchpad edit) forces a fresh panel showing the focused agent's
         // cells.
         super::checks::sync_scratchpad_focus(app);
     }
@@ -350,7 +351,7 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
         let _g = crate::profile!("promote_declared_tasks");
         // Promote any planned task declared via `task_id` on an opted-in tool to
         // in_progress (done/cancelled left be — pre-flight warned; the live delta
-        // rides the emit_task_lists chokepoint). On a real flip, the thread's task
+        // rides the emit_task_lists chokepoint). On a real flip, the agent's task
         // tree is appended to that tool's result (T686).
         super::checks::promote_declared_tasks(app, &tools, &mut tool_results);
     }
@@ -358,7 +359,7 @@ pub(crate) fn handle_tool_execution(app: &mut App) {
     // Check if any tool triggered a console blocking wait
     let has_console_wait = tool_results.iter().any(|r| r.content.starts_with(CONSOLE_WAIT_BLOCKING_SENTINEL));
     if has_console_wait {
-        app.pending_console_wait_tool_results = Some(tool_results);
+        app.stream_rt_mut().pending_console_wait_tool_results = Some(tool_results);
         app.save_state_async();
         crate::infra::profiler::log_tool_time(&tool_names, pipeline_start.elapsed());
         return;
@@ -390,9 +391,9 @@ struct ToolCycle<'cycle> {
 fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     let ToolCycle { tools, tool_results, tool_names, pipeline_start } = *cycle;
     // Create tool result message
-    let result_id = format!("R{}", app.state.next_result_id);
+    let result_id = format!("R{}", app.state.agent().next_result_id);
     let result_global_uid = format!("UID_{}_R", app.state.global_next_uid);
-    app.state.next_result_id = app.state.next_result_id.saturating_add(1);
+    app.state.agent_mut().next_result_id = app.state.agent_mut().next_result_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let tool_result_records: Vec<ToolResultRecord> = tool_results
         .iter()
@@ -409,7 +410,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
         let _g = crate::profile!("save_result_msg");
         app.save_message_async(&result_msg);
     }
-    app.state.messages.push(result_msg);
+    app.state.agent_mut().messages.push(result_msg);
 
     // Check if reload was requested — main loop will handle flag + exit
     if app.state.flags.lifecycle.reload_pending {
@@ -418,7 +419,7 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     }
 
     push_new_assistant_message(app);
-    app.state.streaming_estimated_tokens = 0;
+    app.state.agent_mut().streaming_estimated_tokens = 0;
 
     // Accumulate token stats from intermediate stream before discarding pending_done
     super::cost_log::accumulate_pending_token_stats(app);
@@ -435,11 +436,11 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     }
 
     // Check if any tool requested a sleep (e.g., console send_keys delay)
-    if app.state.tool_sleep_until_ms > 0 {
+    if app.state.agent().tool_sleep_until_ms > 0 {
         // Defer everything — main loop will check timer and continue
-        app.deferred_tool_sleeping = true;
-        app.deferred_tool_sleep_until_ms = app.state.tool_sleep_until_ms;
-        app.state.tool_sleep_until_ms = 0; // Clear from state (App owns it now)
+        app.stream_rt_mut().deferred_tool_sleeping = true;
+        app.stream_rt_mut().deferred_tool_sleep_until_ms = app.state.agent().tool_sleep_until_ms;
+        app.state.agent_mut().tool_sleep_until_ms = 0; // Clear from state (App owns it now)
         crate::infra::profiler::log_tool_time(tool_names, pipeline_start.elapsed());
         return;
     }
@@ -453,8 +454,8 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
     // Check if we need to wait for panels before continuing stream
     if has_dirty_file_panels(&app.state) {
         // Set waiting flag — main loop will check and continue streaming when ready
-        app.state.waiting_for_panels = true;
-        app.wait_started_ms = now_ms();
+        app.state.agent_mut().waiting_for_panels = true;
+        app.stream_rt_mut().wait_started_ms = now_ms();
     } else {
         let _g = crate::profile!("continue_streaming");
         // No dirty panels — continue streaming immediately
@@ -465,12 +466,12 @@ fn finalize_tool_cycle(app: &mut App, cycle: &ToolCycle<'_>) {
 
 /// Push a fresh empty assistant message to receive the next stream turn.
 fn push_new_assistant_message(app: &mut App) {
-    let assistant_id = format!("A{}", app.state.next_assistant_id);
+    let assistant_id = format!("A{}", app.state.agent().next_assistant_id);
     let assistant_global_uid = format!("UID_{}_A", app.state.global_next_uid);
-    app.state.next_assistant_id = app.state.next_assistant_id.saturating_add(1);
+    app.state.agent_mut().next_assistant_id = app.state.agent_mut().next_assistant_id.saturating_add(1);
     app.state.global_next_uid = app.state.global_next_uid.saturating_add(1);
     let new_assistant_msg = Message::new_assistant(assistant_id, assistant_global_uid);
-    app.state.messages.push(new_assistant_msg);
+    app.state.agent_mut().messages.push(new_assistant_msg);
 }
 
 // Post-execution checks (panels, sleep, question form) live in tool_checks.rs

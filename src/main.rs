@@ -26,7 +26,7 @@ use std::process::ExitCode;
 use std::sync::Mutex;
 use std::sync::mpsc;
 
-use ratatui::prelude::{Constraint, CrosstermBackend, Direction, Layout, Line, Modifier, Rect, Span, Style, Terminal};
+use ratatui::prelude::{Constraint, Direction, Layout, Line, Modifier, Rect, Span, Style};
 
 use infra::constants::theme;
 
@@ -96,7 +96,7 @@ fn boot_gauge_line(done_count: usize, total: usize, gauge_width: u16) -> Line<'s
 }
 
 /// Render the boot screen with completed/in-progress steps and a progress bar.
-fn render_boot_screen(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: &[BootStep]) {
+fn render_boot_screen(terminal: &mut ui::perf::tty::Tty, steps: &[BootStep]) {
     let done_count = steps.iter().filter(|s| s.done).count();
     let total = steps.len().max(1); // avoid division by zero
 
@@ -215,7 +215,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use app::{App, ensure_default_agent, ensure_default_contexts};
+use app::{App, ensure_default_contexts, ensure_default_system};
 use state::cache::CacheUpdate;
 use state::persistence::{
     boot_assemble_state, boot_extract_module_data, boot_init_modules, boot_load_config, boot_load_messages,
@@ -297,7 +297,7 @@ fn set_step_detail(steps: &mut [BootStep], idx: usize, detail: String) {
 /// an existing project, or creates a fresh default state; then initializes
 /// modules, prunes orphaned context elements, and ensures default contexts +
 /// agent. `steps` is mutated in place so the boot screen reflects progress.
-fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: &mut [BootStep]) -> state::State {
+fn boot_app_state(terminal: &mut ui::perf::tty::Tty, steps: &mut [BootStep]) -> state::State {
     // Detect new vs fresh-start format
     let new_format = std::path::Path::new(".context-pilot").join("config.json").exists();
 
@@ -365,12 +365,12 @@ fn boot_app_state(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, steps: 
                 types
             })
             .collect();
-        state.context.retain(|c| known_types.contains(c.context_type.as_str()));
+        state.agent_mut().context.retain(|c| known_types.contains(c.context_type.as_str()));
     }
 
     // Phase 6: Prepare workspace
     ensure_default_contexts(&mut state);
-    ensure_default_agent(&mut state);
+    ensure_default_system(&mut state);
     mark_step_done(steps, STEP_WORKSPACE);
     render_boot_screen(terminal, steps);
 
@@ -421,8 +421,8 @@ fn main() -> ExitCode {
     let _r_paste_on = io::stdout().execute(EnableBracketedPaste);
     // Capture mouse so the wheel arrives as distinct `Event::Mouse(ScrollUp/Down)`
     // rather than being folded into Up/Down arrow keys by the terminal's
-    // alternate-scroll mode — lets the threads list keep arrows for selection
-    // while the wheel scrolls the selected thread's conversation history.
+    // alternate-scroll mode — lets the agents list keep arrows for selection
+    // while the wheel scrolls the selected agent's conversation history.
     // Button tracking (1000) + SGR encoding (1006) only — NOT crossterm's
     // EnableMouseCapture, which also turns on any-motion tracking (1003) and
     // floods the loop with an event per mouse move. The wheel still arrives
@@ -432,11 +432,11 @@ fn main() -> ExitCode {
     // alone does not reset it, and some terminals keep translating the wheel
     // into Up/Down arrow keys even with tracking on — which leaked through as
     // thread-list selection ("wheel-down at the bottom sometimes selects a
-    // thread"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
+    // agent"). With 1007 off, the wheel is ALWAYS an SGR mouse event, never an
     // arrow key, so selection stays exclusively on the real arrow keys.
     let _r_altscroll_off = io::stdout().write_all(b"\x1b[?1007l");
     let _r_altscroll_flush = io::stdout().flush();
-    let Ok(mut terminal) = Terminal::new(CrosstermBackend::new(io::stdout())) else {
+    let Ok(mut terminal) = ui::perf::tty::new_terminal() else {
         let _r_cleanup = disable_raw_mode();
         drop(writeln!(io::stderr(), "Fatal: failed to create terminal"));
         return ExitCode::FAILURE;

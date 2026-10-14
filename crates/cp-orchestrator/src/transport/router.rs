@@ -24,9 +24,9 @@ use super::{RouteCtx, auth, files, inspect, it, respond_json, rest};
 /// rejects.
 pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'_>) -> Option<Request> {
     match *segments {
-        ["api", "agent", id, "avatar"] => files::handle_avatar(request, ctx.state, id),
-        ["api", "agent", id, "fs", "download"] => files::handle_download(request, ctx.state, id, ctx.query),
-        ["api", "agent", id, "fs", "raw"] => files::handle_raw(request, ctx.state, id, ctx.query),
+        ["api", "fleet", id, "avatar"] => files::handle_avatar(request, ctx.state, id),
+        ["api", "fleet", id, "fs", "download"] => files::handle_download(request, ctx.state, id, ctx.query),
+        ["api", "fleet", id, "fs", "raw"] => files::handle_raw(request, ctx.state, id, ctx.query),
         // IT: private-CA root download (design §13.5, re-homed from the maint
         // plane). Owns the `Request` for its non-JSON content type. Gate on
         // `can_manage_it` here (a `None` caller is god-mode, FR-v3-08); then
@@ -89,17 +89,17 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         }
 
         // ── ACL routes (Phase 6, §6 of design doc) ─────────────────
-        (&Method::Get, &["api", "agent", id, "acl"]) => auth::acl_list(state, id, auth_user),
-        (&Method::Post, &["api", "agent", id, "acl"]) => auth::acl_grant(state, id, body_bytes, auth_user),
-        (&Method::Patch, &["api", "agent", id, "acl", user_id]) => {
+        (&Method::Get, &["api", "fleet", id, "acl"]) => auth::acl_list(state, id, auth_user),
+        (&Method::Post, &["api", "fleet", id, "acl"]) => auth::acl_grant(state, id, body_bytes, auth_user),
+        (&Method::Patch, &["api", "fleet", id, "acl", user_id]) => {
             auth::acl_update_role(state, (id, user_id), body_bytes, auth_user)
         }
-        (&Method::Delete, &["api", "agent", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
+        (&Method::Delete, &["api", "fleet", id, "acl", user_id]) => auth::acl_revoke(state, id, user_id, auth_user),
 
         // ── Fleet + agent routes ────────────────────────────────────
-        (&Method::Get, &["api", "fleet"]) => rest::fleet(state, auth_user),
-        (&Method::Get, &["api", "fleet", "meta"]) => inspect::meta::fleet(state, auth_user),
-        (&Method::Get, &["api", "fleet", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
+        (&Method::Get, &["api", "fleets"]) => rest::fleet(state, auth_user),
+        (&Method::Get, &["api", "fleets", "meta"]) => inspect::meta::fleet(state, auth_user),
+        (&Method::Get, &["api", "fleets", "retired"]) => inspect::meta::fleet_retired(state, auth_user),
         (&Method::Get, &["api", "metrics"]) => inspect::metrics::fleet(state, auth_user),
 
         // ── Env-key inspection (T399) + editing (T404) ────────────
@@ -125,54 +125,58 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "it", "network", "ap"]) => rest::it_set_network_ap(state, body_bytes, auth_user),
         (&Method::Post, &["api", "it", "network", "wwan"]) => rest::it_set_network_wwan(state, body_bytes, auth_user),
 
-        (&Method::Get, &["api", "agent", id]) => rest::agent(state, id),
-        (&Method::Get, &["api", "agent", id, "meta"]) => inspect::meta::agent(state, id),
-        (&Method::Get, &["api", "agent", id, "metrics"]) => inspect::metrics::agent(state, id),
-        (&Method::Get, &["api", "agent", id, "vitals"]) => inspect::vitals::agent(state, id),
-        (&Method::Get, &["api", "agent", id, "body", hash]) => rest::body(state, id, hash),
-        (&Method::Get, &["api", "agent", id, "threads"]) => rest::threads(state, id),
-        (&Method::Get, &["api", "agent", id, "usage"]) => inspect::panels::usage(state, id, query),
-        (&Method::Get, &["api", "agent", id, "library"]) => inspect::panels::library(state, id),
-        (&Method::Get, &["api", "agent", id, "fs"]) => inspect::finder::fs_list(state, id, query),
-        (&Method::Get, &["api", "agent", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
-        (&Method::Get, &["api", "agent", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
-        (&Method::Get, &["api", "agent", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
-        (&Method::Get, &["api", "agent", id, "conversation"]) => inspect::finder::conversation(state, id),
-        (&Method::Post, &["api", "agent", id, "command"]) => rest::command(state, id, body_bytes),
-        (&Method::Post, &["api", "agent", id, "conversations", "search"]) => {
+        (&Method::Get, &["api", "fleet", id]) => rest::agent(state, id),
+        (&Method::Get, &["api", "fleet", id, "meta"]) => inspect::meta::agent(state, id),
+        (&Method::Get, &["api", "fleet", id, "metrics"]) => inspect::metrics::agent(state, id),
+        (&Method::Get, &["api", "fleet", id, "vitals"]) => inspect::vitals::agent(state, id),
+        (&Method::Get, &["api", "fleet", id, "body", hash]) => rest::body(state, id, hash),
+        // `threads`: pre-T860 alias, kept one version for N-1 frontends.
+        (&Method::Get, &["api", "fleet", id, "agents" | "threads"]) => rest::agents(state, id),
+        (&Method::Get, &["api", "fleet", id, "usage"]) => inspect::panels::usage(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "library"]) => inspect::panels::library(state, id),
+        (&Method::Get, &["api", "fleet", id, "fs"]) => inspect::finder::fs_list(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
+        (&Method::Get, &["api", "fleet", id, "conversation"]) => inspect::finder::conversation(state, id),
+        (&Method::Post, &["api", "fleet", id, "command"]) => rest::command(state, id, body_bytes),
+        (&Method::Post, &["api", "fleet", id, "conversations", "search"]) => {
             rest::search_conversations(state, id, body_bytes)
         }
-        (&Method::Post, &["api", "agent", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
-        (&Method::Put, &["api", "agent", id, "library", "command", item]) => {
+        (&Method::Post, &["api", "fleet", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
+        (&Method::Put, &["api", "fleet", id, "library", "command", item]) => {
             rest::upsert_library_command(state, id, item, body_bytes)
         }
-        (&Method::Get, &["api", "agent", id, "library", "agent", item]) => rest::read_library_agent(state, id, item),
-        (&Method::Put, &["api", "agent", id, "library", "agent", item]) => {
-            rest::upsert_library_agent(state, id, item, body_bytes)
+        (&Method::Get, &["api", "fleet", id, "library", "system", item]) => rest::read_library_system(state, id, item),
+        (&Method::Put, &["api", "fleet", id, "library", "system", item]) => {
+            rest::upsert_library_system(state, id, item, body_bytes)
         }
-        (&Method::Delete, &["api", "agent", id, "library", "agent", item]) => {
-            rest::delete_library_agent(state, id, item)
+        (&Method::Delete, &["api", "fleet", id, "library", "system", item]) => {
+            rest::delete_library_system(state, id, item)
         }
-        (&Method::Post, &["api", "agent", id, "fs", "upload"]) => {
+        (&Method::Post, &["api", "fleet", id, "fs", "upload"]) => {
             inspect::finder::fs_upload(state, id, query, body_bytes)
         }
-        (&Method::Post, &["api", "agent", id, "fs", "upload-unique"]) => {
+        (&Method::Post, &["api", "fleet", id, "fs", "upload-unique"]) => {
             inspect::finder::fs_upload_unique(state, id, query, body_bytes)
         }
-        (&Method::Post, &["api", "agent", id, "fs", "write"]) => {
+        (&Method::Post, &["api", "fleet", id, "fs", "sheet", "save"]) => {
+            inspect::finder::fs_sheet_save(state, id, query, body_bytes)
+        }
+        (&Method::Post, &["api", "fleet", id, "fs", "write"]) => {
             inspect::finder::fs_write(state, id, query, body_bytes)
         }
-        (&Method::Post, &["api", "agent", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
-        (&Method::Post, &["api", "agent", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
-        (&Method::Post, &["api", "agent", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),
-        (&Method::Post, &["api", "agent", id, "fs", "trash"]) => inspect::finder::fs_trash(state, id, body_bytes),
-        (&Method::Post, &["api", "agent", id, "restart"]) => rest::restart_agent(state, id),
-        (&Method::Post, &["api", "agent", id, "retire"]) => rest::retire_agent(state, id),
-        (&Method::Post, &["api", "agent", id, "unretire"]) => rest::unretire_agent(state, id),
-        (&Method::Post, &["api", "agent", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
-        (&Method::Post, &["api", "agent", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
-        (&Method::Delete, &["api", "agent", id, "avatar"]) => rest::delete_avatar(state, id),
-        (&Method::Post, &["api", "fleet", "create"]) => rest::create_agent(state, body_bytes, auth_user),
+        (&Method::Post, &["api", "fleet", id, "fs", "mkdir"]) => inspect::finder::fs_mkdir(state, id, query),
+        (&Method::Post, &["api", "fleet", id, "fs", "rename"]) => inspect::finder::fs_rename(state, id, query),
+        (&Method::Post, &["api", "fleet", id, "fs", "move"]) => inspect::finder::fs_move(state, id, body_bytes),
+        (&Method::Post, &["api", "fleet", id, "fs", "trash"]) => inspect::finder::fs_trash(state, id, body_bytes),
+        (&Method::Post, &["api", "fleet", id, "restart"]) => rest::restart_fleet(state, id),
+        (&Method::Post, &["api", "fleet", id, "retire"]) => rest::retire_fleet(state, id),
+        (&Method::Post, &["api", "fleet", id, "unretire"]) => rest::unretire_fleet(state, id),
+        (&Method::Post, &["api", "fleet", id, "rename"]) => rest::rename_agent(state, id, body_bytes),
+        (&Method::Post, &["api", "fleet", id, "avatar"]) => rest::upload_avatar(state, id, body_bytes),
+        (&Method::Delete, &["api", "fleet", id, "avatar"]) => rest::delete_avatar(state, id),
+        (&Method::Post, &["api", "fleets", "create"]) => rest::create_fleet(state, body_bytes, auth_user),
         (&Method::Post, &["api", "ticket"]) => rest::mint_ticket(state, auth_user),
 
         // ── Release + update management — IT surface (can_manage_it) ──

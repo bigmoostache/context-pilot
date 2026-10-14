@@ -1,9 +1,9 @@
-# Prompt Library — built-in agents, skills, and commands
-# Agents = system prompts (dual-injected), Skills = context panels, Commands = inline /cmd replacement
+# Prompt Library — built-in systems, skills, and commands
+# Systems = system prompts (dual-injected), Skills = context panels, Commands = inline /cmd replacement
 
-default_agent_id: "default"
+default_system_id: "default"
 
-agents:
+systems:
   - id: default
     name: Default
     description: Default coding assistant

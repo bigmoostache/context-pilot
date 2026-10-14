@@ -31,10 +31,14 @@ pub struct WatcherResult {
     /// If set, create a generic dynamic panel when this watcher fires.
     /// Unlike `create_panel` (console-specific), this works for any panel type.
     pub create_dyn_panel: Option<DynPanel>,
-    /// Thread this result is bound to (if any). Stamped by thread-aware watchers
+    /// Agent this result is bound to (if any). Stamped by thread-aware watchers
     /// (e.g. the idle `MY_TURN` detector) so the resulting spine notification can
-    /// be cleared when that thread is `Read`.
-    pub thread_id: Option<String>,
+    /// be cleared when that agent is `Read`.
+    pub agent_id: Option<String>,
+    /// Spine notification source. The spine drops a notification whose
+    /// kind+source match a still-unprocessed one, so watchers that fire
+    /// repeatedly (monitors) need a distinct source per event. `None` = "watcher".
+    pub source: Option<String>,
 }
 
 impl WatcherResult {
@@ -56,7 +60,8 @@ impl WatcherResult {
             kill_session: None,
             preserves_tempo: false,
             create_dyn_panel: None,
-            thread_id: None,
+            agent_id: None,
+            source: None,
         }
     }
 
@@ -134,14 +139,24 @@ impl WatcherResult {
         self
     }
 
-    /// Bind this result to a thread, so the spine notification it produces can
-    /// be cleared when that thread is `Read`.
+    /// Bind this result to an agent, so the spine notification it produces can
+    /// be cleared when that agent is `Read`.
     #[must_use]
-    pub fn thread_id<S>(mut self, id: S) -> Self
+    pub fn agent_id<S>(mut self, id: S) -> Self
     where
         S: Into<String>,
     {
-        self.thread_id = Some(id.into());
+        self.agent_id = Some(id.into());
+        self
+    }
+
+    /// Spine notification source, distinct per event so none is deduplicated away.
+    #[must_use]
+    pub fn source<S>(mut self, source: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.source = Some(source.into());
         self
     }
 }

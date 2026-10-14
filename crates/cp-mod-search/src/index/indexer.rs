@@ -63,6 +63,8 @@ struct IndexerCtx {
     /// notification, keeping Meilisearch at 200 %+ CPU via embedding
     /// regeneration even when the project is idle.
     last_indexed_mtime: HashMap<String, u64>,
+    /// Lazily parsed `.gitignore` matchers; cleared when any `.gitignore` changes.
+    gitignore: crate::index::filters::GitignoreCache,
 }
 
 /// Start the background indexer and file watcher.
@@ -206,6 +208,7 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
         splitter: SplitterChain::new(),
         metrics: std::sync::Arc::clone(&params.metrics),
         last_indexed_mtime: HashMap::new(),
+        gitignore: crate::index::filters::GitignoreCache::default(),
     };
 
     while let Ok(first) = rx.recv() {
@@ -339,6 +342,10 @@ fn record_index_metrics(
 fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     let _fg = cp_base::flame!("index_file");
 
+    if abs_path.file_name().is_some_and(|n| n == ".gitignore") {
+        ctx.gitignore.clear();
+    }
+
     // One stat serves every gate + the (mtime, size) fingerprint below.
     let Ok(meta) = std::fs::metadata(abs_path) else {
         return;
@@ -347,6 +354,10 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     // Shared indexability gate — SAME predicate the reconcile disk-walk uses,
     // so the two paths never disagree (see types::is_indexable).
     if !types::is_indexable(abs_path, &ctx.project_root, &meta) {
+        return;
+    }
+    // Gitignored files are skipped, as in the boot walk (`filters::walk_files`).
+    if ctx.gitignore.is_ignored(&ctx.project_root, abs_path) {
         return;
     }
 
@@ -400,6 +411,9 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
 
 /// Delete all indexed chunks for a single file.
 fn delete_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
+    if abs_path.file_name().is_some_and(|n| n == ".gitignore") {
+        ctx.gitignore.clear();
+    }
     let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
     let rel_str = rel_path.to_string_lossy();
     let escaped = rel_str.replace('\'', "\\'");
@@ -421,28 +435,7 @@ fn delete_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
 /// every regular file encountered.  Filtering (extension, size) is
 /// done by the indexer thread when it processes each command.
 fn scan_directory(tx: &mpsc::Sender<IndexerCmd>, dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-
-        // Skip symlinks
-        if path.is_symlink() {
-            continue;
-        }
-
-        if path.is_dir() {
-            let name = entry.file_name();
-            let name_str = name.to_str().unwrap_or("");
-            if !types::is_excluded_dir(name_str) {
-                scan_directory(tx, &path);
-            }
-        } else if path.is_file() {
-            let _r = tx.send(IndexerCmd::IndexFile(path));
-        } else {
-            // Neither a regular file nor a directory (socket, fifo, …) — skip.
-        }
-    }
+    crate::index::filters::walk_files(dir, |path, _meta| {
+        let _r = tx.send(IndexerCmd::IndexFile(path.to_path_buf()));
+    });
 }

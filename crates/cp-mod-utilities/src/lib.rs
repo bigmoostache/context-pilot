@@ -7,7 +7,9 @@
 //! - [`time`] — Timestamp formatting and parsing (replaces `chrono`)
 //! - [`dirs`] — Platform-specific directories (replaces `dirs`)
 //! - [`secret`] — Secret string wrapper (replaces `secrecy`)
+//! - [`cron`] — 5-field POSIX cron expressions (replaces `cron`)
 
+pub mod cron;
 pub mod dirs;
 pub mod hash;
 pub mod secret;

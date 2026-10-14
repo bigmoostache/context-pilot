@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 // ── Frosted floating bottom bar (mobile chrome) ──────────────────────
 //
 // The shared primitive behind every mobile surface's floating bottom control
-// strip (the thread composer, the thread-sidebar search/create bar, the agents
+// strip (the agent composer, the agent-sidebar search/create bar, the agents
 // list search/create bar). Factored to ONE implementation (design rule M141) so
 // the gradient-blur look + fixed-bottom behaviour is defined once and every
 // consumer inherits it identically.

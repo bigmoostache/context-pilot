@@ -1,0 +1,222 @@
+import { useEffect, useRef, useState } from "react"
+import type { Fleet } from "@/lib/types"
+import {
+  useCreateFleet,
+  useRenameFleet,
+  useRestartFlow,
+  useRetireFleet,
+  useUploadAvatar,
+  sendCommand,
+} from "@/lib/live"
+import { findModel, type ProviderDef } from "@/lib/support/models"
+import { slugify, type SelectionState } from "./controller"
+
+/** The mutation surface + derived busy/error flags returned by
+ *  {@link useFleetModalActions}. */
+export interface Actions {
+  error: string | null
+  saving: boolean
+  pending: boolean
+  submit: () => void
+  retire: () => void
+  restart: () => void
+  retireBusy: boolean
+  restartBusy: boolean
+  avatarBust: number
+  onAvatarChange: (file: File) => void
+  onRandomizeAvatar: () => void
+}
+
+/** DiceBear avatar styles suitable for agents (robots, shapes, playful glyphs —
+ *  no realistic human faces). One is picked at random on each randomize click. */
+const DICEBEAR_STYLES = [
+  "bottts",
+  "bottts-neutral",
+  "fun-emoji",
+  "icons",
+  "shapes",
+  "thumbs",
+  "identicon",
+  "pixel-art",
+]
+
+/** Inputs to {@link useFleetModalActions} — bundled into one object so the hook
+ *  stays within the max-params budget. */
+export interface ActionsArgs {
+  isManage: boolean
+  fleet: Fleet | undefined
+  name: string
+  sel: SelectionState
+  providers: ProviderDef[]
+  onClose: () => void
+  onFlash: ((m: string) => void) | undefined
+}
+
+/**
+ * All create/rename/restart/retire/avatar mutations plus the Esc/⌘↵ key handler,
+ * extracted from the controller so each unit meets the P8 budgets. `submit`
+ * dispatches to create or save-manage; the key handler binds ONCE on mount and
+ * reads `submit`/`onClose` through latest-refs kept fresh by the assignment
+ * effect (so the mount-only binding sees live values without re-binding and
+ * without an inline eslint-disable, P4-banned).
+ */
+export function useFleetModalActions(args: ActionsArgs): Actions {
+  const { isManage, fleet, name, sel, providers, onClose, onFlash } = args
+  const createFleet = useCreateFleet()
+  const {
+    restart: doRestart,
+    restarting: restartBusy,
+    error: restartFlowError,
+  } = useRestartFlow(fleet?.id ?? "")
+  const retireFleet = useRetireFleet()
+  const renameFleet = useRenameFleet()
+  const uploadAvatar = useUploadAvatar()
+  const [avatarBust, setAvatarBust] = useState(0)
+  const [localError, setLocalError] = useState<string | null>(null)
+  const error = restartFlowError ?? localError
+  const [saving, setSaving] = useState(false)
+  const pending = createFleet.isPending || saving || restartBusy || retireFleet.isPending
+
+  const onAvatarChange = (file: File) => {
+    if (!fleet) return
+    uploadAvatar.mutate(
+      { fleetId: fleet.id, file },
+      {
+        onSuccess: () => setAvatarBust(Date.now()),
+        onError: (err) =>
+          setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
+      },
+    )
+  }
+
+  /** Randomize the avatar: pick a random DiceBear style + seed, fetch the SVG,
+   *  and push it through the SAME upload mutation as a manual file pick (so the
+   *  bytes land on the agent identically — no new backend surface). */
+  const onRandomizeAvatar = () => {
+    if (!fleet) return
+    const style = DICEBEAR_STYLES[Math.floor(Math.random() * DICEBEAR_STYLES.length)] ?? "bottts"
+    const seed = crypto.randomUUID()
+    const url = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`
+    setLocalError(null)
+    fetch(url)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`DiceBear ${r.status}`))))
+      .then((blob) => {
+        const file = new File([blob], `${style}-${seed}.svg`, { type: "image/svg+xml" })
+        uploadAvatar.mutate(
+          { fleetId: fleet.id, file },
+          {
+            onSuccess: () => setAvatarBust(Date.now()),
+            onError: (err) =>
+              setLocalError(err instanceof Error ? err.message : "Avatar upload failed"),
+          },
+        )
+      })
+      .catch((e: unknown) =>
+        setLocalError(e instanceof Error ? e.message : "Could not fetch a random avatar"),
+      )
+  }
+
+  /** Restart a (possibly stale-binary) agent so a fresh process can accept
+   *  commands the old binary rejected with `502 agent unreachable`. Spins until
+   *  the SSE push plane reconnects (full lifecycle, not just API ack). */
+  const restart = () => {
+    if (!fleet || restartBusy) return
+    setLocalError(null)
+    doRestart()
+  }
+
+  // Restart flow errors are derived from the hook — no sync effect needed.
+  // `error` is the derived value: restartFlowError takes precedence over local.
+
+  /** Retire (archive) the agent: stop its process + console server, keep its
+   *  folder, and move it to the dashboard's Retired section. Reversible. */
+  const retire = () => {
+    if (!fleet || retireFleet.isPending) return
+    setLocalError(null)
+    retireFleet.mutate(fleet.id, {
+      onSuccess: () => {
+        onFlash?.(`Retired ${fleet.name} — moved to the Retired section`)
+        onClose()
+      },
+      onError: (e) => setLocalError(e instanceof Error ? e.message : "Could not retire the fleet."),
+    })
+  }
+
+  const saveManage = (a: Fleet) => {
+    setSaving(true)
+    setLocalError(null)
+    const nameChanged = name.trim() !== a.name
+    const tasks: Promise<unknown>[] = [
+      sendCommand(a.id, { kind: "configure", provider: sel.provId, model: sel.modelId }),
+    ]
+    if (nameChanged) tasks.push(renameFleet.mutateAsync({ fleetId: a.id, name: name.trim() }))
+    Promise.all(tasks)
+      .then(() => {
+        onFlash?.(
+          nameChanged
+            ? `Saved changes to ${name.trim()}`
+            : `Model updated to ${findModel(providers, sel.provId, sel.modelId)?.displayName ?? sel.modelId}`,
+        )
+        onClose()
+      })
+      .catch((e: unknown) =>
+        setLocalError(e instanceof Error ? e.message : "Failed to save changes"),
+      )
+      .finally(() => setSaving(false))
+  }
+
+  const create = () => {
+    setLocalError(null)
+    const apiName = findModel(providers, sel.provId, sel.modelId)?.apiName
+    createFleet.mutate(
+      { name: name.trim(), ...(apiName && { model: apiName }) },
+      {
+        onSuccess: (receipt) => {
+          onFlash?.(`Spawning “${slugify(name)}” in ${receipt.folder}`)
+          onClose()
+        },
+        onError: (e) =>
+          setLocalError(
+            e instanceof Error ? e.message : "Could not create the fleet. Please try again.",
+          ),
+      },
+    )
+  }
+
+  const canSubmit = (isManage || name.trim().length > 0) && !pending
+  const submit = () => {
+    if (!canSubmit) return
+    if (isManage && fleet) saveManage(fleet)
+    else create()
+  }
+
+  // Esc closes, ⌘/Ctrl+Enter submits — bound once on mount via latest-refs.
+  const submitRef = useRef(submit)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    submitRef.current = submit
+    onCloseRef.current = onClose
+  })
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current()
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitRef.current()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  return {
+    error,
+    saving,
+    pending,
+    submit,
+    retire,
+    restart,
+    retireBusy: retireFleet.isPending,
+    restartBusy,
+    avatarBust,
+    onAvatarChange,
+    onRandomizeAvatar,
+  }
+}

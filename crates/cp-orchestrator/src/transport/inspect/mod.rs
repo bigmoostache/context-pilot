@@ -5,7 +5,7 @@
 //! module because they share a role (read → reshape → respond, never mutate)
 //! and a structural budget (the parent `transport` directory's 8-entry limit).
 //!
-//! * [`meta`] — enriched `Agent` objects (registry + view + git + threads).
+//! * [`meta`] — enriched `Agent` objects (registry + view + git + agents).
 //! * [`panels`] — the surviving non-cockpit inspection endpoints (usage, library).
 //! * [`finder`] — the per-agent file manager (`/fs`, preview, download).
 //! * [`metrics`] — the §19 observability snapshot (stream, rev lag).

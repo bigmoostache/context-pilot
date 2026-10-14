@@ -12,7 +12,7 @@
 //!    that are **still in context** after the close.
 //! 3. The project root (`"."`) is always included.
 //!
-//! The computed set **replaces** [`TreeState::open_folders`] entirely.
+//! The computed set **replaces** [`TreeView::open_folders`] entirely.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -20,9 +20,9 @@ use std::path::Path;
 use cp_base::state::context::Kind;
 use cp_base::state::data::message::{Message, MsgKind};
 use cp_base::state::runtime::State;
-use cp_mod_tree::types::TreeState;
+use cp_mod_tree::types::TreeView;
 
-/// Rebuild [`TreeState::open_folders`] from the live context + conversation
+/// Rebuild [`TreeView::open_folders`] from the live context + conversation
 /// history. Called by the tool pipeline immediately after
 /// `Close_conversation_history` executes.
 pub(crate) fn recompute_tree_folders(state: &mut State) {
@@ -31,7 +31,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         return;
     }
 
-    let Some(cwd) = std::env::current_dir().ok() else {
+    let Ok(cwd) = state.workdir().canonicalize() else {
         return;
     };
 
@@ -40,7 +40,7 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
     let _new = folders.insert(".".to_owned());
 
     // ── 1. Ancestor folders of every open file panel ────────────────────
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         if ctx.context_type.as_str() != Kind::FILE {
             continue;
         }
@@ -50,10 +50,10 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
     }
 
     // ── 2. Explicitly opened folders from the current conversation ──────
-    collect_opened_folders_from_messages(&state.messages, &mut folders);
+    collect_opened_folders_from_messages(&state.agent().messages, &mut folders);
 
     // ── 3. Explicitly opened folders from remaining history panels ──────
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         if ctx.context_type.as_str() != Kind::CONVERSATION_HISTORY {
             continue;
         }
@@ -62,9 +62,9 @@ pub(crate) fn recompute_tree_folders(state: &mut State) {
         }
     }
 
-    // ── Replace the tree's open-folder set ──────────────────────────────
-    let ts = TreeState::get_mut(state);
-    ts.open_folders = folders.into_iter().collect();
+    // ── Replace the tree's open-folder set (per-agent view) ─────────────
+    let tv = TreeView::get_mut(state);
+    tv.open_folders = folders.into_iter().collect();
 }
 
 /// Walk a file's path upward, inserting every ancestor directory (relative to

@@ -22,7 +22,7 @@
 //! follow-up. This endpoint reports only figures the backend genuinely holds —
 //! no fabricated metrics.
 //!
-//! * [`agent_metrics`] — one agent (`GET /api/agent/{id}/metrics`).
+//! * [`agent_metrics`] — one agent (`GET /api/fleet/{id}/metrics`).
 //! * [`fleet_metrics`] — every known agent (`GET /api/metrics`).
 
 use std::path::Path;
@@ -33,13 +33,13 @@ use cp_wire::types::registry::Entry;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-/// `GET /api/agent/{id}/metrics` — the §19 observability snapshot for one agent.
-pub fn agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match crate::transport::rest::resolve_entry(state, agent_id) {
+/// `GET /api/fleet/{id}/metrics` — the §19 observability snapshot for one agent.
+pub fn agent(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match crate::transport::rest::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
-    HttpReply::ok(&build_metrics(state, agent_id, &entry))
+    HttpReply::ok(&build_metrics(state, fleet_id, &entry))
 }
 
 /// `GET /api/metrics` — the §19 snapshot for every agent in the registry.
@@ -76,17 +76,17 @@ pub fn fleet(state: &Mutex<Backend>, auth_user: Option<&crate::services::auth::t
 /// Holds the backend lock once for every in-memory read, then computes the
 /// oplog head `rev` from disk *outside* the lock (a metrics call must never
 /// block a command path on I/O).
-fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde_json::Value {
+fn build_metrics(state: &Mutex<Backend>, fleet_id: &str, entry: &Entry) -> serde_json::Value {
     let snapshot = state.lock().ok().map(|b| {
-        let (subs, dropped, degraded) = b.hub.agent_stream_health(agent_id);
-        let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(agent_id).map_or((0, None, None, 0, 0), |v| {
+        let (subs, dropped, degraded) = b.hub.agent_stream_health(fleet_id);
+        let (view_rev, phase, lifecycle, in_tok, out_tok) = b.view.get(fleet_id).map_or((0, None, None, 0, 0), |v| {
             (v.rev, v.phase, v.lifecycle, v.cost.input_tokens, v.cost.output_tokens)
         });
         (subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)
     });
 
     let Some((subs, dropped, degraded, view_rev, phase, lifecycle, in_tok, out_tok)) = snapshot else {
-        return serde_json::json!({ "id": agent_id, "error": "backend lock poisoned" });
+        return serde_json::json!({ "id": fleet_id, "error": "backend lock poisoned" });
     };
 
     // Oplog head rev, read fresh from disk (outside the lock). A view that
@@ -95,7 +95,7 @@ fn build_metrics(state: &Mutex<Backend>, agent_id: &str, entry: &Entry) -> serde
     let rev_lag = oplog_head.map_or(0, |head| head.saturating_sub(view_rev));
 
     serde_json::json!({
-        "id": agent_id,
+        "id": fleet_id,
         "stream": {
             "subscribers": subs,
             "droppedFrames": dropped,

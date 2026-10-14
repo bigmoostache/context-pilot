@@ -42,7 +42,7 @@ use std::time::SystemTime;
 use cp_mod_bridge::boot::Boot;
 use cp_wire::PROTOCOL_VERSION;
 use cp_wire::heartbeat::{DEFAULT_MAX_AGE, HEARTBEAT_LEN, Heartbeat};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 use tempfile::TempDir;
 
 // The `#[test]` fns live inside this `#[cfg(test)]` module so
@@ -92,7 +92,7 @@ mod tests {
     fn assert_entry_fields(entry: &Entry, booted_id: &str) {
         assert_eq!(entry.id, booted_id);
         assert_eq!(entry.protocol_version, PROTOCOL_VERSION);
-        assert_eq!(entry.status, AgentStatus::Starting);
+        assert_eq!(entry.status, FleetStatus::Starting);
         assert_eq!(entry.cap_token.len(), 64, "256-bit cap_token");
         assert_eq!(entry.boot_id.len(), 32, "128-bit boot_id");
     }

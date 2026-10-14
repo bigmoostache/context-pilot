@@ -40,7 +40,7 @@ pub struct CallbackDefinition {
     #[serde(default)]
     pub built_in_command: Option<String>,
     /// Hint (multi-thread, §13/H2): this callback is safe to run concurrently
-    /// across threads. Purely informational — it never serializes subprocesses.
+    /// across agents. Purely informational — it never serializes subprocesses.
     /// When set, a cross-thread note may be appended to a failure/timeout result
     /// ("another run of this callback was in flight"). Default `false`.
     #[serde(default)]
@@ -57,11 +57,11 @@ pub struct CallbackState {
     pub editor_open: Option<String>,
     /// Active callback sessions: dedup key → `session_key`.
     ///
-    /// The dedup key is **per (executing thread, callback)** — composed from the
-    /// resident thread id and the callback id (see `firing::dedup_key`). Keying
-    /// by thread as well as callback means one thread's edit re-firing a
-    /// callback kills only *its own* prior run, never another thread's in-flight
-    /// run of the same callback (§13/H2, S6). At N=1 the thread component is
+    /// The dedup key is **per (executing agent, callback)** — composed from the
+    /// executing agent id and the callback id (see `firing::dedup_key`). Keying
+    /// by agent as well as callback means one agent's edit re-firing a
+    /// callback kills only *its own* prior run, never another agent's in-flight
+    /// run of the same callback (§13/H2, S6). At N=1 the agent component is
     /// constant, so behaviour is identical to the old callback-id-only keying.
     /// Ephemeral — not persisted across restarts.
     pub active_sessions: HashMap<String, String>,

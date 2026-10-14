@@ -1,3 +1,5 @@
+/// Thread-related helpers: auto-Read injection, `MY_TURN` detection.
+pub(super) mod agents;
 /// Constructor, state persistence helpers, autocomplete / question-form / palette input handlers.
 mod input;
 /// Main event loop (`App::run`) and spine check / auto-continuation.
@@ -6,8 +8,6 @@ pub(crate) mod lifecycle;
 mod reverie;
 /// Stream-event processing, retry logic, typewriter buffer, and stream finalization.
 mod streaming;
-/// Thread-related helpers: auto-Read injection, `MY_TURN` detection.
-pub(super) mod threads;
 /// Tool execution: pipeline, post-execution checks, and watcher-sentinel cleanup.
 pub(crate) mod tools;
 /// File/GH watcher setup, cache updates, timer-based deprecation, and watcher-event dispatch.

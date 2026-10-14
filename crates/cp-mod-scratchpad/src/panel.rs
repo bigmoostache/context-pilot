@@ -12,19 +12,19 @@ use std::fmt::Write as _;
 pub(crate) struct ScratchpadPanel;
 
 impl ScratchpadPanel {
-    /// Format the focused thread's scratchpad cells for LLM context.
+    /// Format the focused agent's scratchpad cells for LLM context.
     fn format_cells_for_context(state: &State) -> String {
         let ss = ScratchpadState::get(state);
-        // Per-thread view: scope to the RESIDENT thread (the thread this panel
-        // instance belongs to — focused at rest, or a background thread while it
-        // is being stepped), falling back to the shared focus pointer. Scoping to
-        // the shared `focus_filter` alone made every thread's Scratchpad panel
-        // show the focused thread's cells (same class as the Threads-panel bug).
-        let Some(focus) = state.resident_thread_id.as_deref().or(ss.focus_filter.as_deref()) else {
-            return "No focused thread".to_owned();
+        // Per-thread view: scope to the EXECUTING agent (the agent this panel
+        // instance belongs to — focused at rest, or a background agent while it
+        // is being stepped), never the shared focus pointer. Scoping to
+        // the shared `focus_filter` alone made every agent's Scratchpad panel
+        // show the focused agent's cells (same class as the Threads-panel bug).
+        let Some(focus) = state.executing_agent_id() else {
+            return "No focused agent".to_owned();
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
         if cells.is_empty() {
             return "No scratchpad cells".to_owned();
         }
@@ -50,12 +50,12 @@ impl Panel for ScratchpadPanel {
 
         let ss = ScratchpadState::get(state);
 
-        // Per-thread view: scope to the resident thread (see format_cells_for_context).
-        let Some(focus) = state.resident_thread_id.as_deref().or(ss.focus_filter.as_deref()) else {
-            return vec![Block::Line(vec![S::muted("  No focused thread".into()).italic()])];
+        // Per-thread view: scope to the executing agent (see format_cells_for_context).
+        let Some(focus) = state.executing_agent_id() else {
+            return vec![Block::Line(vec![S::muted("  No focused agent".into()).italic()])];
         };
         let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.thread_id == focus).collect();
+            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
 
         if cells.is_empty() {
             return vec![
@@ -90,7 +90,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         let token_count = estimate_tokens(&content);
 
-        for ctx in &mut state.context {
+        for ctx in &mut state.agent_mut().context {
             if ctx.context_type.as_str() == Kind::SCRATCHPAD {
                 ctx.token_count = token_count;
                 let _changed = cp_base::panels::update_if_changed(ctx, &content);
@@ -107,6 +107,7 @@ impl Panel for ScratchpadPanel {
         let content = Self::format_cells_for_context(state);
         // Find the Scratchpad context element to get its ID and timestamp
         let (id, last_refresh_ms) = state
+            .agent()
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::SCRATCHPAD)

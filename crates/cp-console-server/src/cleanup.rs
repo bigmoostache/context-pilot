@@ -9,6 +9,29 @@ use std::sync::{Arc, PoisonError};
 
 use crate::{SHUTDOWN_REQUESTED, Session, Sessions, is_pid_alive};
 
+/// Delete `*.log` files in `dir` whose mtime is older than `max_age`.
+/// Best-effort: unreadable entries are skipped. A live session keeps writing
+/// to its log, so its mtime stays fresh and it is never pruned.
+pub(crate) fn prune_old_logs(dir: &std::path::Path, max_age: std::time::Duration) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let now = std::time::SystemTime::now();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("log") {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| now.duration_since(t).ok())
+            .is_some_and(|age| age > max_age);
+        if stale {
+            drop(std::fs::remove_file(&path));
+        }
+    }
+}
+
 /// Raise the process file-descriptor soft limit. The console server holds
 /// pipes, sockets, and log files for every managed child — the macOS default
 /// of 256 FDs is easily exhausted. We raise to `min(hard_limit, 8192)`.

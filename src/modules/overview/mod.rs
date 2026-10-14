@@ -84,27 +84,27 @@ fn load_budgets_and_costs(data: &serde_json::Value, state: &mut State) {
 
 /// Restore cumulative token counters and dollar-cost accumulators.
 ///
-/// Per-thread values: the conversation module persists them in each thread's
+/// Per-thread values: the conversation module persists them in each agent's
 /// worker data. The call from [`load_budgets_and_costs`] only reads the legacy
-/// global slot (pre-T809 configs); the per-thread value overrides it.
+/// global slot (pre-T809 configs); the per-agent value overrides it.
 pub(crate) fn load_token_cost_accumulators(data: &serde_json::Value, state: &mut State) {
     if let Some(v) = data.get("cache_hit_tokens").and_then(serde_json::Value::as_u64) {
-        state.cache_hit_tokens = v.to_usize();
+        state.agent_mut().cache_hit_tokens = v.to_usize();
     }
     if let Some(v) = data.get("cache_miss_tokens").and_then(serde_json::Value::as_u64) {
-        state.cache_miss_tokens = v.to_usize();
+        state.agent_mut().cache_miss_tokens = v.to_usize();
     }
     if let Some(v) = data.get("total_output_tokens").and_then(serde_json::Value::as_u64) {
-        state.total_output_tokens = v.to_usize();
+        state.agent_mut().total_output_tokens = v.to_usize();
     }
     if let Some(v) = data.get("cost_hit_usd").and_then(serde_json::Value::as_f64) {
-        state.cost_hit_usd = v;
+        state.agent_mut().cost_hit_usd = v;
     }
     if let Some(v) = data.get("cost_miss_usd").and_then(serde_json::Value::as_f64) {
-        state.cost_miss_usd = v;
+        state.agent_mut().cost_miss_usd = v;
     }
     if let Some(v) = data.get("cost_output_usd").and_then(serde_json::Value::as_f64) {
-        state.cost_output_usd = v;
+        state.agent_mut().cost_output_usd = v;
     }
 }
 
@@ -144,14 +144,19 @@ impl Module for OverviewModule {
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {
         json!({
-            "previous_panel_hash_list": state.previous_panel_hash_list,
+            "previous_panel_hash_list": state.agent().previous_panel_hash_list,
         })
     }
 
     fn load_worker_data(&self, data: &serde_json::Value, state: &mut State) {
         if let Some(arr) = data.get("previous_panel_hash_list").and_then(|v| v.as_array()) {
-            state.previous_panel_hash_list = arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+            state.agent_mut().previous_panel_hash_list =
+                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect();
         }
+    }
+
+    fn worker_data_is_agent_scoped(&self) -> bool {
+        true
     }
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {

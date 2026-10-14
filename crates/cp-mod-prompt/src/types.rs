@@ -7,7 +7,8 @@ use cp_base::state::runtime::State;
 #[serde(rename_all = "snake_case")]
 pub enum PromptType {
     /// System prompt defining the AI's identity and behavior.
-    Agent,
+    #[serde(alias = "agent")]
+    System,
     /// Knowledge/instruction block loaded as a context panel.
     Skill,
     /// Inline replacement triggered by `/command-name` in the input field.
@@ -17,14 +18,14 @@ pub enum PromptType {
 impl std::fmt::Display for PromptType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Self::Agent => write!(f, "agent"),
+            Self::System => write!(f, "system"),
             Self::Skill => write!(f, "skill"),
             Self::Command => write!(f, "command"),
         }
     }
 }
 
-/// A prompt library entry (agent, skill, or command).
+/// A prompt library entry (system, skill, or command).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptItem {
     /// Unique identifier (e.g., "pirate-coder", "brave-goggles").
@@ -46,8 +47,8 @@ pub struct PromptItem {
 /// active selections and loaded panels.
 #[derive(Debug)]
 pub struct PromptState {
-    /// Currently active agent ID (None = default).
-    pub active_agent_id: Option<String>,
+    /// Currently active system ID (None = default).
+    pub active_system_id: Option<String>,
     /// IDs of skills currently loaded as context panels.
     pub loaded_skill_ids: Vec<String>,
 }
@@ -62,7 +63,7 @@ impl PromptState {
     /// Create an empty prompt state.
     #[must_use]
     pub const fn new() -> Self {
-        Self { active_agent_id: None, loaded_skill_ids: vec![] }
+        Self { active_system_id: None, loaded_skill_ids: vec![] }
     }
     /// Get shared ref from State's `TypeMap`.
     ///

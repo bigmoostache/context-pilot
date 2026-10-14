@@ -1,9 +1,9 @@
 //! Interactive main-loop watchdog — wedge detection + automatic diagnostics.
 //!
-//! The interactive TUI runs on a **single thread**: one loop polls input, runs
+//! The interactive TUI runs on a **single agent**: one loop polls input, runs
 //! a long list of background steps (bridge, stream drain, tool execution, panel
 //! refresh, spine, reverie), redraws, and sleeps a few ms. Every step runs
-//! *inline* on that one thread, so any synchronous block (a tool hitting a hung
+//! *inline* on that one agent, so any synchronous block (a tool hitting a hung
 //! dependency, a slow panel rehash, a lock wait, a stalled socket read) freezes
 //! the **entire** UI for its full duration — and historically there was zero
 //! visibility into *which* step wedged. This module ends the guessing.
@@ -26,12 +26,12 @@
 //!    calls [`mark`] with the [`Step`] it is about to run. If the current step
 //!    has been in flight past [`SLOW_STEP_MS`] the dump names the exact culprit
 //!    step (the heartbeat freezes at the same instant since it's the same
-//!    thread, so the two detectors corroborate each other).
+//!    agent, so the two detectors corroborate each other).
 //!
 //! On a trip the dump auto-captures the single observation that cracks these
 //! cases: **process CPU%** — high ⇒ a busy-loop/runaway computation, low ⇒ a
-//! blocked syscall or deadlock — plus per-thread states (Linux `/proc`) or a
-//! real backtrace of the wedged thread (macOS `sample`).
+//! blocked syscall or deadlock — plus per-agent states (Linux `/proc`) or a
+//! real backtrace of the wedged agent (macOS `sample`).
 //!
 //! ## Cost on the happy path
 //!
@@ -47,7 +47,7 @@ use std::time::{Duration, Instant};
 use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 
-/// How often the monitor thread wakes to inspect the loop's liveness.
+/// How often the monitor agent wakes to inspect the loop's liveness.
 const POLL_SECS: u64 = 2;
 /// Heartbeat staleness past which the loop is declared wedged (total freeze).
 /// A healthy loop ticks every ≤50 ms, so 15 s is unambiguous.
@@ -79,8 +79,8 @@ pub(crate) enum Step {
     Input = 1,
     /// Servicing the orchestration bridge socket + self-heal.
     Bridge = 2,
-    /// Emitting vitals / messages / thread status over the bridge.
-    ThreadsEmit = 3,
+    /// Emitting vitals / messages / agent status over the bridge.
+    AgentsEmit = 3,
     /// Draining LLM stream events + retry + typewriter.
     Stream = 4,
     /// Processing background cache-refresh results.
@@ -89,7 +89,7 @@ pub(crate) enum Step {
     Watchers = 6,
     /// Executing a tool (search / `entity_sql` / git / file I/O — prime suspect).
     Tools = 7,
-    /// Spine auto-continuation + `MY_TURN` thread detection.
+    /// Spine auto-continuation + `MY_TURN` agent detection.
     Spine = 8,
     /// Reverie sub-agent stream + tool dispatch.
     Reverie = 9,
@@ -108,7 +108,7 @@ impl Step {
             Self::Idle => "Idle (input poll)",
             Self::Input => "Input handling",
             Self::Bridge => "Bridge socket",
-            Self::ThreadsEmit => "Thread/vitals emit",
+            Self::AgentsEmit => "Agent/vitals emit",
             Self::Stream => "Stream event drain",
             Self::Cache => "Cache updates",
             Self::Watchers => "Watcher events",
@@ -128,7 +128,7 @@ impl Step {
             Self::Idle => 0,
             Self::Input => 1,
             Self::Bridge => 2,
-            Self::ThreadsEmit => 3,
+            Self::AgentsEmit => 3,
             Self::Stream => 4,
             Self::Cache => 5,
             Self::Watchers => 6,
@@ -147,7 +147,7 @@ impl Step {
         match v {
             1 => Self::Input,
             2 => Self::Bridge,
-            3 => Self::ThreadsEmit,
+            3 => Self::AgentsEmit,
             4 => Self::Stream,
             5 => Self::Cache,
             6 => Self::Watchers,
@@ -169,7 +169,7 @@ impl Step {
             Self::Idle => "loop.idle",
             Self::Input => "loop.input",
             Self::Bridge => "loop.bridge",
-            Self::ThreadsEmit => "loop.threads_emit",
+            Self::AgentsEmit => "loop.threads_emit",
             Self::Stream => "loop.stream",
             Self::Cache => "loop.cache",
             Self::Watchers => "loop.watchers",
@@ -204,7 +204,7 @@ pub(crate) fn mark(step: Step) {
     record_step_timing(step);
 }
 
-/// Perf key (`loop.<step>`) of the main-loop step in flight on this thread.
+/// Perf key (`loop.<step>`) of the main-loop step in flight on this agent.
 /// `None` off the main thread or before the first [`mark`]: nested profile
 /// guards then keep their bare leaf name.
 pub(crate) fn current_perf_step() -> Option<&'static str> {
@@ -235,12 +235,12 @@ pub(crate) fn spawn() {
         return;
     }
     let builder = std::thread::Builder::new().name("cp-loop-watchdog".to_owned());
-    // If the OS refuses the thread we simply forgo watchdog coverage rather than
+    // If the OS refuses the agent we simply forgo watchdog coverage rather than
     // crash the app — the watchdog is a diagnostic aid, never load-bearing.
     let _r = builder.spawn(monitor_loop);
 }
 
-/// Monitor thread body: poll the heartbeat + activity marker, dump once per
+/// Monitor agent body: poll the heartbeat + activity marker, dump once per
 /// wedge episode. Never returns.
 fn monitor_loop() -> ! {
     // The heartbeat value already dumped for — guards against re-dumping the
@@ -314,7 +314,7 @@ fn dump_diagnostic(w: &Wedge) {
 
     let kind = if wedged { "HEARTBEAT_STALE (total wedge)" } else { "SLOW_STEP" };
     let pid = std::process::id();
-    let threads = thread_states(&errors_dir, now);
+    let agents = agent_states(&errors_dir, now);
 
     let body = format!(
         "Interactive main-loop watchdog — wedge detected\n\
@@ -329,7 +329,7 @@ fn dump_diagnostic(w: &Wedge) {
          {interpretation}\n\
          \n\
          Per-thread states:\n\
-         {threads}\n",
+         {agents}\n",
         step_name = step.name(),
     );
 
@@ -380,14 +380,14 @@ fn cpu_busy_pct() -> Option<f64> {
 
 /// Per-thread state lines for the dump.
 ///
-/// On Linux, reads each `/proc/self/task/<tid>/{comm,stat,wchan}` so a thread
+/// On Linux, reads each `/proc/self/task/<tid>/{comm,stat,wchan}` so an agent
 /// in state `R` (running — busy-loop) or `D` (uninterruptible sleep) and the
 /// kernel function it's parked in (`wchan`) pinpoint the wedge. On macOS, where
 /// `/proc` is absent, best-effort spawns `sample <pid>` to capture a real
-/// backtrace of the wedged thread to a sibling file, and returns the thread
+/// backtrace of the wedged agent to a sibling file, and returns the agent
 /// list from `ps -M`.
 #[cfg(target_os = "linux")]
-fn thread_states(_errors_dir: &std::path::Path, _now: u64) -> String {
+fn agent_states(_errors_dir: &std::path::Path, _now: u64) -> String {
     let Ok(entries) = std::fs::read_dir("/proc/self/task") else {
         return "(unavailable)".to_owned();
     };
@@ -412,9 +412,9 @@ fn thread_states(_errors_dir: &std::path::Path, _now: u64) -> String {
 /// macOS variant — see the Linux doc comment. Captures a `sample` backtrace
 /// (works on a wedged process; that's its purpose) and returns `ps -M` output.
 #[cfg(target_os = "macos")]
-fn thread_states(errors_dir: &std::path::Path, now: u64) -> String {
+fn agent_states(errors_dir: &std::path::Path, now: u64) -> String {
     let pid = std::process::id().to_string();
-    // Best-effort: a 2-second `sample` writes a full backtrace of every thread —
+    // Best-effort: a 2-second `sample` writes a full backtrace of every agent —
     // the single most useful artifact for a wedge — to a sibling file.
     let sample_path = errors_dir.join(format!("watchdog-sample-{now}.txt"));
     let _sample =

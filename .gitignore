@@ -37,7 +37,6 @@ test
 output
 !.context-pilot/shared/
 .context-pilot/shared/entities/
-!.context-pilot/agents/
 !.context-pilot/skills/
 !.context-pilot/commands/
 test-typst
@@ -127,3 +126,6 @@ deploy/ansible/*.local.yml
 tmp/**orchestrator.log
 orchestrator.log
 tmp
+target-t788
+# playwright-cli browser-test snapshots (local debris)
+.playwright-cli/

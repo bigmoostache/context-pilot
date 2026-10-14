@@ -28,9 +28,10 @@ impl Panel for GithubResultPanel {
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?.to_owned();
         let token = GithubState::get(state).github_token.as_ref()?;
+        let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GITHUB_RESULT),
-            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone() }),
+            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone(), cwd }),
         ))
     }
 
@@ -67,6 +68,7 @@ impl Panel for GithubResultPanel {
         let mut cmd = std::process::Command::new("gh");
         let _r = cmd
             .args(&args)
+            .current_dir(&req.cwd)
             .env("GITHUB_TOKEN", &req.github_token)
             .env("GH_TOKEN", &req.github_token)
             .env("GH_PROMPT_DISABLED", "1")
@@ -115,8 +117,11 @@ impl Panel for GithubResultPanel {
     fn blocks(&self, state: &State) -> Vec<cp_render::Block> {
         use cp_render::{Block, Semantic, Span as S};
 
-        let ctx_opt =
-            state.context.get(state.selected_context).filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
+        let ctx_opt = state
+            .agent()
+            .context
+            .get(state.agent().selected_context)
+            .filter(|c| c.context_type.as_str() == Kind::GITHUB_RESULT);
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text(" No GitHub result panel".into(), Semantic::Muted)];
@@ -157,7 +162,7 @@ impl Panel for GithubResultPanel {
             .collect()
     }
     fn title(&self, state: &State) -> String {
-        if let Some(ctx) = state.context.get(state.selected_context)
+        if let Some(ctx) = state.agent().context.get(state.agent().selected_context)
             && ctx.context_type.as_str() == Kind::GITHUB_RESULT
             && let Some(cmd) = ctx.get_meta_str("result_command")
         {
@@ -177,7 +182,7 @@ impl Panel for GithubResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         let mut items = Vec::new();
-        for ctx in &state.context {
+        for ctx in &state.agent().context {
             if ctx.context_type.as_str() != Kind::GITHUB_RESULT {
                 continue;
             }

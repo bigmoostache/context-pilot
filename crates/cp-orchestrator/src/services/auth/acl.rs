@@ -4,7 +4,7 @@
 
 use super::db::AuthStore;
 use super::helpers::now_ms;
-use super::types::{AccessGrant, AclEntry, AgentRole, AuthError};
+use super::types::{AccessGrant, AclEntry, AuthError, FleetRole};
 
 impl AuthStore {
     /// Grant a user access to an agent with a specific per-agent role.
@@ -17,12 +17,12 @@ impl AuthStore {
     /// Returns [`AuthError::Database`] on foreign-key violation (unknown
     /// `user_id`) or other `SQLite` failure.
     pub(crate) fn grant_access(&self, grant: AccessGrant<'_>) -> Result<(), AuthError> {
-        let AccessGrant { agent_id, user_id, role, granted_by } = grant;
+        let AccessGrant { fleet_id, user_id, role, granted_by } = grant;
         let now = now_ms();
         let _rows = self.conn.execute(
             "INSERT OR REPLACE INTO agent_acl (agent_id, user_id, role, granted_at, granted_by) \
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            rusqlite::params![agent_id, user_id, role.as_str(), now, granted_by],
+            rusqlite::params![fleet_id, user_id, role.as_str(), now, granted_by],
         )?;
         Ok(())
     }
@@ -33,10 +33,10 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn revoke_access(&self, agent_id: &str, user_id: &str) -> Result<bool, AuthError> {
+    pub(crate) fn revoke_access(&self, fleet_id: &str, user_id: &str) -> Result<bool, AuthError> {
         let deleted = self.conn.execute(
             "DELETE FROM agent_acl WHERE agent_id = ?1 AND user_id = ?2",
-            rusqlite::params![agent_id, user_id],
+            rusqlite::params![fleet_id, user_id],
         )?;
         Ok(deleted > 0)
     }
@@ -47,30 +47,30 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn update_agent_role(
+    pub(crate) fn update_fleet_role(
         &self,
-        agent_id: &str,
+        fleet_id: &str,
         user_id: &str,
-        new_role: AgentRole,
+        new_role: FleetRole,
     ) -> Result<bool, AuthError> {
         let updated = self.conn.execute(
             "UPDATE agent_acl SET role = ?1 WHERE agent_id = ?2 AND user_id = ?3",
-            rusqlite::params![new_role.as_str(), agent_id, user_id],
+            rusqlite::params![new_role.as_str(), fleet_id, user_id],
         )?;
         Ok(updated > 0)
     }
 
-    /// Check whether `user_id` has access to `agent_id`, returning their
+    /// Check whether `user_id` has access to `fleet_id`, returning their
     /// per-agent role if so.
     ///
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn check_access(&self, agent_id: &str, user_id: &str) -> Result<Option<AgentRole>, AuthError> {
+    pub(crate) fn check_access(&self, fleet_id: &str, user_id: &str) -> Result<Option<FleetRole>, AuthError> {
         let mut stmt = self.conn.prepare("SELECT role FROM agent_acl WHERE agent_id = ?1 AND user_id = ?2")?;
-        let mut rows = stmt.query_map(rusqlite::params![agent_id, user_id], |row| {
+        let mut rows = stmt.query_map(rusqlite::params![fleet_id, user_id], |row| {
             let role_str: String = row.get(0)?;
-            Ok(AgentRole::from_sql(&role_str))
+            Ok(FleetRole::from_sql(&role_str))
         })?;
         match rows.next() {
             Some(role) => Ok(Some(role?)),
@@ -78,13 +78,13 @@ impl AuthStore {
         }
     }
 
-    /// List all users with access to `agent_id`, with their roles and
+    /// List all users with access to `fleet_id`, with their roles and
     /// profile info.
     ///
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn list_agent_users(&self, agent_id: &str) -> Result<Vec<AclEntry>, AuthError> {
+    pub(crate) fn list_fleet_users(&self, fleet_id: &str) -> Result<Vec<AclEntry>, AuthError> {
         let mut stmt = self.conn.prepare(
             "SELECT a.agent_id, a.user_id, a.role, a.granted_at, a.granted_by, \
                     u.email, u.name \
@@ -93,12 +93,12 @@ impl AuthStore {
              WHERE a.agent_id = ?1 \
              ORDER BY a.granted_at ASC, u.name ASC",
         )?;
-        let rows = stmt.query_map(rusqlite::params![agent_id], |row| {
+        let rows = stmt.query_map(rusqlite::params![fleet_id], |row| {
             let role_str: String = row.get(2)?;
             Ok(AclEntry {
-                agent_id: row.get(0)?,
+                fleet_id: row.get(0)?,
                 user_id: row.get(1)?,
-                role: AgentRole::from_sql(&role_str),
+                role: FleetRole::from_sql(&role_str),
                 granted_at: row.get(3)?,
                 granted_by: row.get(4)?,
                 user_email: row.get(5)?,
@@ -117,7 +117,7 @@ impl AuthStore {
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn list_user_agents(&self, user_id: &str) -> Result<Vec<String>, AuthError> {
+    pub(crate) fn list_user_fleets(&self, user_id: &str) -> Result<Vec<String>, AuthError> {
         let mut stmt =
             self.conn.prepare("SELECT agent_id FROM agent_acl WHERE user_id = ?1 ORDER BY granted_at ASC")?;
         let rows = stmt.query_map(rusqlite::params![user_id], |row| row.get(0))?;
@@ -128,12 +128,12 @@ impl AuthStore {
         Ok(ids)
     }
 
-    /// Convenience: is `user_id` an `agent-admin` on `agent_id`?
+    /// Convenience: is `user_id` an `agent-admin` on `fleet_id`?
     ///
     /// # Errors
     ///
     /// Returns [`AuthError::Database`] on `SQLite` failure.
-    pub(crate) fn is_agent_admin(&self, agent_id: &str, user_id: &str) -> Result<bool, AuthError> {
-        Ok(self.check_access(agent_id, user_id)? == Some(AgentRole::AgentAdmin))
+    pub(crate) fn is_fleet_admin(&self, fleet_id: &str, user_id: &str) -> Result<bool, AuthError> {
+        Ok(self.check_access(fleet_id, user_id)? == Some(FleetRole::FleetAdmin))
     }
 }

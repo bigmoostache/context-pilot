@@ -268,7 +268,7 @@ mod tests {
         let state = std::sync::Arc::new(backend);
         let ap = br#"{"enabled":false,"ssid":"concurrent","band":"a","channel":36,"country":"FR","hidden":false,"share_internet":true}"#;
         let wwan = br#"{"apn":"concurrent.apn","roaming":true,"standby":"cold"}"#;
-        let threads: Vec<_> = (0..8usize)
+        let agents: Vec<_> = (0..8usize)
             .map(|worker| {
                 let worker_state = std::sync::Arc::clone(&state);
                 std::thread::spawn(move || {
@@ -280,8 +280,8 @@ mod tests {
                 })
             })
             .collect();
-        for thread in threads {
-            thread.join().expect("worker");
+        for agent in agents {
+            agent.join().expect("worker");
         }
         let got = it_get_network(&state, None);
         assert!(got.body.contains("\"ssid\":\"concurrent\""), "the AP write survived: {}", got.body);

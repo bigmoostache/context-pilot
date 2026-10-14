@@ -32,6 +32,7 @@ use cp_oplog as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;
+use flate2 as _;
 use minisign_verify as _;
 use notify as _;
 use openssl as _;
@@ -43,6 +44,7 @@ use serde_json as _;
 use serde_yaml as _;
 use sha2 as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 use std::os::unix::process::ExitStatusExt as _;
@@ -56,7 +58,7 @@ use nix::sys::signal::kill;
 use nix::unistd::Pid;
 
 use cp_orchestrator::supervisor::{Event, ProcManager, SpawnPlan};
-use cp_wire::types::registry::{AgentStatus, Entry};
+use cp_wire::types::registry::{Entry, FleetStatus};
 
 use tempfile::tempdir;
 
@@ -97,7 +99,7 @@ mod tests {
             tee_socket_path: String::new(),
             cap_token: String::new(),
             started_at_ms: 0,
-            status: AgentStatus::Running,
+            status: FleetStatus::Running,
         }
     }
 
@@ -241,8 +243,8 @@ mod tests {
         let events = sup.check_liveness();
         assert_eq!(events.len(), 2, "both deaths are reported in one pass");
 
-        let saw_exited = events.iter().any(|e| matches!(e, Event::Exited { agent_id, .. } if agent_id == "exits"));
-        let saw_vanished = events.iter().any(|e| matches!(e, Event::Vanished { agent_id } if agent_id == "vanished"));
+        let saw_exited = events.iter().any(|e| matches!(e, Event::Exited { fleet_id, .. } if fleet_id == "exits"));
+        let saw_vanished = events.iter().any(|e| matches!(e, Event::Vanished { fleet_id } if fleet_id == "vanished"));
         assert!(saw_exited, "the spawned child is reported Exited (reaped via try_wait)");
         assert!(saw_vanished, "the adopted process is reported Vanished (signal-0 probe)");
         assert!(sup.is_empty(), "both dead agents are removed");

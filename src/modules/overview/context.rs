@@ -46,10 +46,10 @@ pub(crate) fn estimate_tool_definitions_tokens(state: &State) -> usize {
 /// the `system` field and the seed re-injection) + every enabled tool
 /// definition + the sum of all live context-panel token counts.
 pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
-    let panel_tokens: usize = state.context.iter().map(|c| c.token_count).sum();
+    let panel_tokens: usize = state.agent().context.iter().map(|c| c.token_count).sum();
     let used = system_prompt_tokens.saturating_add(tool_def_tokens).saturating_add(panel_tokens);
     (used, state.cleaning_threshold_tokens(), state.effective_context_budget())
 }
@@ -74,13 +74,13 @@ pub(crate) fn context_usage(state: &State) -> (usize, usize, usize) {
 /// The non-panel prefix is classed entirely as a hit because it is byte-stable
 /// across turns and therefore always rides the cache breakpoint.
 pub(crate) fn context_hit_miss(state: &State) -> (usize, usize) {
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
     let tool_def_tokens = estimate_tool_definitions_tokens(state);
 
     let mut hit = system_prompt_tokens.saturating_add(tool_def_tokens);
     let mut miss = 0usize;
-    for ctx in &state.context {
+    for ctx in &state.agent().context {
         if ctx.panel_cache_hit {
             hit = hit.saturating_add(ctx.token_count);
         } else {
@@ -139,7 +139,7 @@ fn write_panel_line(
 /// This is separate from the TUI rendering (`overview_render.rs`).
 pub(crate) fn generate_context_content(state: &State) -> String {
     // Estimate system prompt tokens
-    let system_prompt = cp_mod_prompt::seed::get_active_agent_content(state);
+    let system_prompt = cp_mod_prompt::seed::get_active_system_content(state);
     // The system prompt is sent twice: once in the system field, once as seed re-injection
     let system_prompt_tokens = estimate_tokens(&system_prompt).saturating_mul(2);
 
@@ -171,7 +171,7 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     );
 
     // --- Panels sorted by last_refresh_ms, with Conversation forced to end ---
-    let mut sorted_contexts: Vec<&crate::state::Entry> = state.context.iter().collect();
+    let mut sorted_contexts: Vec<&crate::state::Entry> = state.agent().context.iter().collect();
     sorted_contexts.sort_by_key(|ctx| ctx.last_refresh_ms);
 
     // Partition: conversation ("chat") always last
@@ -187,10 +187,15 @@ pub(crate) fn generate_context_content(state: &State) -> String {
     }
 
     // Statistics
-    let user_msgs = state.messages.iter().filter(|m| m.role == "user").count();
-    let assistant_msgs = state.messages.iter().filter(|m| m.role == "assistant").count();
-    let _r5 =
-        write!(output, "\nMessages: {} ({} user, {} assistant)\n", state.messages.len(), user_msgs, assistant_msgs);
+    let user_msgs = state.agent().messages.iter().filter(|m| m.role == "user").count();
+    let assistant_msgs = state.agent().messages.iter().filter(|m| m.role == "assistant").count();
+    let _r5 = write!(
+        output,
+        "\nMessages: {} ({} user, {} assistant)\n",
+        state.agent().messages.len(),
+        user_msgs,
+        assistant_msgs
+    );
 
     // Module-specific overview sections (todos, memories, git status, etc.)
     for module in &modules {

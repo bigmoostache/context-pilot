@@ -8,7 +8,6 @@ use std::io;
 use std::time::Duration;
 
 use crossterm::event;
-use ratatui::prelude::{CrosstermBackend, Terminal};
 
 use crate::app::App;
 use crate::app::actions::Action;
@@ -17,56 +16,99 @@ use crate::infra::constants::RENDER_THROTTLE_MS;
 
 use super::InputOutcome;
 
+/// Most events routed in one input phase before rendering: bounds the phase
+/// when input floods (held key, wheel burst) so background work still runs.
+const MAX_EVENTS_PER_PHASE: usize = 64;
+
+/// What routing one event did.
+enum EventStep {
+    /// A modal (palette, autocomplete) consumed it.
+    Modal,
+    /// Routed normally (or ignored).
+    Handled,
+    /// User quit — state already flushed and saved.
+    Quit,
+}
+
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
-    /// Non-blocking input phase: poll one event and route it (palette,
-    /// autocomplete, quit, or normal action), rendering immediately for
-    /// responsiveness. Returns how the main loop should proceed this tick.
+    /// Non-blocking input phase: route every pending event (up to
+    /// [`MAX_EVENTS_PER_PHASE`]), then render once. A burst of N events costs
+    /// one frame instead of N. Returns how the main loop should proceed.
     pub(super) fn handle_input_phase(
         &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        terminal: &mut crate::ui::perf::tty::Tty,
         current_ms: u64,
     ) -> io::Result<InputOutcome> {
         // Reuse the idle poll that ended the previous iteration; only poll
         // (crossterm reader lock + kevent syscall) when there is none — first
         // iteration, or after a `Restart` skipped the idle poll.
-        let ready = self.input_ready.take().map_or_else(
-            || {
-                let _guard = crate::profile!("event_poll");
-                event::poll(Duration::ZERO)
-            },
-            Ok,
-        )?;
+        let mut ready = self.input_ready.take().map_or_else(poll_now, Ok)?;
         if !ready {
             return Ok(InputOutcome::Continue);
         }
-        let evt = {
-            let _guard = crate::profile!("event_read");
-            event::read()?
-        };
-
-        if self.route_modal_event(&evt) {
+        let mut modal = false;
+        let mut routed = 0usize;
+        while ready && routed < MAX_EVENTS_PER_PHASE {
+            let evt = {
+                let _guard = crate::profile!("event_read");
+                event::read()?
+            };
+            match self.route_event(&evt) {
+                EventStep::Quit => return Ok(InputOutcome::Quit),
+                EventStep::Modal => modal = true,
+                EventStep::Handled => {}
+            }
+            routed = routed.saturating_add(1);
+            ready = poll_now()?;
+        }
+        if modal {
             self.render_frame(terminal, current_ms)?;
             return Ok(InputOutcome::Restart);
         }
+        // Render immediately after input for instant feedback, but never faster
+        // than the frame cap; otherwise the frame stays dirty and the throttled
+        // render step later in the loop paints it.
+        if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
+            self.render_frame(terminal, current_ms)?;
+        }
+        Ok(InputOutcome::Continue)
+    }
 
+    /// Route one event: resize bookkeeping, modals, quit, or a normal action.
+    fn route_event(&mut self, evt: &event::Event) -> EventStep {
+        if matches!(*evt, event::Event::Resize(..)) {
+            // Next loop-tail render repaints every cell: resize leaves
+            // artifacts the cell diff cannot see.
+            self.last_full_redraw_ms = 0;
+            self.state.flags.ui.dirty = true;
+        }
+        if self.route_modal_event(evt) {
+            return EventStep::Modal;
+        }
         let mapped = {
             let _guard = crate::profile!("handle_event");
-            handle_event(&evt, &self.state)
+            handle_event(evt, &self.state)
         };
         let Some(action) = mapped else {
             // User quit — flush all pending writes and save final state synchronously
             let _guard = crate::profile!("quit_flush");
             self.writer.flush();
-            self.save_all_threads();
-            return Ok(InputOutcome::Quit);
+            self.save_all_agents();
+            return EventStep::Quit;
         };
-
         // Ignored event (mouse click/move, unbound key): nothing changed, so
         // don't mark dirty and don't redraw.
         if matches!(action, Action::None) {
-            return Ok(InputOutcome::Continue);
+            return EventStep::Handled;
         }
+        self.apply_input_action(action);
+        EventStep::Handled
+    }
+
+    /// Apply a mapped input action, then make the executing agent follow a
+    /// focus change it may have made.
+    fn apply_input_action(&mut self, action: Action) {
         if matches!(action, Action::OpenCommandPalette) {
             let _guard = crate::profile!("open_palette");
             self.command_palette.open(&self.state);
@@ -75,23 +117,12 @@ impl App {
             let _guard = crate::profile!("handle_action");
             self.handle_action(action);
         }
-
-        // Make the resident follow a focus change the action may have just made
-        // (e.g. Right-arrow drill-in switching the focused thread) BEFORE the
-        // post-input render below — else this frame paints the previous resident
+        // Make the executing follow a focus change the action may have just made
+        // (e.g. Right-arrow drill-in switching the focused agent) BEFORE the
+        // post-input render — else that frame paints the previous executing
         // ("one stale frame until I type" bug). No-op when focus did not change.
-        {
-            let _guard = crate::profile!("relocate_resident");
-            self.relocate_resident_on_focus_change();
-        }
-
-        // Render immediately after input for instant feedback, but never faster
-        // than the frame cap; otherwise the frame stays dirty and the throttled
-        // render step later in the loop paints it.
-        if self.state.flags.ui.dirty && current_ms.saturating_sub(self.last_render_ms) >= RENDER_THROTTLE_MS {
-            self.render_frame(terminal, current_ms)?;
-        }
-        Ok(InputOutcome::Continue)
+        let _guard = crate::profile!("follow_focus");
+        self.follow_focus();
     }
 
     /// Route `evt` to an open modal (command palette first, then autocomplete).
@@ -117,4 +148,10 @@ impl App {
         self.state.flags.ui.dirty = true;
         true
     }
+}
+
+/// Non-blocking check for a pending input event.
+fn poll_now() -> io::Result<bool> {
+    let _guard = crate::profile!("event_poll");
+    event::poll(Duration::ZERO)
 }

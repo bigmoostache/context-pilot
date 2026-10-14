@@ -13,7 +13,7 @@ const BOOT_B: &str = "ffffffffffffffffffffffffffffffff";
 /// A pid that cannot name a live process (above any platform's `pid_max`).
 const DEAD_PID: u32 = 4_000_000_000;
 
-fn entry(id: &str, pid: u32, hb_path: &Path, status: AgentStatus) -> Entry {
+fn entry(id: &str, pid: u32, hb_path: &Path, status: FleetStatus) -> Entry {
     Entry {
         schema_version: 1,
         id: id.to_owned(),
@@ -63,7 +63,7 @@ fn scan_emits_appeared_then_disappeared() {
     let me = std::process::id();
     let hb_path = dir.path().join("hb-a");
     write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
-    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Running));
 
     let mut reg = FleetScanner::new(dir.path().to_path_buf());
     let first = reg.scan().expect("scan");
@@ -85,14 +85,14 @@ fn scan_emits_status_change() {
     let me = std::process::id();
     let hb_path = dir.path().join("hb-a");
     write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
-    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Starting));
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Starting));
 
     let mut reg = FleetScanner::new(dir.path().to_path_buf());
     let _appeared = reg.scan().expect("scan");
 
-    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Running));
     let events = reg.scan().expect("scan");
-    assert_eq!(events, vec![Event::StatusChanged("a".to_owned(), AgentStatus::Running)]);
+    assert_eq!(events, vec![Event::StatusChanged("a".to_owned(), FleetStatus::Running)]);
 }
 
 #[test]
@@ -106,13 +106,13 @@ fn scan_rebuilds_readers_on_boot_id_change() {
     let me = std::process::id();
     let hb_path = dir.path().join("hb-a");
     write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
-    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Running));
 
     let mut reg = FleetScanner::new(dir.path().to_path_buf());
     let _appeared = reg.scan().expect("scan"); // first sight → Appeared
 
     // Same id, fresh boot_id → the reboot signal.
-    let mut rebooted = entry("a", me, &hb_path, AgentStatus::Running);
+    let mut rebooted = entry("a", me, &hb_path, FleetStatus::Running);
     rebooted.boot_id = BOOT_B.to_owned();
     write_record(dir.path(), &rebooted);
 
@@ -131,7 +131,7 @@ fn scan_emits_stale_on_liveness_loss() {
     let hb_path = dir.path().join("hb-a");
     // Start live (fresh beat).
     write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
-    write_record(dir.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Running));
 
     let mut reg = FleetScanner::new(dir.path().to_path_buf());
     let _appeared = reg.scan().expect("scan");
@@ -151,7 +151,7 @@ fn scan_reports_dead_pid_entry_as_stale_not_live() {
     let dir = tempdir().expect("dir");
     let hb_path = dir.path().join("hb-a");
     write_heartbeat(&hb_path, &heartbeat(DEAD_PID, now_ms()));
-    write_record(dir.path(), &entry("a", DEAD_PID, &hb_path, AgentStatus::Running));
+    write_record(dir.path(), &entry("a", DEAD_PID, &hb_path, FleetStatus::Running));
 
     let mut reg = FleetScanner::new(dir.path().to_path_buf());
     let events = reg.scan().expect("scan");
@@ -192,7 +192,7 @@ fn reap_orphan_sync_dirs_collects_only_unregistered_aged_dirs() {
     let me = std::process::id();
     let hb_path = agents.path().join("hb-a");
     write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
-    write_record(agents.path(), &entry("a", me, &hb_path, AgentStatus::Running));
+    write_record(agents.path(), &entry("a", me, &hb_path, FleetStatus::Running));
     let mut reg = FleetScanner::new(agents.path().to_path_buf());
     let _appeared = reg.scan().expect("scan");
 

@@ -7,7 +7,7 @@
 //!
 //! # Restart
 //!
-//! `POST /api/agent/{id}/restart` — kill a running agent and respawn it.  The
+//! `POST /api/fleet/{id}/restart` — kill a running agent and respawn it.  The
 //! motivating case: an agent whose **running binary is stale** (it predates a
 //! new command the web cockpit wants to send), so its bridge socket rejects the
 //! command with `502 agent unreachable`.  Restarting respawns the agent from
@@ -22,7 +22,7 @@
 //!
 //! # Retire / Unretire
 //!
-//! `POST /api/agent/{id}/retire` + `/unretire` — stop-and-keep an agent, or
+//! `POST /api/fleet/{id}/retire` + `/unretire` — stop-and-keep an agent, or
 //! bring it back (T271).  Retiring is the dashboard's "archive" action,
 //! deliberately **not** a delete:
 //!
@@ -47,7 +47,7 @@ use crate::supervisor;
 
 // ── Restart ─────────────────────────────────────────────────────────────
 
-/// `POST /api/agent/{id}/restart` — terminate the agent's process and respawn
+/// `POST /api/fleet/{id}/restart` — terminate the agent's process and respawn
 /// it on the same realm folder with the backend's current `cp` binary.
 ///
 /// Flow:
@@ -60,8 +60,8 @@ use crate::supervisor;
 ///
 /// Returns `202 {status:"restarting", folder, pid}` on success, `404` for an
 /// unknown agent, `502` for a respawn failure.
-pub(crate) fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match super::resolve_entry(state, agent_id) {
+pub(crate) fn restart_fleet(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match super::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
@@ -84,8 +84,8 @@ pub(crate) fn restart_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply
     // (~2s). The respawn below re-registers the agent; the next scan detects
     // the new boot and sets liveness back to Live.
     if let Ok(mut backend) = state.lock() {
-        let _prev = backend.liveness.insert(agent_id.to_owned(), crate::liveness::Liveness::StalePid);
-        backend.mark_dirty(agent_id);
+        let _prev = backend.liveness.insert(fleet_id.to_owned(), crate::liveness::Liveness::StalePid);
+        backend.mark_dirty(fleet_id);
     }
 
     // Drop any stale supervised record so the respawn key is free. The pid is
@@ -134,7 +134,7 @@ struct RestartReceipt {
 
 // ── Retire ──────────────────────────────────────────────────────────────
 
-/// `POST /api/agent/{id}/retire` — stop the agent (process + console server),
+/// `POST /api/fleet/{id}/retire` — stop the agent (process + console server),
 /// keep its folder, and record it as retired.
 ///
 /// Flow:
@@ -150,21 +150,21 @@ struct RestartReceipt {
 ///
 /// Returns `200 {status:"retired", id, folder}` on success, `404` for an
 /// unknown agent.
-pub(crate) fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
-    let entry = match super::resolve_entry(state, agent_id) {
+pub(crate) fn retire_fleet(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
+    let entry = match super::resolve_entry(state, fleet_id) {
         Ok(e) => e,
         Err(reply) => return reply,
     };
     let folder = entry.folder.clone();
     let key = std::path::PathBuf::from(&folder).to_string_lossy().into_owned();
     let name =
-        std::path::Path::new(&folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(agent_id).to_owned();
+        std::path::Path::new(&folder).file_name().and_then(std::ffi::OsStr::to_str).unwrap_or(fleet_id).to_owned();
 
     // Provider snapshot (best-effort) before the process dies.
     let provider = crate::transport::inspect::meta::read_provider(state, &folder);
 
     let record = RetiredRecord {
-        id: agent_id.to_owned(),
+        id: fleet_id.to_owned(),
         name,
         folder: folder.clone(),
         model: entry.model.clone(),
@@ -200,21 +200,21 @@ pub(crate) fn retire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply 
         b.retired.retire(record);
     }
 
-    HttpReply::json(200, &RetireReceipt { status: "retired", id: agent_id, folder })
+    HttpReply::json(200, &RetireReceipt { status: "retired", id: fleet_id, folder })
 }
 
-/// `POST /api/agent/{id}/unretire` — clear the retired flag and respawn the
+/// `POST /api/fleet/{id}/unretire` — clear the retired flag and respawn the
 /// agent on its kept folder.
 ///
 /// Returns `202 {status:"unretiring", id, folder, pid}` on success, `404` if
 /// the agent is not retired, `502` for a respawn failure.
-pub(crate) fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpReply {
+pub(crate) fn unretire_fleet(state: &Mutex<Backend>, fleet_id: &str) -> HttpReply {
     // Clear the flag, recovering the snapshot (404 if it was never retired).
     let record = {
         let Ok(mut b) = state.lock() else {
             return HttpReply::error(500, "backend lock poisoned");
         };
-        match b.retired.unretire(agent_id) {
+        match b.retired.unretire(fleet_id) {
             Some(r) => r,
             None => return HttpReply::error(404, "agent is not retired"),
         }
@@ -242,7 +242,7 @@ pub(crate) fn unretire_agent(state: &Mutex<Backend>, agent_id: &str) -> HttpRepl
 
     match spawn_result {
         Ok(pid) => {
-            HttpReply::json(202, &UnretireReceipt { status: "unretiring", id: agent_id, folder: record.folder, pid })
+            HttpReply::json(202, &UnretireReceipt { status: "unretiring", id: fleet_id, folder: record.folder, pid })
         }
         Err(e) => {
             crate::oerr!("unretire_agent spawn error: {e}");

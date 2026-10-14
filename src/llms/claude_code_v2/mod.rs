@@ -127,7 +127,7 @@ fn send_v2_request(
 /// `~/.context-pilot/refusals/{project}_{worker_id}_{utc_compact}.json` so
 /// refusals from every agent on the host land in one place.
 fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::Value) {
-    let project_dir = std::env::current_dir().unwrap_or_default();
+    let project_dir = cp_base::config::constants::project_root();
     let project = project_dir.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_owned();
     let record = serde_json::json!({
         "stop_reason": "refusal",
@@ -191,7 +191,7 @@ impl ClaudeCodeV2Client {
 
         // System prompt
         let system_text =
-            request.system_prompt.as_ref().map_or_else(|| library::default_agent_content().to_owned(), Clone::clone);
+            request.system_prompt.as_ref().map_or_else(|| library::default_system_content().to_owned(), Clone::clone);
 
         // Build messages (api-message conversion + cleaner context + tool results)
         let super::CcJsonResult { mut json_messages, bp_hashes, bp_panel_ids, alive_count, alive_positions_permille } =

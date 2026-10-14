@@ -1,0 +1,34 @@
+tools:
+  Group_create:
+    description: |
+      Create a group with other agents. You own it and are always a member.
+      Talk in it with Send(group_id=...). Its panel opens for you.
+      Name it after its purpose (e.g. "Auth refactor review"): no ids, no
+      member list like "A12 + A15", members are shown with the group anyway.
+    parameters:
+      agent_ids: "Other member agent ids (A<n>)."
+      name: "Short name conveying the group's purpose. No ids or member names."
+      description: "One-line purpose."
+  Read:
+    description: |
+      Open the panel of a group you belong to, or refresh it if already open.
+      Marks its messages read. Close it with Close_panel.
+    parameters:
+      group_id: "Group id (G<n>); your human group for the user."
+  Group_update:
+    description: |
+      Change a group you own (not a human group). before_agent_ids must list
+      the current members exactly, in any order, or the call fails: check the
+      group first. after_agent_ids is the full new list and must include you.
+      To leave a group you don't own, ask its owner.
+    parameters:
+      group_id: "Group id (G<n>)."
+      before_agent_ids: "Current members, exactly."
+      after_agent_ids: "New full member list (omit to keep)."
+      name: "New name conveying the group's purpose, no ids (optional)."
+      description: "New description (optional)."
+  Group_delete:
+    description: |
+      Delete a group you own. Human groups can't be deleted.
+    parameters:
+      group_id: "Group id (G<n>)."

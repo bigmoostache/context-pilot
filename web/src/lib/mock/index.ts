@@ -3,7 +3,7 @@ import type { User } from "../types"
 // ── Surviving fixtures ────────────────────────────────────────────────
 //
 // The app is fully demaquetted (M63): every cockpit / usage / finder surface
-// now renders live backend data, so the old maquette payloads (panels, threads,
+// now renders live backend data, so the old maquette payloads (panels, agents,
 // spine, usage, tree, radar, memory, entities, tool/queue/scratch/callback rows)
 // were deleted. One fixture remains, still consumed by a live view that has no
 // backend source yet:

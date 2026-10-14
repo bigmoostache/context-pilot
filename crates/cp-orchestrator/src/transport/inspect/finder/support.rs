@@ -8,15 +8,17 @@ use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
 /// Resolve the agent's working directory from the registry record.
-pub(super) fn agent_folder(state: &Mutex<Backend>, agent_id: &str) -> Result<String, HttpReply> {
-    let entry = crate::transport::rest::resolve_entry(state, agent_id)?;
+pub(super) fn fleet_folder(state: &Mutex<Backend>, fleet_id: &str) -> Result<String, HttpReply> {
+    let entry = crate::transport::rest::resolve_entry(state, fleet_id)?;
     Ok(entry.folder)
 }
 
-/// Canonicalize and confine a relative path to a root directory.
+/// Canonicalize and confine a path to a root directory.
 ///
-/// Returns `None` if the resolved path escapes `root` (via `..`, symlinks,
-/// or absolute paths). An empty `relative` resolves to `root` itself.
+/// `relative` may also be absolute: agents in a git worktree cite files by
+/// full path (`<root>/.worktrees/<branch>/…`). Either way, `None` when the
+/// resolved path escapes `root` (via `..`, symlinks, or an absolute path
+/// elsewhere). An empty `relative` resolves to `root` itself.
 pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
     let root_path = Path::new(root);
     let root_canonical = root_path.canonicalize().ok()?;
@@ -25,14 +27,32 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
         return Some(root_canonical);
     }
 
-    // Reject absolute paths outright.
-    if relative.starts_with('/') {
-        return None;
-    }
-
     let candidate = root_path.join(relative);
     let canonical = candidate.canonicalize().ok()?;
     canonical.starts_with(&root_canonical).then_some(canonical)
+}
+
+/// Read-only roots a preview may reach outside the fleet folder: agents
+/// write scratch files (prompts, reports) to `/tmp` and cite them in cards.
+const PREVIEW_EXTRA_ROOTS: &[&str] = &["/tmp"];
+
+/// [`confined_path`] widened with [`PREVIEW_EXTRA_ROOTS`] — for read-only
+/// preview endpoints only, never for listing or writes. Roots are
+/// canonicalized too (`/tmp` → `/private/tmp` on macOS).
+pub(super) fn previewable_path(root: &str, relative: &str) -> Option<PathBuf> {
+    if let Some(inside) = confined_path(root, relative) {
+        return Some(inside);
+    }
+    let abs = Path::new(relative);
+    if !abs.is_absolute() {
+        return None;
+    }
+    let canonical = abs.canonicalize().ok()?;
+    PREVIEW_EXTRA_ROOTS
+        .iter()
+        .filter_map(|r| Path::new(r).canonicalize().ok())
+        .any(|r| canonical.starts_with(r))
+        .then_some(canonical)
 }
 
 /// Count the non-hidden direct children of a directory.
@@ -127,8 +147,18 @@ mod tests {
     fn confined_path_rejects_escape() {
         // Trying to escape via ..
         assert!(confined_path("/tmp", "../etc/passwd").is_none());
-        // Absolute path rejected
+        // Absolute path elsewhere rejected
         assert!(confined_path("/tmp", "/etc/passwd").is_none());
+    }
+
+    #[test]
+    fn confined_path_accepts_absolute_inside_root() {
+        let root = std::env::temp_dir().canonicalize().expect("temp dir");
+        let inner = root.join("cp-confined-abs-probe");
+        std::fs::create_dir_all(&inner).expect("mkdir");
+        let got = confined_path(&root.to_string_lossy(), &inner.to_string_lossy());
+        let _r = std::fs::remove_dir(&inner);
+        assert_eq!(got, Some(inner));
     }
 
     #[test]

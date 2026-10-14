@@ -25,6 +25,7 @@ use cp_mod_utilities as _;
 use cp_oplog as _;
 use cp_vault as _;
 use csv as _;
+use flate2 as _;
 use minisign_verify as _;
 use nix as _;
 use notify as _;
@@ -39,6 +40,7 @@ use sha2 as _;
 #[cfg(test)]
 use tempfile as _;
 use tiny_http as _;
+use umya_spreadsheet as _;
 use utoipa as _;
 
 fn main() -> ExitCode {
@@ -96,7 +98,7 @@ fn main() -> ExitCode {
     }
 
     // Health-gated commit of a staged update (update-policy §5.5): a committer
-    // thread polls our own `/healthz` and, only after a real `200` within the
+    // agent polls our own `/healthz` and, only after a real `200` within the
     // deadline, commits the binary swap and promotes the release state
     // (`active_tag`, agent binary). If the probe never turns healthy, the
     // rollback markers stay and the next boot's `boot_check` self-heals.

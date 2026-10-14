@@ -8,7 +8,7 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { qk } from "../query/sync"
 import * as api from "../api"
-import type { Agent } from "../types"
+import type { Fleet } from "../types"
 import { useLive, type LiveQueryResult } from "./core"
 
 /** Invalidate the active-fleet query — refetches the dashboard roster. Hoisted
@@ -38,14 +38,14 @@ function invalidateBothFleets(client: QueryClient) {
  * invalidated so a re-open shows the saved content, and the containing
  * directory's `useFs` listing is invalidated so its size/mtime refresh.
  */
-export function useWriteFile(agentId: string) {
+export function useWriteFile(fleetId: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.writeFile(agentId, path, content),
+      api.writeFile(fleetId, path, content),
     onSuccess: (_res, { path }) => {
-      void client.invalidateQueries({ queryKey: qk.fsPreview(agentId, path) })
-      void client.invalidateQueries({ queryKey: ["fs", agentId] })
+      void client.invalidateQueries({ queryKey: qk.fsPreview(fleetId, path) })
+      void client.invalidateQueries({ queryKey: ["fs", fleetId] })
     },
   })
 }
@@ -62,15 +62,15 @@ export function useWriteFile(agentId: string) {
  * agent process. On success both the fleet and the per-agent meta queries are
  * invalidated so the new name surfaces everywhere at once.
  */
-export function useRenameAgent() {
+export function useRenameFleet() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ agentId, name }: { agentId: string; name: string }) =>
-      api.renameAgent(agentId, name),
-    onSuccess: (_res, { agentId }) => {
+    mutationFn: ({ fleetId, name }: { fleetId: string; name: string }) =>
+      api.renameFleet(fleetId, name),
+    onSuccess: (_res, { fleetId }) => {
       void client.invalidateQueries({ queryKey: qk.fleet() })
       void client.invalidateQueries({ queryKey: qk.retiredFleet() })
-      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+      void client.invalidateQueries({ queryKey: qk.agent(fleetId) })
     },
   })
 }
@@ -81,10 +81,10 @@ export function useRenameAgent() {
  * surfaces on the dashboard the moment it self-registers (the spawn is async —
  * the receipt only confirms the launch).
  */
-export function useCreateAgent() {
+export function useCreateFleet() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (body: { name: string; folder?: string; model?: string }) => api.createAgent(body),
+    mutationFn: (body: { name: string; folder?: string; model?: string }) => api.createFleet(body),
     onSuccess: () => {
       invalidateFleet(client)
       // The agent self-registers in ~1-2s after the pty spawn; re-poll a couple
@@ -97,15 +97,15 @@ export function useCreateAgent() {
 
 /**
  * Mutation to restart an agent (kill its stale process + respawn from the
- * current binary). Like {@link useCreateAgent}, the respawn is async: the agent
+ * current binary). Like {@link useCreateFleet}, the respawn is async: the agent
  * re-registers under the same id within ~2-3s, so we nudge the fleet query to
  * refetch immediately and again shortly after, surfacing the back-to-life agent
  * well before the slow backstop poll.
  */
-export function useRestartAgent() {
+export function useRestartFleet() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (agentId: string) => api.restartAgent(agentId),
+    mutationFn: (fleetId: string) => api.restartFleet(fleetId),
     onSuccess: () => {
       invalidateFleet(client)
       window.setTimeout(() => invalidateFleet(client), 2000)
@@ -116,12 +116,12 @@ export function useRestartAgent() {
 
 /**
  * The Retired (archived) fleet — agents stopped-but-kept (T271). Served from
- * the orchestrator's retired store (`GET /api/fleet/retired`), so each card is
+ * the orchestrator's retired store (`GET /api/fleets/retired`), so each card is
  * rendered from a snapshot, not a live process. No SSE bridge (a retired agent
  * emits nothing); a slow poll keeps it eventually-consistent after a retire /
  * unretire on another tab.
  */
-export function useRetiredFleet(): LiveQueryResult<Agent[]> {
+export function useRetiredFleet(): LiveQueryResult<Fleet[]> {
   return useLive(qk.retiredFleet(), () => api.fetchRetiredFleet())
 }
 
@@ -132,10 +132,10 @@ export function useRetiredFleet(): LiveQueryResult<Agent[]> {
  * registry-record removal settle asynchronously) so the card moves from the
  * Active grid to the Retired section without waiting on the backstop poll.
  */
-export function useRetireAgent() {
+export function useRetireFleet() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (agentId: string) => api.retireAgent(agentId),
+    mutationFn: (fleetId: string) => api.retireFleet(fleetId),
     onSuccess: () => {
       invalidateBothFleets(client)
       window.setTimeout(() => invalidateBothFleets(client), 1500)
@@ -149,10 +149,10 @@ export function useRetireAgent() {
  * refetch both fleets immediately and again shortly after to surface the
  * back-to-life agent in the Active grid before the slow backstop poll.
  */
-export function useUnretireAgent() {
+export function useUnretireFleet() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (agentId: string) => api.unretireAgent(agentId),
+    mutationFn: (fleetId: string) => api.unretireFleet(fleetId),
     onSuccess: () => {
       invalidateBothFleets(client)
       window.setTimeout(() => invalidateBothFleets(client), 2000)
@@ -171,11 +171,11 @@ export function useUnretireAgent() {
 export function useUploadAvatar() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ agentId, file }: { agentId: string; file: File }) =>
-      api.uploadAvatar(agentId, file),
-    onSuccess: (_res, { agentId }) => {
+    mutationFn: ({ fleetId, file }: { fleetId: string; file: File }) =>
+      api.uploadAvatar(fleetId, file),
+    onSuccess: (_res, { fleetId }) => {
       void client.invalidateQueries({ queryKey: qk.fleet() })
-      void client.invalidateQueries({ queryKey: qk.agent(agentId) })
+      void client.invalidateQueries({ queryKey: qk.agent(fleetId) })
     },
   })
 }
@@ -183,20 +183,20 @@ export function useUploadAvatar() {
 // ── Prompt library (T350) ──────────────────────────────────────────────
 
 /**
- * Mutation to create a new `/command` in an agent's prompt library (the thread
+ * Mutation to create a new `/command` in an agent's prompt library (the agent
  * composer's "create command" button). One-shot POST writing a markdown file
  * into the agent's `.context-pilot/commands/`; not a delta-covered resource → a
  * `useMutation`. On success the agent's `useLibrary` query is invalidated so the
  * new command surfaces as a suggestion bubble immediately (the running agent
  * also picks the file up on its own filesystem watch).
  */
-export function useCreateCommand(agentId: string) {
+export function useCreateCommand(fleetId: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (cmd: { name: string; description?: string; body: string }) =>
-      api.createCommand(agentId, cmd),
+      api.createCommand(fleetId, cmd),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+      void client.invalidateQueries({ queryKey: qk.library(fleetId) })
     },
   })
 }
@@ -205,63 +205,63 @@ export function useCreateCommand(agentId: string) {
  * Mutation to create or overwrite an existing `/command` `.md` by its file id
  * (the command bubble row's per-command Edit button). One-shot
  * `PUT …/library/command/{itemId}` — the command twin of
- * {@link useUpsertLibraryAgent}, deliberately overwriting (unlike the
+ * {@link useUpsertLibrarySystem}, deliberately overwriting (unlike the
  * 409-on-clobber {@link useCreateCommand}). Not a delta-covered resource → a
  * `useMutation`. On success the agent's `useLibrary` query is invalidated so
  * the edited command surfaces immediately (the running agent also picks the
  * file up on its own filesystem watch).
  */
-export function useUpsertCommand(agentId: string) {
+export function useUpsertCommand(fleetId: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (cmd: { itemId: string; name: string; description?: string; body: string }) =>
-      api.updateCommand(agentId, cmd.itemId, {
+      api.updateCommand(fleetId, cmd.itemId, {
         name: cmd.name,
         description: cmd.description ?? "",
         body: cmd.body,
       }),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+      void client.invalidateQueries({ queryKey: qk.library(fleetId) })
     },
   })
 }
 
 /**
- * Mutation to create or overwrite a behaviour agent `.md` (T581 footer editor).
- * One-shot `PUT …/library/agent/{itemId}` — a user agent, or a local override
+ * Mutation to create or overwrite a system `.md` (T581 footer editor).
+ * One-shot `PUT …/library/system/{itemId}` — a user system, or a local override
  * of a built-in. Not a delta-covered resource → a `useMutation`. On success the
- * agent's `useLibrary` query is invalidated so the new/edited agent surfaces in
+ * agent's `useLibrary` query is invalidated so the new/edited system surfaces in
  * the selector immediately (the running agent also picks the file up on its own
  * filesystem watch, and a behaviour switch re-reads it).
  */
-export function useUpsertLibraryAgent(agentId: string) {
+export function useUpsertLibrarySystem(fleetId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (agent: { itemId: string; name: string; description?: string; body: string }) =>
-      api.upsertLibraryAgent(agentId, agent.itemId, {
-        name: agent.name,
-        description: agent.description ?? "",
-        body: agent.body,
+    mutationFn: (system: { itemId: string; name: string; description?: string; body: string }) =>
+      api.upsertLibrarySystem(fleetId, system.itemId, {
+        name: system.name,
+        description: system.description ?? "",
+        body: system.body,
       }),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+      void client.invalidateQueries({ queryKey: qk.library(fleetId) })
     },
   })
 }
 
 /**
- * Mutation to delete a behaviour agent's on-disk `.md` (T581 footer editor).
+ * Mutation to delete a system's on-disk `.md` (T581 footer editor).
  * If the file overrode a built-in, the compiled-in seed reappears; if it was a
- * pure user agent, it is gone. Not a delta-covered resource → a `useMutation`.
+ * pure user system, it is gone. Not a delta-covered resource → a `useMutation`.
  * On success the agent's `useLibrary` query is invalidated so the row updates
  * (reverts to seed, or vanishes) at once.
  */
-export function useDeleteLibraryAgent(agentId: string) {
+export function useDeleteLibrarySystem(fleetId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (itemId: string) => api.deleteLibraryAgent(agentId, itemId),
+    mutationFn: (itemId: string) => api.deleteLibrarySystem(fleetId, itemId),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: qk.library(agentId) })
+      void client.invalidateQueries({ queryKey: qk.library(fleetId) })
     },
   })
 }

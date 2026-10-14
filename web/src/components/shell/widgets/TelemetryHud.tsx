@@ -36,7 +36,7 @@ export function TelemetryHud() {
   if (!showOverlay) return null
 
   // Copy the full snapshot as markdown so it can be pasted straight into a
-  // thread for diagnosis. The report carries MORE than the HUD renders (every
+  // agent for diagnosis. The report carries MORE than the HUD renders (every
   // worst-list entry, the counts/totals, and the userAgent — so the browser is
   // known without asking). A transient check confirms the copy.
   const doCopy = () => {
@@ -128,9 +128,9 @@ function VitalsRow({ snap }: { snap: TelemetrySnapshot }) {
 function HudBody({ snap }: { snap: TelemetrySnapshot }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-2.5">
-      {/* Real main-thread blocks — the AUTHORITATIVE freeze signal. A Web
-          Worker heartbeat runs on its own (never-throttled) thread; a gap here
-          means the main thread was GENUINELY blocked, so this can't be faked by
+      {/* Real main-agent blocks — the AUTHORITATIVE freeze signal. A Web
+          Worker heartbeat runs on its own (never-throttled) agent; a gap here
+          means the main agent was GENUINELY blocked, so this can't be faked by
           Firefox's focus-throttling of rAF the way a bare "stall" can. */}
       <HudList
         title="Real blocks (worker)"
@@ -150,7 +150,7 @@ function HudBody({ snap }: { snap: TelemetrySnapshot }) {
         row={(a, i) => <AggRow key={i} agg={a} />}
       />
       <Divider />
-      {/* Main-thread stalls — THE headline freeze signal (universal rAF watchdog,
+      {/* Main-agent stalls — THE headline freeze signal (universal rAF watchdog,
           catches storms of cheap tasks INP/LoAF miss). */}
       <HudList
         title="Main-thread stalls"
@@ -196,7 +196,7 @@ function HudBody({ snap }: { snap: TelemetrySnapshot }) {
 
 /**
  * Serialize the whole telemetry snapshot to a markdown report for pasting into
- * a thread. Deliberately richer than the HUD: every worst-list entry (not just
+ * a agent. Deliberately richer than the HUD: every worst-list entry (not just
  * the top 5), the counts/totals, and `navigator.userAgent` (so the reader knows
  * the browser — decisive, since several signals are Chromium-only). Built as a
  * single array literal joined at the end (no repeated `.push`, which unicorn's
@@ -320,7 +320,7 @@ function Vital({
 }
 
 function BlockRow({ block }: { block: BlockEvent }) {
-  // A real main-thread block: sub-½s = amber hitch, multi-second = red freeze.
+  // A real main-agent block: sub-½s = amber hitch, multi-second = red freeze.
   const tone = block.blocked >= 1000 ? "var(--danger)" : "var(--warn)"
   const when = new Date(block.ts).toLocaleTimeString([], {
     hour: "2-digit",

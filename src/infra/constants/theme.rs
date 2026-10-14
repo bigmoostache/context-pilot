@@ -91,7 +91,7 @@ pub(crate) const fn card_text() -> Color {
     Color::Rgb(255, 255, 255)
 }
 /// Agent card background — purple.
-pub(crate) const fn card_agent_bg() -> Color {
+pub(crate) const fn card_system_bg() -> Color {
     Color::Rgb(130, 80, 200)
 }
 /// Reverie card background — dark purple.

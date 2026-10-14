@@ -32,7 +32,7 @@ const BASH_MAX_EXECUTION_SECS: u64 = 10;
 
 /// Check if a command string contains git or gh commands.
 /// Returns `Some(error_message)` if blocked, None if allowed.
-fn check_git_gh_guardrail(input: &str) -> Option<String> {
+pub(crate) fn check_git_gh_guardrail(input: &str) -> Option<String> {
     // Split on shell operators to handle chained commands
     let segments: Vec<&str> = input.split(['|', ';', '&', '\n']).collect();
 
@@ -61,8 +61,9 @@ fn check_git_gh_guardrail(input: &str) -> Option<String> {
 
 /// Resolve a panel ID (e.g. "P11") to the internal session key.
 /// Returns (`session_key`, `panel_id`) or an error.
-fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
+pub(crate) fn resolve_session_key(state: &State, panel_id: &str) -> Result<String, String> {
     state
+        .agent()
         .context
         .iter()
         .find(|c| c.id == panel_id && c.context_type.as_str() == Kind::CONSOLE)
@@ -83,25 +84,30 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(str::to_owned);
+    let cwd = match resolve_cwd(tool, state) {
+        Ok(c) => Some(c),
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
     let description = tool.input.get("description").and_then(|v| v.as_str()).map(str::to_owned);
+    let (panel_id, _session) = spawn_console(state, &command, cwd, description.as_deref());
+    ToolResult::new(tool.id.clone(), format!("Console created in {panel_id}"), false)
+}
 
-    // Auto-generate session key
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+/// Spawn `command` in a new console session with its panel. Returns (`panel_id`, `session_key`).
+pub(crate) fn spawn_console(
+    state: &mut State,
+    command: &str,
+    cwd: Option<String>,
+    description: Option<&str>,
+) -> (String, String) {
+    let session_key = ConsoleState::alloc_key(state, "c");
 
-    // Spawn the process
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
-    };
+    // Spawn the process off the main loop; a spawn error lands in the panel output.
+    let cwd_meta = cwd.clone();
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.to_owned(), cwd);
 
     // Display name: description if provided, else truncated command
-    let display_name = description.as_deref().unwrap_or_else(|| truncate_str(&command, 30));
+    let display_name = description.unwrap_or_else(|| truncate_str(command, 30));
 
     // Create dynamic panel with UID for persistence
     let panel_id = state.next_available_context_id();
@@ -112,19 +118,17 @@ pub fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     ctx.set_meta("console_name", &session_key);
     ctx.set_meta("console_command", &command);
     ctx.set_meta("console_status", &handle.get_status().label());
-    if let Some(desc) = description.as_ref() {
-        ctx.set_meta("console_description", desc);
+    if let Some(desc) = description {
+        ctx.set_meta("console_description", &desc);
     }
-    if let Some(dir) = cwd.as_ref() {
+    if let Some(dir) = cwd_meta.as_ref() {
         ctx.set_meta("console_cwd", dir);
     }
-    state.context.push(ctx);
+    state.agent_mut().context.push(ctx);
 
-    // Store handle
     let cs = ConsoleState::get_mut(state);
-    drop(cs.sessions.insert(session_key, handle));
-
-    ToolResult::new(tool.id.clone(), format!("Console created in {panel_id}"), false)
+    drop(cs.sessions.insert(session_key.clone(), handle));
+    (panel_id, session_key)
 }
 
 /// Handle `console_send_keys`: write input text to a running process's stdin.
@@ -167,12 +171,12 @@ pub fn execute_send_keys(tool: &ToolUse, state: &mut State) -> ToolResult {
     }
 
     // Short delay for output to arrive
-    state.tool_sleep_until_ms = now_ms().saturating_add(500);
+    state.agent_mut().tool_sleep_until_ms = now_ms().saturating_add(500);
 
     ToolResult::new(tool.id.clone(), format!("Sent input to console '{panel_id}'"), false)
 }
 
-/// Validated common inputs shared by `console_wait` and `console_watch`.
+/// Validated inputs of `console_wait`.
 struct WatchRequest {
     /// Panel ID the watcher targets (e.g. "P11").
     panel_id: String,
@@ -294,52 +298,15 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
     ToolResult::new(tool.id.clone(), CONSOLE_WAIT_BLOCKING_SENTINEL.to_owned(), false)
 }
 
-/// Handle `console_watch`: register an async (non-blocking) watcher with spine notification.
-pub fn execute_watch(tool: &ToolUse, state: &mut State) -> ToolResult {
-    let _fg = cp_base::flame!("console_watch");
-    let req = match parse_watch_request(tool, state) {
-        Ok(r) => r,
-        Err(e) => return *e,
-    };
-
-    match early_watch_result(tool, state, &req) {
-        Ok(Some(done)) => return done,
-        Err(e) => return *e,
-        Ok(None) => {}
+/// Process cwd for a spawned command: the `cwd` param resolved against the
+/// agent's workdir, or the workdir itself — never the shared process cwd.
+/// Errors when the agent's worktree folder no longer exists.
+pub(crate) fn resolve_cwd(tool: &ToolUse, state: &State) -> Result<String, String> {
+    if let Some(e) = state.workdir_error() {
+        return Err(e);
     }
-
-    let now = now_ms();
-    let WatchRequest { panel_id, mode, pattern, session_key } = req;
-    let desc = match mode.as_str() {
-        "exit" => format!("👁 Watching {panel_id} for exit"),
-        "pattern" => format!("👁 Watching {} for '{}'", panel_id, pattern.as_deref().unwrap_or("?")),
-        _ => format!("👁 Watching {panel_id}"),
-    };
-
-    let watcher = ConsoleWatcher {
-        watcher_id: format!("console_{session_key}_{mode}"),
-        session_name: session_key,
-        mode,
-        pattern,
-        blocking: false,
-        tool_use_id: None,
-        registered_at_ms: now,
-        deadline_ms: None, // async watchers have no timeout
-        easy_bash: false,
-        panel_id: panel_id.clone(),
-        desc,
-        command: String::new(),
-        cwd: None,
-    };
-
-    let registry = WatcherRegistry::get_mut(state);
-    registry.register(Box::new(watcher));
-
-    ToolResult::new(
-        tool.id.clone(),
-        format!("Watcher registered for '{panel_id}' — you'll get a spine notification when the condition is met."),
-        false,
-    )
+    let raw = tool.input.get("cwd").and_then(|v| v.as_str()).unwrap_or(".");
+    Ok(state.resolve_path(raw).to_string_lossy().into_owned())
 }
 
 /// Handle `console_easy_bash`: spawn, block until exit or 10s timeout, return output inline
@@ -356,20 +323,17 @@ pub fn execute_debug_bash(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), msg, true);
     }
 
-    let cwd = tool.input.get("cwd").and_then(|v| v.as_str()).map(str::to_owned);
+    let cwd = match resolve_cwd(tool, state) {
+        Ok(c) => Some(c),
+        Err(e) => return ToolResult::new(tool.id.clone(), format!("Error: {e}"), true),
+    };
 
     // Spawn via the console server (non-blocking to the main loop)
-    let session_key = {
-        let cs = ConsoleState::get_mut(state);
-        let key = format!("c_{}", cs.next_session_id);
-        cs.next_session_id = cs.next_session_id.saturating_add(1);
-        key
-    };
+    let session_key = ConsoleState::alloc_key(state, "c");
 
-    let handle = match SessionHandle::spawn(session_key.clone(), command.clone(), cwd.clone()) {
-        Ok(h) => h,
-        Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to execute: {e}"), true),
-    };
+    // A spawn error flips the status to Failed(-1) with the message in the
+    // output buffer, so the exit watcher below reports it.
+    let handle = SessionHandle::spawn_detached(session_key.clone(), command.clone(), cwd.clone());
 
     // Store the handle (needed for watcher to check status + read output)
     // NO panel created — the watcher decides inline vs. deferred panel at completion.

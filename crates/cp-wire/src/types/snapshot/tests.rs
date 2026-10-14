@@ -11,7 +11,7 @@ use super::*;
 fn heads_round_trip() {
     let heads = Heads {
         schema_version: 1,
-        threads: vec![ThreadHead { thread_id: "T1".into(), last_message_hash: ContentHash::new([0x11; 32]) }],
+        agents: vec![AgentHead { agent_id: "T1".into(), last_message_hash: ContentHash::new([0x11; 32]) }],
         panels: vec![PanelHead { panel_id: "P5".into(), hash: ContentHash::new([0x22; 32]) }],
     };
     let json = serde_json::to_string(&heads).expect("serialize");
@@ -71,7 +71,7 @@ fn seen_set_eviction_is_rev_based_not_time_based() {
 #[test]
 fn snapshot_round_trip() {
     let mut snapshot = Snapshot::default();
-    snapshot.heads.set_thread_head("T1", ContentHash::new([0x33; 32]));
+    snapshot.heads.set_agent_head("T1", ContentHash::new([0x33; 32]));
     snapshot.seen.mark("cmd-x", 5);
     let json = serde_json::to_string(&snapshot).expect("serialize");
     let back: Snapshot = serde_json::from_str(&json).expect("deserialize");
@@ -81,18 +81,19 @@ fn snapshot_round_trip() {
 #[test]
 fn snapshot_round_trip_with_roster() {
     let mut snapshot = Snapshot::default();
-    snapshot.heads.set_thread_head("T1", ContentHash::new([0x33; 32]));
+    snapshot.heads.set_agent_head("T1", ContentHash::new([0x33; 32]));
     snapshot.seen.mark("cmd-x", 5);
-    snapshot.roster.push(RosterThread {
-        thread_id: "T1".into(),
+    snapshot.roster.push(RosterAgent {
+        agent_id: "T1".into(),
         name: "Plan".into(),
-        status: ThreadTurn::MyTurn,
+        status: AgentTurn::MyTurn,
         archived: false,
         paused: false,
         last_activity_ms: 1_700,
         msg_count: 3,
         tasks: Vec::new(),
         notes: Vec::new(),
+        parent_agent_id: Some("T0".into()),
     });
     let json = serde_json::to_string(&snapshot).expect("serialize");
     let back: Snapshot = serde_json::from_str(&json).expect("deserialize");
@@ -112,48 +113,66 @@ fn snapshot_without_roster_field_decodes_to_empty() {
 }
 
 /// The first roster entry, or a test failure — avoids `roster[0]` indexing.
-fn first(roster: &[RosterThread]) -> &RosterThread {
-    roster.first().expect("roster has at least one thread")
+fn first(roster: &[RosterAgent]) -> &RosterAgent {
+    roster.first().expect("roster has at least one agent")
 }
 
 #[test]
 fn roster_fold_created_is_idempotent_refresh() {
-    let mut roster: Vec<RosterThread> = Vec::new();
-    RosterThread::fold_created(
+    let mut roster: Vec<RosterAgent> = Vec::new();
+    RosterAgent::fold_created(
         &mut roster,
-        ThreadCreation { thread_id: "T1", name: "Plan", status: ThreadTurn::TheirTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan",
+            status: AgentTurn::TheirTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
     assert_eq!(roster.len(), 1);
     // A re-seen creation refreshes, never duplicates.
-    RosterThread::fold_created(
+    RosterAgent::fold_created(
         &mut roster,
-        ThreadCreation { thread_id: "T1", name: "Plan v2", status: ThreadTurn::MyTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan v2",
+            status: AgentTurn::MyTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
     assert_eq!(roster.len(), 1, "duplicate creation folds idempotently");
     assert_eq!(first(&roster).name, "Plan v2");
-    assert_eq!(first(&roster).status, ThreadTurn::MyTurn);
+    assert_eq!(first(&roster).status, AgentTurn::MyTurn);
 }
 
 #[test]
 fn roster_fold_message_and_archived_accumulate() {
-    let mut roster: Vec<RosterThread> = Vec::new();
-    RosterThread::fold_created(
+    let mut roster: Vec<RosterAgent> = Vec::new();
+    RosterAgent::fold_created(
         &mut roster,
-        ThreadCreation { thread_id: "T1", name: "Plan", status: ThreadTurn::TheirTurn, timestamp_ms: 100 },
+        AgentCreation {
+            agent_id: "T1",
+            name: "Plan",
+            status: AgentTurn::TheirTurn,
+            timestamp_ms: 100,
+            parent_agent_id: None,
+        },
     );
 
-    RosterThread::fold_message(&mut roster, "T1", 250);
-    RosterThread::fold_message(&mut roster, "T1", 400);
+    RosterAgent::fold_message(&mut roster, "T1", 250);
+    RosterAgent::fold_message(&mut roster, "T1", 400);
     assert_eq!(first(&roster).msg_count, 2);
     assert_eq!(first(&roster).last_activity_ms, 400, "activity tracks the latest message");
 
-    RosterThread::fold_archived(&mut roster, "T1", true);
+    RosterAgent::fold_archived(&mut roster, "T1", true);
     assert!(first(&roster).archived);
-    RosterThread::fold_archived(&mut roster, "T1", false);
+    RosterAgent::fold_archived(&mut roster, "T1", false);
     assert!(!first(&roster).archived);
 
     // Folds for an unknown thread are no-ops, never a panic.
-    RosterThread::fold_message(&mut roster, "T-absent", 999);
-    RosterThread::fold_status(&mut roster, "T-absent", ThreadTurn::MyTurn);
+    RosterAgent::fold_message(&mut roster, "T-absent", 999);
+    RosterAgent::fold_status(&mut roster, "T-absent", AgentTurn::MyTurn);
     assert_eq!(roster.len(), 1);
 }

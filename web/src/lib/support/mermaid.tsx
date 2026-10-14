@@ -21,7 +21,7 @@ const memo: { mod: Promise<MermaidApi> | null; theme: "dark" | "light" | null } 
 /**
  * Rendered-SVG cache keyed by `"<theme>:<source>"`. Identical diagrams (repeats)
  * and re-mounts (scrolling a message row in/out) reuse the SVG verbatim instead
- * of re-running the expensive dagre/d3 layout + serialize on the main thread.
+ * of re-running the expensive dagre/d3 layout + serialize on the main agent.
  */
 const svgCache = new Map<string, string>()
 
@@ -45,12 +45,43 @@ async function loadMermaid(dark: boolean): Promise<MermaidApi> {
   return mermaid
 }
 
+/** Tail of the render chain: mermaid's `render` is not reentrant. */
+const queue: { tail: Promise<unknown> } = { tail: Promise.resolve() }
+
+/**
+ * Validate then render one diagram, one at a time.
+ *
+ * On a syntax error `mermaid.render` appends its "Syntax error" SVG inside a
+ * temporary `#d<id>` div on `document.body` and never removes it, so every
+ * invalid or half-streamed fence used to leak a visible bomb below the app.
+ * `parse` with `suppressErrors` rejects bad input without touching the DOM, and
+ * the `finally` sweeps the temp div should `render` itself still fail.
+ */
+function renderSerialized(dark: boolean, id: string, code: string): Promise<string> {
+  const prev = queue.tail
+  const run = (async () => {
+    await prev
+    try {
+      const mermaid = await loadMermaid(dark)
+      if (!(await mermaid.parse(code, { suppressErrors: true }))) {
+        throw new Error("Invalid mermaid syntax")
+      }
+      const { svg } = await mermaid.render(id, code)
+      return svg
+    } finally {
+      document.querySelector(`#d${id}`)?.remove()
+    }
+  })()
+  queue.tail = run.catch(() => null)
+  return run
+}
+
 /**
  * Render a ```mermaid``` fenced block as an actual diagram.
  *
  * `mermaid` is a heavy dependency (it pulls in d3, dagre, cytoscape), so it is
  * **lazy-loaded** via dynamic `import()` on first mount — the initial bundle
- * never pays for it, only threads that actually contain a mermaid diagram do.
+ * never pays for it, only agents that actually contain a mermaid diagram do.
  *
  * Rendering is async: `mermaid.render(id, code)` returns an SVG string that we
  * inject as inner HTML (the same pattern as the Finder's highlight.js preview).
@@ -90,8 +121,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
     const alive = { current: true }
     void (async () => {
       try {
-        const mermaid = await loadMermaid(dark)
-        const { svg: out } = await mermaid.render(id, code)
+        const out = await renderSerialized(dark, id, code)
         if (alive.current) {
           svgCache.set(cacheKey, out)
           setSvg(out)

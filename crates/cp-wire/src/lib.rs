@@ -37,7 +37,7 @@ pub mod types;
 /// Bumped only on a **breaking** wire change (a field removed or its meaning
 /// changed). Additive, tolerantly-decoded changes do **not** bump it — they are
 /// absorbed by serde's ignore-unknown-fields behaviour on the receiving side.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// Whether a peer running [`PROTOCOL_VERSION`] can accept a payload produced at
 /// `their_major`.

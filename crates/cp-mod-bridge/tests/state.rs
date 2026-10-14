@@ -65,12 +65,12 @@ mod tests {
 
     /// Assert every change-detection memo starts empty/none.
     fn assert_memos_empty(bs: &BridgeState) {
-        assert!(bs.thread_msg_counts.is_empty());
-        assert!(bs.thread_statuses.is_empty());
+        assert!(bs.agent_msg_counts.is_empty());
+        assert!(bs.agent_statuses.is_empty());
         assert!(bs.last_focus.is_none());
         assert!(bs.last_behaviour.is_none());
-        assert!(bs.thread_archived_memo.is_empty());
-        assert!(bs.thread_paused_memo.is_empty());
+        assert!(bs.agent_archived_memo.is_empty());
+        assert!(bs.agent_paused_memo.is_empty());
     }
 
     /// Assert no seed bit is set on a cold default.

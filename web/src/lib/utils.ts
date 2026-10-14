@@ -40,7 +40,7 @@ export function prefersReducedMotion(): boolean {
 
 // ── Client-side zip-on-drop (T367) ────────────────────────────────────
 //
-// Bundle the file(s) a user drops onto the thread conversation into a SINGLE
+// Bundle the file(s) a user drops onto the agent conversation into a SINGLE
 // `.zip` (built entirely in the browser via fflate) before they're uploaded, so
 // what lands in the realm is one compressed archive instead of N loose files.
 // Only the drag-and-drop path uses this; the paperclip picker still uploads raw
@@ -182,7 +182,7 @@ export function zipDropped(dropped: DroppedFile[]): Promise<File> {
 // ── List Enter / Tab behaviour (T359) ────────────────────────────────
 //
 // Web port of the TUI input area (src/modules/conversation/list.rs +
-// panel.rs Enter branch), used by the thread composer, extended with
+// panel.rs Enter branch), used by the agent composer, extended with
 // nesting (Tab / Shift+Tab) and depth-styled unordered bullets.
 //
 // Plain Enter:

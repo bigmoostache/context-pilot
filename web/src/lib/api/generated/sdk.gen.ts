@@ -3,7 +3,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteApiAgentByIdAclByUserIdData, DeleteApiAgentByIdAclByUserIdErrors, DeleteApiAgentByIdAclByUserIdResponses, DeleteApiAgentByIdAvatarData, DeleteApiAgentByIdAvatarErrors, DeleteApiAgentByIdAvatarResponses, DeleteApiAgentByIdLibraryAgentByItemData, DeleteApiAgentByIdLibraryAgentByItemErrors, DeleteApiAgentByIdLibraryAgentByItemResponses, DeleteApiAuthSessionsByIdData, DeleteApiAuthSessionsByIdErrors, DeleteApiAuthSessionsByIdResponses, DeleteApiAuthUsersByUserIdData, DeleteApiAuthUsersByUserIdErrors, DeleteApiAuthUsersByUserIdResponses, DeleteApiClaudeAccountsByEmailData, DeleteApiClaudeAccountsByEmailErrors, DeleteApiClaudeAccountsByEmailResponses, DeleteApiReleasesByTagData, DeleteApiReleasesByTagErrors, DeleteApiReleasesByTagResponses, GetApiAgentByIdAclData, GetApiAgentByIdAclErrors, GetApiAgentByIdAclResponses, GetApiAgentByIdAvatarData, GetApiAgentByIdAvatarResponses, GetApiAgentByIdBodyByHashData, GetApiAgentByIdBodyByHashErrors, GetApiAgentByIdBodyByHashResponses, GetApiAgentByIdConversationData, GetApiAgentByIdConversationErrors, GetApiAgentByIdConversationResponses, GetApiAgentByIdData, GetApiAgentByIdErrors, GetApiAgentByIdFsData, GetApiAgentByIdFsDescriptionsData, GetApiAgentByIdFsDescriptionsErrors, GetApiAgentByIdFsDescriptionsResponses, GetApiAgentByIdFsDownloadData, GetApiAgentByIdFsDownloadResponses, GetApiAgentByIdFsErrors, GetApiAgentByIdFsPreviewData, GetApiAgentByIdFsPreviewErrors, GetApiAgentByIdFsPreviewResponses, GetApiAgentByIdFsRawData, GetApiAgentByIdFsRawResponses, GetApiAgentByIdFsResponses, GetApiAgentByIdFsSheetData, GetApiAgentByIdFsSheetErrors, GetApiAgentByIdFsSheetResponses, GetApiAgentByIdLibraryAgentByItemData, GetApiAgentByIdLibraryAgentByItemErrors, GetApiAgentByIdLibraryAgentByItemResponses, GetApiAgentByIdLibraryData, GetApiAgentByIdLibraryErrors, GetApiAgentByIdLibraryResponses, GetApiAgentByIdMetaData, GetApiAgentByIdMetaErrors, GetApiAgentByIdMetaResponses, GetApiAgentByIdMetricsData, GetApiAgentByIdMetricsErrors, GetApiAgentByIdMetricsResponses, GetApiAgentByIdResponses, GetApiAgentByIdThreadsData, GetApiAgentByIdThreadsErrors, GetApiAgentByIdThreadsResponses, GetApiAgentByIdUsageData, GetApiAgentByIdUsageErrors, GetApiAgentByIdUsageResponses, GetApiAgentByIdVitalsData, GetApiAgentByIdVitalsErrors, GetApiAgentByIdVitalsResponses, GetApiAuthMeData, GetApiAuthMeErrors, GetApiAuthMeResponses, GetApiAuthSessionsData, GetApiAuthSessionsErrors, GetApiAuthSessionsResponses, GetApiAuthStatusData, GetApiAuthStatusErrors, GetApiAuthStatusResponses, GetApiAuthUsersData, GetApiAuthUsersErrors, GetApiAuthUsersResponses, GetApiClaudeAccountsData, GetApiClaudeAccountsErrors, GetApiClaudeAccountsResponses, GetApiClaudeLoginStatusData, GetApiClaudeLoginStatusErrors, GetApiClaudeLoginStatusResponses, GetApiClaudeUsageData, GetApiClaudeUsageErrors, GetApiClaudeUsageResponses, GetApiEnvKeysByNameData, GetApiEnvKeysByNameErrors, GetApiEnvKeysByNameResponses, GetApiEnvKeysData, GetApiEnvKeysErrors, GetApiEnvKeysResponses, GetApiFeaturesData, GetApiFeaturesErrors, GetApiFeaturesResponses, GetApiFleetData, GetApiFleetErrors, GetApiFleetMetaData, GetApiFleetMetaErrors, GetApiFleetMetaResponses, GetApiFleetResponses, GetApiFleetRetiredData, GetApiFleetRetiredErrors, GetApiFleetRetiredResponses, GetApiHealthData, GetApiHealthErrors, GetApiHealthResponses, GetApiItCaCrtData, GetApiItCaCrtResponses, GetApiItCaFingerprintData, GetApiItCaFingerprintErrors, GetApiItCaFingerprintResponses, GetApiItIdentityData, GetApiItIdentityErrors, GetApiItIdentityResponses, GetApiItNetworkData, GetApiItNetworkErrors, GetApiItNetworkResponses, GetApiItProvisionedData, GetApiItProvisionedErrors, GetApiItProvisionedResponses, GetApiMetricsData, GetApiMetricsErrors, GetApiMetricsResponses, GetApiProvidersData, GetApiProvidersErrors, GetApiProvidersResponses, GetApiReleasesData, GetApiReleasesErrors, GetApiReleasesResponses, GetApiSettingsData, GetApiSettingsErrors, GetApiSettingsResponses, GetApiUpdateStatusData, GetApiUpdateStatusErrors, GetApiUpdateStatusResponses, GetApiVaultSnapshotData, GetApiVaultSnapshotErrors, GetApiVaultSnapshotResponses, PatchApiAgentByIdAclByUserIdData, PatchApiAgentByIdAclByUserIdErrors, PatchApiAgentByIdAclByUserIdResponses, PatchApiAuthMeData, PatchApiAuthMeErrors, PatchApiAuthMeResponses, PostApiAgentByIdAclData, PostApiAgentByIdAclErrors, PostApiAgentByIdAclResponses, PostApiAgentByIdAvatarData, PostApiAgentByIdAvatarErrors, PostApiAgentByIdAvatarResponses, PostApiAgentByIdCommandData, PostApiAgentByIdCommandErrors, PostApiAgentByIdCommandResponses, PostApiAgentByIdConversationsSearchData, PostApiAgentByIdConversationsSearchErrors, PostApiAgentByIdConversationsSearchResponses, PostApiAgentByIdFsMkdirData, PostApiAgentByIdFsMkdirErrors, PostApiAgentByIdFsMkdirResponses, PostApiAgentByIdFsMoveData, PostApiAgentByIdFsMoveErrors, PostApiAgentByIdFsMoveResponses, PostApiAgentByIdFsRenameData, PostApiAgentByIdFsRenameErrors, PostApiAgentByIdFsRenameResponses, PostApiAgentByIdFsTrashData, PostApiAgentByIdFsTrashErrors, PostApiAgentByIdFsTrashResponses, PostApiAgentByIdFsUploadData, PostApiAgentByIdFsUploadErrors, PostApiAgentByIdFsUploadResponses, PostApiAgentByIdFsUploadUniqueData, PostApiAgentByIdFsUploadUniqueErrors, PostApiAgentByIdFsUploadUniqueResponses, PostApiAgentByIdFsWriteData, PostApiAgentByIdFsWriteErrors, PostApiAgentByIdFsWriteResponses, PostApiAgentByIdLibraryCommandData, PostApiAgentByIdLibraryCommandErrors, PostApiAgentByIdLibraryCommandResponses, PostApiAgentByIdRenameData, PostApiAgentByIdRenameErrors, PostApiAgentByIdRenameResponses, PostApiAgentByIdRestartData, PostApiAgentByIdRestartErrors, PostApiAgentByIdRestartResponses, PostApiAgentByIdRetireData, PostApiAgentByIdRetireErrors, PostApiAgentByIdRetireResponses, PostApiAgentByIdUnretireData, PostApiAgentByIdUnretireErrors, PostApiAgentByIdUnretireResponses, PostApiAuthLoginData, PostApiAuthLoginErrors, PostApiAuthLoginResponses, PostApiAuthLogoutData, PostApiAuthLogoutErrors, PostApiAuthLogoutResponses, PostApiAuthPasswordData, PostApiAuthPasswordErrors, PostApiAuthPasswordResponses, PostApiAuthRegisterData, PostApiAuthRegisterErrors, PostApiAuthRegisterResponses, PostApiAuthUsersByUserIdLogoutData, PostApiAuthUsersByUserIdLogoutErrors, PostApiAuthUsersByUserIdLogoutResponses, PostApiAuthUsersData, PostApiAuthUsersErrors, PostApiAuthUsersResponses, PostApiClaudeAccountsStoreData, PostApiClaudeAccountsStoreErrors, PostApiClaudeAccountsStoreResponses, PostApiClaudeAccountsSwitchData, PostApiClaudeAccountsSwitchErrors, PostApiClaudeAccountsSwitchResponses, PostApiClaudeLoginCompleteData, PostApiClaudeLoginCompleteErrors, PostApiClaudeLoginCompleteResponses, PostApiClaudeLoginRefreshData, PostApiClaudeLoginRefreshErrors, PostApiClaudeLoginRefreshResponses, PostApiClaudeLoginStartData, PostApiClaudeLoginStartErrors, PostApiClaudeLoginStartResponses, PostApiFleetCreateData, PostApiFleetCreateErrors, PostApiFleetCreateResponses, PostApiItIdentityData, PostApiItIdentityErrors, PostApiItIdentityResponses, PostApiItNetworkApData, PostApiItNetworkApErrors, PostApiItNetworkApResponses, PostApiItNetworkModeData, PostApiItNetworkModeErrors, PostApiItNetworkModeResponses, PostApiItNetworkWwanData, PostApiItNetworkWwanErrors, PostApiItNetworkWwanResponses, PostApiReleasesDeployData, PostApiReleasesDeployErrors, PostApiReleasesDeployResponses, PostApiReleasesDownloadData, PostApiReleasesDownloadErrors, PostApiReleasesDownloadResponses, PostApiReleasesRestartOrchestratorData, PostApiReleasesRestartOrchestratorErrors, PostApiReleasesRestartOrchestratorResponses, PostApiSettingsData, PostApiSettingsErrors, PostApiSettingsResponses, PostApiTicketData, PostApiTicketErrors, PostApiTicketResponses, PostApiUpdateApplyData, PostApiUpdateApplyErrors, PostApiUpdateApplyResponses, PostApiUpdateCheckData, PostApiUpdateCheckErrors, PostApiUpdateCheckResponses, PutApiAgentByIdLibraryAgentByItemData, PutApiAgentByIdLibraryAgentByItemErrors, PutApiAgentByIdLibraryAgentByItemResponses, PutApiAgentByIdLibraryCommandByItemData, PutApiAgentByIdLibraryCommandByItemErrors, PutApiAgentByIdLibraryCommandByItemResponses, PutApiEnvKeysByNameData, PutApiEnvKeysByNameErrors, PutApiEnvKeysByNameResponses, PutApiReleasesArchData, PutApiReleasesArchErrors, PutApiReleasesArchResponses, PutApiReleasesSelectData, PutApiReleasesSelectErrors, PutApiReleasesSelectResponses, PutApiUpdateModeData, PutApiUpdateModeErrors, PutApiUpdateModeResponses } from './types.gen';
+import type { DeleteApiAuthSessionsByIdData, DeleteApiAuthSessionsByIdErrors, DeleteApiAuthSessionsByIdResponses, DeleteApiAuthUsersByUserIdData, DeleteApiAuthUsersByUserIdErrors, DeleteApiAuthUsersByUserIdResponses, DeleteApiClaudeAccountsByEmailData, DeleteApiClaudeAccountsByEmailErrors, DeleteApiClaudeAccountsByEmailResponses, DeleteApiFleetByIdAclByUserIdData, DeleteApiFleetByIdAclByUserIdErrors, DeleteApiFleetByIdAclByUserIdResponses, DeleteApiFleetByIdAvatarData, DeleteApiFleetByIdAvatarErrors, DeleteApiFleetByIdAvatarResponses, DeleteApiFleetByIdLibrarySystemByItemData, DeleteApiFleetByIdLibrarySystemByItemErrors, DeleteApiFleetByIdLibrarySystemByItemResponses, DeleteApiReleasesByTagData, DeleteApiReleasesByTagErrors, DeleteApiReleasesByTagResponses, GetApiAuthMeData, GetApiAuthMeErrors, GetApiAuthMeResponses, GetApiAuthSessionsData, GetApiAuthSessionsErrors, GetApiAuthSessionsResponses, GetApiAuthStatusData, GetApiAuthStatusErrors, GetApiAuthStatusResponses, GetApiAuthUsersData, GetApiAuthUsersErrors, GetApiAuthUsersResponses, GetApiClaudeAccountsData, GetApiClaudeAccountsErrors, GetApiClaudeAccountsResponses, GetApiClaudeLoginStatusData, GetApiClaudeLoginStatusErrors, GetApiClaudeLoginStatusResponses, GetApiClaudeUsageData, GetApiClaudeUsageErrors, GetApiClaudeUsageResponses, GetApiEnvKeysByNameData, GetApiEnvKeysByNameErrors, GetApiEnvKeysByNameResponses, GetApiEnvKeysData, GetApiEnvKeysErrors, GetApiEnvKeysResponses, GetApiFeaturesData, GetApiFeaturesErrors, GetApiFeaturesResponses, GetApiFleetByIdAclData, GetApiFleetByIdAclErrors, GetApiFleetByIdAclResponses, GetApiFleetByIdAgentsData, GetApiFleetByIdAgentsErrors, GetApiFleetByIdAgentsResponses, GetApiFleetByIdAvatarData, GetApiFleetByIdAvatarResponses, GetApiFleetByIdBodyByHashData, GetApiFleetByIdBodyByHashErrors, GetApiFleetByIdBodyByHashResponses, GetApiFleetByIdConversationData, GetApiFleetByIdConversationErrors, GetApiFleetByIdConversationResponses, GetApiFleetByIdData, GetApiFleetByIdErrors, GetApiFleetByIdFsData, GetApiFleetByIdFsDescriptionsData, GetApiFleetByIdFsDescriptionsErrors, GetApiFleetByIdFsDescriptionsResponses, GetApiFleetByIdFsDownloadData, GetApiFleetByIdFsDownloadResponses, GetApiFleetByIdFsErrors, GetApiFleetByIdFsPreviewData, GetApiFleetByIdFsPreviewErrors, GetApiFleetByIdFsPreviewResponses, GetApiFleetByIdFsRawData, GetApiFleetByIdFsRawResponses, GetApiFleetByIdFsResponses, GetApiFleetByIdFsSheetData, GetApiFleetByIdFsSheetErrors, GetApiFleetByIdFsSheetResponses, GetApiFleetByIdLibraryData, GetApiFleetByIdLibraryErrors, GetApiFleetByIdLibraryResponses, GetApiFleetByIdLibrarySystemByItemData, GetApiFleetByIdLibrarySystemByItemErrors, GetApiFleetByIdLibrarySystemByItemResponses, GetApiFleetByIdMetaData, GetApiFleetByIdMetaErrors, GetApiFleetByIdMetaResponses, GetApiFleetByIdMetricsData, GetApiFleetByIdMetricsErrors, GetApiFleetByIdMetricsResponses, GetApiFleetByIdResponses, GetApiFleetByIdUsageData, GetApiFleetByIdUsageErrors, GetApiFleetByIdUsageResponses, GetApiFleetByIdVitalsData, GetApiFleetByIdVitalsErrors, GetApiFleetByIdVitalsResponses, GetApiFleetsData, GetApiFleetsErrors, GetApiFleetsMetaData, GetApiFleetsMetaErrors, GetApiFleetsMetaResponses, GetApiFleetsResponses, GetApiFleetsRetiredData, GetApiFleetsRetiredErrors, GetApiFleetsRetiredResponses, GetApiHealthData, GetApiHealthErrors, GetApiHealthResponses, GetApiItCaCrtData, GetApiItCaCrtResponses, GetApiItCaFingerprintData, GetApiItCaFingerprintErrors, GetApiItCaFingerprintResponses, GetApiItIdentityData, GetApiItIdentityErrors, GetApiItIdentityResponses, GetApiItNetworkData, GetApiItNetworkErrors, GetApiItNetworkResponses, GetApiItProvisionedData, GetApiItProvisionedErrors, GetApiItProvisionedResponses, GetApiMetricsData, GetApiMetricsErrors, GetApiMetricsResponses, GetApiProvidersData, GetApiProvidersErrors, GetApiProvidersResponses, GetApiReleasesData, GetApiReleasesErrors, GetApiReleasesResponses, GetApiSettingsData, GetApiSettingsErrors, GetApiSettingsResponses, GetApiUpdateStatusData, GetApiUpdateStatusErrors, GetApiUpdateStatusResponses, GetApiVaultSnapshotData, GetApiVaultSnapshotErrors, GetApiVaultSnapshotResponses, PatchApiAuthMeData, PatchApiAuthMeErrors, PatchApiAuthMeResponses, PatchApiFleetByIdAclByUserIdData, PatchApiFleetByIdAclByUserIdErrors, PatchApiFleetByIdAclByUserIdResponses, PostApiAuthLoginData, PostApiAuthLoginErrors, PostApiAuthLoginResponses, PostApiAuthLogoutData, PostApiAuthLogoutErrors, PostApiAuthLogoutResponses, PostApiAuthPasswordData, PostApiAuthPasswordErrors, PostApiAuthPasswordResponses, PostApiAuthRegisterData, PostApiAuthRegisterErrors, PostApiAuthRegisterResponses, PostApiAuthUsersByUserIdLogoutData, PostApiAuthUsersByUserIdLogoutErrors, PostApiAuthUsersByUserIdLogoutResponses, PostApiAuthUsersData, PostApiAuthUsersErrors, PostApiAuthUsersResponses, PostApiClaudeAccountsStoreData, PostApiClaudeAccountsStoreErrors, PostApiClaudeAccountsStoreResponses, PostApiClaudeAccountsSwitchData, PostApiClaudeAccountsSwitchErrors, PostApiClaudeAccountsSwitchResponses, PostApiClaudeLoginCompleteData, PostApiClaudeLoginCompleteErrors, PostApiClaudeLoginCompleteResponses, PostApiClaudeLoginRefreshData, PostApiClaudeLoginRefreshErrors, PostApiClaudeLoginRefreshResponses, PostApiClaudeLoginStartData, PostApiClaudeLoginStartErrors, PostApiClaudeLoginStartResponses, PostApiFleetByIdAclData, PostApiFleetByIdAclErrors, PostApiFleetByIdAclResponses, PostApiFleetByIdAvatarData, PostApiFleetByIdAvatarErrors, PostApiFleetByIdAvatarResponses, PostApiFleetByIdCommandData, PostApiFleetByIdCommandErrors, PostApiFleetByIdCommandResponses, PostApiFleetByIdConversationsSearchData, PostApiFleetByIdConversationsSearchErrors, PostApiFleetByIdConversationsSearchResponses, PostApiFleetByIdFsMkdirData, PostApiFleetByIdFsMkdirErrors, PostApiFleetByIdFsMkdirResponses, PostApiFleetByIdFsMoveData, PostApiFleetByIdFsMoveErrors, PostApiFleetByIdFsMoveResponses, PostApiFleetByIdFsRenameData, PostApiFleetByIdFsRenameErrors, PostApiFleetByIdFsRenameResponses, PostApiFleetByIdFsSheetSaveData, PostApiFleetByIdFsSheetSaveErrors, PostApiFleetByIdFsSheetSaveResponses, PostApiFleetByIdFsTrashData, PostApiFleetByIdFsTrashErrors, PostApiFleetByIdFsTrashResponses, PostApiFleetByIdFsUploadData, PostApiFleetByIdFsUploadErrors, PostApiFleetByIdFsUploadResponses, PostApiFleetByIdFsUploadUniqueData, PostApiFleetByIdFsUploadUniqueErrors, PostApiFleetByIdFsUploadUniqueResponses, PostApiFleetByIdFsWriteData, PostApiFleetByIdFsWriteErrors, PostApiFleetByIdFsWriteResponses, PostApiFleetByIdLibraryCommandData, PostApiFleetByIdLibraryCommandErrors, PostApiFleetByIdLibraryCommandResponses, PostApiFleetByIdRenameData, PostApiFleetByIdRenameErrors, PostApiFleetByIdRenameResponses, PostApiFleetByIdRestartData, PostApiFleetByIdRestartErrors, PostApiFleetByIdRestartResponses, PostApiFleetByIdRetireData, PostApiFleetByIdRetireErrors, PostApiFleetByIdRetireResponses, PostApiFleetByIdUnretireData, PostApiFleetByIdUnretireErrors, PostApiFleetByIdUnretireResponses, PostApiFleetsCreateData, PostApiFleetsCreateErrors, PostApiFleetsCreateResponses, PostApiItIdentityData, PostApiItIdentityErrors, PostApiItIdentityResponses, PostApiItNetworkApData, PostApiItNetworkApErrors, PostApiItNetworkApResponses, PostApiItNetworkModeData, PostApiItNetworkModeErrors, PostApiItNetworkModeResponses, PostApiItNetworkWwanData, PostApiItNetworkWwanErrors, PostApiItNetworkWwanResponses, PostApiReleasesDeployData, PostApiReleasesDeployErrors, PostApiReleasesDeployResponses, PostApiReleasesDownloadData, PostApiReleasesDownloadErrors, PostApiReleasesDownloadResponses, PostApiReleasesRestartOrchestratorData, PostApiReleasesRestartOrchestratorErrors, PostApiReleasesRestartOrchestratorResponses, PostApiSettingsData, PostApiSettingsErrors, PostApiSettingsResponses, PostApiTicketData, PostApiTicketErrors, PostApiTicketResponses, PostApiUpdateApplyData, PostApiUpdateApplyErrors, PostApiUpdateApplyResponses, PostApiUpdateCheckData, PostApiUpdateCheckErrors, PostApiUpdateCheckResponses, PutApiEnvKeysByNameData, PutApiEnvKeysByNameErrors, PutApiEnvKeysByNameResponses, PutApiFleetByIdLibraryCommandByItemData, PutApiFleetByIdLibraryCommandByItemErrors, PutApiFleetByIdLibraryCommandByItemResponses, PutApiFleetByIdLibrarySystemByItemData, PutApiFleetByIdLibrarySystemByItemErrors, PutApiFleetByIdLibrarySystemByItemResponses, PutApiReleasesArchData, PutApiReleasesArchErrors, PutApiReleasesArchResponses, PutApiReleasesSelectData, PutApiReleasesSelectErrors, PutApiReleasesSelectResponses, PutApiUpdateModeData, PutApiUpdateModeErrors, PutApiUpdateModeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,308 +18,6 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
-
-/**
- * Raw agent view (rev-envelope)
- */
-export const getApiAgentById = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdData, ThrowOnError>): RequestResult<GetApiAgentByIdResponses, GetApiAgentByIdErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdResponses, GetApiAgentByIdErrors, ThrowOnError>({ url: '/api/agent/{id}', ...options });
-
-/**
- * List agent ACL
- */
-export const getApiAgentByIdAcl = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdAclData, ThrowOnError>): RequestResult<GetApiAgentByIdAclResponses, GetApiAgentByIdAclErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdAclResponses, GetApiAgentByIdAclErrors, ThrowOnError>({ url: '/api/agent/{id}/acl', ...options });
-
-/**
- * Grant agent access
- */
-export const postApiAgentByIdAcl = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdAclData, ThrowOnError>): RequestResult<PostApiAgentByIdAclResponses, PostApiAgentByIdAclErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdAclResponses, PostApiAgentByIdAclErrors, ThrowOnError>({
-    url: '/api/agent/{id}/acl',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Revoke agent access
- */
-export const deleteApiAgentByIdAclByUserId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiAgentByIdAclByUserIdData, ThrowOnError>): RequestResult<DeleteApiAgentByIdAclByUserIdResponses, DeleteApiAgentByIdAclByUserIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiAgentByIdAclByUserIdResponses, DeleteApiAgentByIdAclByUserIdErrors, ThrowOnError>({ url: '/api/agent/{id}/acl/{userId}', ...options });
-
-/**
- * Update agent role
- */
-export const patchApiAgentByIdAclByUserId = <ThrowOnError extends boolean = false>(options: Options<PatchApiAgentByIdAclByUserIdData, ThrowOnError>): RequestResult<PatchApiAgentByIdAclByUserIdResponses, PatchApiAgentByIdAclByUserIdErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiAgentByIdAclByUserIdResponses, PatchApiAgentByIdAclByUserIdErrors, ThrowOnError>({
-    url: '/api/agent/{id}/acl/{userId}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Delete avatar
- */
-export const deleteApiAgentByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<DeleteApiAgentByIdAvatarData, ThrowOnError>): RequestResult<DeleteApiAgentByIdAvatarResponses, DeleteApiAgentByIdAvatarErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiAgentByIdAvatarResponses, DeleteApiAgentByIdAvatarErrors, ThrowOnError>({ url: '/api/agent/{id}/avatar', ...options });
-
-/**
- * Get agent avatar image
- */
-export const getApiAgentByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdAvatarData, ThrowOnError>): RequestResult<GetApiAgentByIdAvatarResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdAvatarResponses, unknown, ThrowOnError>({ url: '/api/agent/{id}/avatar', ...options });
-
-/**
- * Upload avatar
- */
-export const postApiAgentByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdAvatarData, ThrowOnError>): RequestResult<PostApiAgentByIdAvatarResponses, PostApiAgentByIdAvatarErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdAvatarResponses, PostApiAgentByIdAvatarErrors, ThrowOnError>({
-    bodySerializer: null,
-    url: '/api/agent/{id}/avatar',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Hydrate content body
- */
-export const getApiAgentByIdBodyByHash = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdBodyByHashData, ThrowOnError>): RequestResult<GetApiAgentByIdBodyByHashResponses, GetApiAgentByIdBodyByHashErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdBodyByHashResponses, GetApiAgentByIdBodyByHashErrors, ThrowOnError>({ url: '/api/agent/{id}/body/{hash}', ...options });
-
-/**
- * Send command to agent
- */
-export const postApiAgentByIdCommand = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdCommandData, ThrowOnError>): RequestResult<PostApiAgentByIdCommandResponses, PostApiAgentByIdCommandErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdCommandResponses, PostApiAgentByIdCommandErrors, ThrowOnError>({
-    url: '/api/agent/{id}/command',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Conversation feed
- */
-export const getApiAgentByIdConversation = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdConversationData, ThrowOnError>): RequestResult<GetApiAgentByIdConversationResponses, GetApiAgentByIdConversationErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdConversationResponses, GetApiAgentByIdConversationErrors, ThrowOnError>({ url: '/api/agent/{id}/conversation', ...options });
-
-/**
- * Hybrid conversation search
- */
-export const postApiAgentByIdConversationsSearch = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdConversationsSearchData, ThrowOnError>): RequestResult<PostApiAgentByIdConversationsSearchResponses, PostApiAgentByIdConversationsSearchErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdConversationsSearchResponses, PostApiAgentByIdConversationsSearchErrors, ThrowOnError>({
-    url: '/api/agent/{id}/conversations/search',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * List directory
- */
-export const getApiAgentByIdFs = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsData, ThrowOnError>): RequestResult<GetApiAgentByIdFsResponses, GetApiAgentByIdFsErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsResponses, GetApiAgentByIdFsErrors, ThrowOnError>({ url: '/api/agent/{id}/fs', ...options });
-
-/**
- * File/folder descriptions
- */
-export const getApiAgentByIdFsDescriptions = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsDescriptionsData, ThrowOnError>): RequestResult<GetApiAgentByIdFsDescriptionsResponses, GetApiAgentByIdFsDescriptionsErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsDescriptionsResponses, GetApiAgentByIdFsDescriptionsErrors, ThrowOnError>({ url: '/api/agent/{id}/fs/descriptions', ...options });
-
-/**
- * Download file or folder
- */
-export const getApiAgentByIdFsDownload = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsDownloadData, ThrowOnError>): RequestResult<GetApiAgentByIdFsDownloadResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsDownloadResponses, unknown, ThrowOnError>({ url: '/api/agent/{id}/fs/download', ...options });
-
-/**
- * Create folder
- */
-export const postApiAgentByIdFsMkdir = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsMkdirData, ThrowOnError>): RequestResult<PostApiAgentByIdFsMkdirResponses, PostApiAgentByIdFsMkdirErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsMkdirResponses, PostApiAgentByIdFsMkdirErrors, ThrowOnError>({ url: '/api/agent/{id}/fs/mkdir', ...options });
-
-/**
- * Move items
- */
-export const postApiAgentByIdFsMove = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsMoveData, ThrowOnError>): RequestResult<PostApiAgentByIdFsMoveResponses, PostApiAgentByIdFsMoveErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsMoveResponses, PostApiAgentByIdFsMoveErrors, ThrowOnError>({
-    url: '/api/agent/{id}/fs/move',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Text preview
- */
-export const getApiAgentByIdFsPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsPreviewData, ThrowOnError>): RequestResult<GetApiAgentByIdFsPreviewResponses, GetApiAgentByIdFsPreviewErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsPreviewResponses, GetApiAgentByIdFsPreviewErrors, ThrowOnError>({ url: '/api/agent/{id}/fs/preview', ...options });
-
-/**
- * Inline raw file (image/PDF preview)
- */
-export const getApiAgentByIdFsRaw = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsRawData, ThrowOnError>): RequestResult<GetApiAgentByIdFsRawResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsRawResponses, unknown, ThrowOnError>({ url: '/api/agent/{id}/fs/raw', ...options });
-
-/**
- * Rename item
- */
-export const postApiAgentByIdFsRename = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsRenameData, ThrowOnError>): RequestResult<PostApiAgentByIdFsRenameResponses, PostApiAgentByIdFsRenameErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsRenameResponses, PostApiAgentByIdFsRenameErrors, ThrowOnError>({ url: '/api/agent/{id}/fs/rename', ...options });
-
-/**
- * Spreadsheet data
- */
-export const getApiAgentByIdFsSheet = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdFsSheetData, ThrowOnError>): RequestResult<GetApiAgentByIdFsSheetResponses, GetApiAgentByIdFsSheetErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdFsSheetResponses, GetApiAgentByIdFsSheetErrors, ThrowOnError>({ url: '/api/agent/{id}/fs/sheet', ...options });
-
-/**
- * Trash items
- */
-export const postApiAgentByIdFsTrash = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsTrashData, ThrowOnError>): RequestResult<PostApiAgentByIdFsTrashResponses, PostApiAgentByIdFsTrashErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsTrashResponses, PostApiAgentByIdFsTrashErrors, ThrowOnError>({
-    url: '/api/agent/{id}/fs/trash',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Upload file
- */
-export const postApiAgentByIdFsUpload = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsUploadData, ThrowOnError>): RequestResult<PostApiAgentByIdFsUploadResponses, PostApiAgentByIdFsUploadErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsUploadResponses, PostApiAgentByIdFsUploadErrors, ThrowOnError>({
-    bodySerializer: null,
-    url: '/api/agent/{id}/fs/upload',
-    ...options,
-    headers: {
-        'Content-Type': 'application/octet-stream',
-        ...options.headers
-    }
-});
-
-/**
- * Upload file (unique name)
- */
-export const postApiAgentByIdFsUploadUnique = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsUploadUniqueData, ThrowOnError>): RequestResult<PostApiAgentByIdFsUploadUniqueResponses, PostApiAgentByIdFsUploadUniqueErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsUploadUniqueResponses, PostApiAgentByIdFsUploadUniqueErrors, ThrowOnError>({
-    bodySerializer: null,
-    url: '/api/agent/{id}/fs/upload-unique',
-    ...options,
-    headers: {
-        'Content-Type': 'application/octet-stream',
-        ...options.headers
-    }
-});
-
-/**
- * Write file
- */
-export const postApiAgentByIdFsWrite = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdFsWriteData, ThrowOnError>): RequestResult<PostApiAgentByIdFsWriteResponses, PostApiAgentByIdFsWriteErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdFsWriteResponses, PostApiAgentByIdFsWriteErrors, ThrowOnError>({
-    bodySerializer: null,
-    url: '/api/agent/{id}/fs/write',
-    ...options,
-    headers: {
-        'Content-Type': 'text/plain',
-        ...options.headers
-    }
-});
-
-/**
- * Prompt library
- */
-export const getApiAgentByIdLibrary = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdLibraryData, ThrowOnError>): RequestResult<GetApiAgentByIdLibraryResponses, GetApiAgentByIdLibraryErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdLibraryResponses, GetApiAgentByIdLibraryErrors, ThrowOnError>({ url: '/api/agent/{id}/library', ...options });
-
-/**
- * Delete behaviour agent override
- */
-export const deleteApiAgentByIdLibraryAgentByItem = <ThrowOnError extends boolean = false>(options: Options<DeleteApiAgentByIdLibraryAgentByItemData, ThrowOnError>): RequestResult<DeleteApiAgentByIdLibraryAgentByItemResponses, DeleteApiAgentByIdLibraryAgentByItemErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiAgentByIdLibraryAgentByItemResponses, DeleteApiAgentByIdLibraryAgentByItemErrors, ThrowOnError>({ url: '/api/agent/{id}/library/agent/{item}', ...options });
-
-/**
- * Read behaviour agent raw
- */
-export const getApiAgentByIdLibraryAgentByItem = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdLibraryAgentByItemData, ThrowOnError>): RequestResult<GetApiAgentByIdLibraryAgentByItemResponses, GetApiAgentByIdLibraryAgentByItemErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdLibraryAgentByItemResponses, GetApiAgentByIdLibraryAgentByItemErrors, ThrowOnError>({ url: '/api/agent/{id}/library/agent/{item}', ...options });
-
-/**
- * Create or override behaviour agent
- */
-export const putApiAgentByIdLibraryAgentByItem = <ThrowOnError extends boolean = false>(options: Options<PutApiAgentByIdLibraryAgentByItemData, ThrowOnError>): RequestResult<PutApiAgentByIdLibraryAgentByItemResponses, PutApiAgentByIdLibraryAgentByItemErrors, ThrowOnError> => (options.client ?? client).put<PutApiAgentByIdLibraryAgentByItemResponses, PutApiAgentByIdLibraryAgentByItemErrors, ThrowOnError>({
-    url: '/api/agent/{id}/library/agent/{item}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Create command
- */
-export const postApiAgentByIdLibraryCommand = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdLibraryCommandData, ThrowOnError>): RequestResult<PostApiAgentByIdLibraryCommandResponses, PostApiAgentByIdLibraryCommandErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdLibraryCommandResponses, PostApiAgentByIdLibraryCommandErrors, ThrowOnError>({
-    url: '/api/agent/{id}/library/command',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Create or overwrite a command
- */
-export const putApiAgentByIdLibraryCommandByItem = <ThrowOnError extends boolean = false>(options: Options<PutApiAgentByIdLibraryCommandByItemData, ThrowOnError>): RequestResult<PutApiAgentByIdLibraryCommandByItemResponses, PutApiAgentByIdLibraryCommandByItemErrors, ThrowOnError> => (options.client ?? client).put<PutApiAgentByIdLibraryCommandByItemResponses, PutApiAgentByIdLibraryCommandByItemErrors, ThrowOnError>({
-    url: '/api/agent/{id}/library/command/{item}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Agent enriched info
- */
-export const getApiAgentByIdMeta = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdMetaData, ThrowOnError>): RequestResult<GetApiAgentByIdMetaResponses, GetApiAgentByIdMetaErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdMetaResponses, GetApiAgentByIdMetaErrors, ThrowOnError>({ url: '/api/agent/{id}/meta', ...options });
-
-/**
- * Agent metrics
- */
-export const getApiAgentByIdMetrics = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdMetricsData, ThrowOnError>): RequestResult<GetApiAgentByIdMetricsResponses, GetApiAgentByIdMetricsErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdMetricsResponses, GetApiAgentByIdMetricsErrors, ThrowOnError>({ url: '/api/agent/{id}/metrics', ...options });
-
-/**
- * Rename agent
- */
-export const postApiAgentByIdRename = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdRenameData, ThrowOnError>): RequestResult<PostApiAgentByIdRenameResponses, PostApiAgentByIdRenameErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdRenameResponses, PostApiAgentByIdRenameErrors, ThrowOnError>({
-    url: '/api/agent/{id}/rename',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Restart agent
- */
-export const postApiAgentByIdRestart = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdRestartData, ThrowOnError>): RequestResult<PostApiAgentByIdRestartResponses, PostApiAgentByIdRestartErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdRestartResponses, PostApiAgentByIdRestartErrors, ThrowOnError>({ url: '/api/agent/{id}/restart', ...options });
-
-/**
- * Retire agent
- */
-export const postApiAgentByIdRetire = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdRetireData, ThrowOnError>): RequestResult<PostApiAgentByIdRetireResponses, PostApiAgentByIdRetireErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdRetireResponses, PostApiAgentByIdRetireErrors, ThrowOnError>({ url: '/api/agent/{id}/retire', ...options });
-
-/**
- * Agent threads + conversation
- */
-export const getApiAgentByIdThreads = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdThreadsData, ThrowOnError>): RequestResult<GetApiAgentByIdThreadsResponses, GetApiAgentByIdThreadsErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdThreadsResponses, GetApiAgentByIdThreadsErrors, ThrowOnError>({ url: '/api/agent/{id}/threads', ...options });
-
-/**
- * Unretire agent
- */
-export const postApiAgentByIdUnretire = <ThrowOnError extends boolean = false>(options: Options<PostApiAgentByIdUnretireData, ThrowOnError>): RequestResult<PostApiAgentByIdUnretireResponses, PostApiAgentByIdUnretireErrors, ThrowOnError> => (options.client ?? client).post<PostApiAgentByIdUnretireResponses, PostApiAgentByIdUnretireErrors, ThrowOnError>({ url: '/api/agent/{id}/unretire', ...options });
-
-/**
- * Usage analytics
- */
-export const getApiAgentByIdUsage = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdUsageData, ThrowOnError>): RequestResult<GetApiAgentByIdUsageResponses, GetApiAgentByIdUsageErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdUsageResponses, GetApiAgentByIdUsageErrors, ThrowOnError>({ url: '/api/agent/{id}/usage', ...options });
-
-/**
- * Agent service vitals
- */
-export const getApiAgentByIdVitals = <ThrowOnError extends boolean = false>(options: Options<GetApiAgentByIdVitalsData, ThrowOnError>): RequestResult<GetApiAgentByIdVitalsResponses, GetApiAgentByIdVitalsErrors, ThrowOnError> => (options.client ?? client).get<GetApiAgentByIdVitalsResponses, GetApiAgentByIdVitalsErrors, ThrowOnError>({ url: '/api/agent/{id}/vitals', ...options });
 
 /**
  * Login
@@ -508,15 +206,329 @@ export const putApiEnvKeysByName = <ThrowOnError extends boolean = false>(option
 export const getApiFeatures = <ThrowOnError extends boolean = false>(options?: Options<GetApiFeaturesData, ThrowOnError>): RequestResult<GetApiFeaturesResponses, GetApiFeaturesErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFeaturesResponses, GetApiFeaturesErrors, ThrowOnError>({ url: '/api/features', ...options });
 
 /**
+ * Raw agent view (rev-envelope)
+ */
+export const getApiFleetById = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdData, ThrowOnError>): RequestResult<GetApiFleetByIdResponses, GetApiFleetByIdErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdResponses, GetApiFleetByIdErrors, ThrowOnError>({ url: '/api/fleet/{id}', ...options });
+
+/**
+ * List agent ACL
+ */
+export const getApiFleetByIdAcl = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdAclData, ThrowOnError>): RequestResult<GetApiFleetByIdAclResponses, GetApiFleetByIdAclErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdAclResponses, GetApiFleetByIdAclErrors, ThrowOnError>({ url: '/api/fleet/{id}/acl', ...options });
+
+/**
+ * Grant agent access
+ */
+export const postApiFleetByIdAcl = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdAclData, ThrowOnError>): RequestResult<PostApiFleetByIdAclResponses, PostApiFleetByIdAclErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdAclResponses, PostApiFleetByIdAclErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/acl',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revoke agent access
+ */
+export const deleteApiFleetByIdAclByUserId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiFleetByIdAclByUserIdData, ThrowOnError>): RequestResult<DeleteApiFleetByIdAclByUserIdResponses, DeleteApiFleetByIdAclByUserIdErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiFleetByIdAclByUserIdResponses, DeleteApiFleetByIdAclByUserIdErrors, ThrowOnError>({ url: '/api/fleet/{id}/acl/{userId}', ...options });
+
+/**
+ * Update agent role
+ */
+export const patchApiFleetByIdAclByUserId = <ThrowOnError extends boolean = false>(options: Options<PatchApiFleetByIdAclByUserIdData, ThrowOnError>): RequestResult<PatchApiFleetByIdAclByUserIdResponses, PatchApiFleetByIdAclByUserIdErrors, ThrowOnError> => (options.client ?? client).patch<PatchApiFleetByIdAclByUserIdResponses, PatchApiFleetByIdAclByUserIdErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/acl/{userId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Fleet agents + conversation
+ */
+export const getApiFleetByIdAgents = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdAgentsData, ThrowOnError>): RequestResult<GetApiFleetByIdAgentsResponses, GetApiFleetByIdAgentsErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdAgentsResponses, GetApiFleetByIdAgentsErrors, ThrowOnError>({ url: '/api/fleet/{id}/agents', ...options });
+
+/**
+ * Delete avatar
+ */
+export const deleteApiFleetByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<DeleteApiFleetByIdAvatarData, ThrowOnError>): RequestResult<DeleteApiFleetByIdAvatarResponses, DeleteApiFleetByIdAvatarErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiFleetByIdAvatarResponses, DeleteApiFleetByIdAvatarErrors, ThrowOnError>({ url: '/api/fleet/{id}/avatar', ...options });
+
+/**
+ * Get agent avatar image
+ */
+export const getApiFleetByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdAvatarData, ThrowOnError>): RequestResult<GetApiFleetByIdAvatarResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdAvatarResponses, unknown, ThrowOnError>({ url: '/api/fleet/{id}/avatar', ...options });
+
+/**
+ * Upload avatar
+ */
+export const postApiFleetByIdAvatar = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdAvatarData, ThrowOnError>): RequestResult<PostApiFleetByIdAvatarResponses, PostApiFleetByIdAvatarErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdAvatarResponses, PostApiFleetByIdAvatarErrors, ThrowOnError>({
+    bodySerializer: null,
+    url: '/api/fleet/{id}/avatar',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Hydrate content body
+ */
+export const getApiFleetByIdBodyByHash = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdBodyByHashData, ThrowOnError>): RequestResult<GetApiFleetByIdBodyByHashResponses, GetApiFleetByIdBodyByHashErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdBodyByHashResponses, GetApiFleetByIdBodyByHashErrors, ThrowOnError>({ url: '/api/fleet/{id}/body/{hash}', ...options });
+
+/**
+ * Send command to agent
+ */
+export const postApiFleetByIdCommand = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdCommandData, ThrowOnError>): RequestResult<PostApiFleetByIdCommandResponses, PostApiFleetByIdCommandErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdCommandResponses, PostApiFleetByIdCommandErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/command',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Conversation feed
+ */
+export const getApiFleetByIdConversation = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdConversationData, ThrowOnError>): RequestResult<GetApiFleetByIdConversationResponses, GetApiFleetByIdConversationErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdConversationResponses, GetApiFleetByIdConversationErrors, ThrowOnError>({ url: '/api/fleet/{id}/conversation', ...options });
+
+/**
+ * Hybrid conversation search
+ */
+export const postApiFleetByIdConversationsSearch = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdConversationsSearchData, ThrowOnError>): RequestResult<PostApiFleetByIdConversationsSearchResponses, PostApiFleetByIdConversationsSearchErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdConversationsSearchResponses, PostApiFleetByIdConversationsSearchErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/conversations/search',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List directory
+ */
+export const getApiFleetByIdFs = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsData, ThrowOnError>): RequestResult<GetApiFleetByIdFsResponses, GetApiFleetByIdFsErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsResponses, GetApiFleetByIdFsErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs', ...options });
+
+/**
+ * File/folder descriptions
+ */
+export const getApiFleetByIdFsDescriptions = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsDescriptionsData, ThrowOnError>): RequestResult<GetApiFleetByIdFsDescriptionsResponses, GetApiFleetByIdFsDescriptionsErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsDescriptionsResponses, GetApiFleetByIdFsDescriptionsErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs/descriptions', ...options });
+
+/**
+ * Download file or folder
+ */
+export const getApiFleetByIdFsDownload = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsDownloadData, ThrowOnError>): RequestResult<GetApiFleetByIdFsDownloadResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsDownloadResponses, unknown, ThrowOnError>({ url: '/api/fleet/{id}/fs/download', ...options });
+
+/**
+ * Create folder
+ */
+export const postApiFleetByIdFsMkdir = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsMkdirData, ThrowOnError>): RequestResult<PostApiFleetByIdFsMkdirResponses, PostApiFleetByIdFsMkdirErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsMkdirResponses, PostApiFleetByIdFsMkdirErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs/mkdir', ...options });
+
+/**
+ * Move items
+ */
+export const postApiFleetByIdFsMove = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsMoveData, ThrowOnError>): RequestResult<PostApiFleetByIdFsMoveResponses, PostApiFleetByIdFsMoveErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsMoveResponses, PostApiFleetByIdFsMoveErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/fs/move',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Text preview
+ */
+export const getApiFleetByIdFsPreview = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsPreviewData, ThrowOnError>): RequestResult<GetApiFleetByIdFsPreviewResponses, GetApiFleetByIdFsPreviewErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsPreviewResponses, GetApiFleetByIdFsPreviewErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs/preview', ...options });
+
+/**
+ * Inline raw file (image/PDF preview)
+ */
+export const getApiFleetByIdFsRaw = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsRawData, ThrowOnError>): RequestResult<GetApiFleetByIdFsRawResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsRawResponses, unknown, ThrowOnError>({ url: '/api/fleet/{id}/fs/raw', ...options });
+
+/**
+ * Rename item
+ */
+export const postApiFleetByIdFsRename = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsRenameData, ThrowOnError>): RequestResult<PostApiFleetByIdFsRenameResponses, PostApiFleetByIdFsRenameErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsRenameResponses, PostApiFleetByIdFsRenameErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs/rename', ...options });
+
+/**
+ * Spreadsheet data
+ */
+export const getApiFleetByIdFsSheet = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdFsSheetData, ThrowOnError>): RequestResult<GetApiFleetByIdFsSheetResponses, GetApiFleetByIdFsSheetErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdFsSheetResponses, GetApiFleetByIdFsSheetErrors, ThrowOnError>({ url: '/api/fleet/{id}/fs/sheet', ...options });
+
+/**
+ * Save spreadsheet edits (patches the original xlsx/xlsm)
+ */
+export const postApiFleetByIdFsSheetSave = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsSheetSaveData, ThrowOnError>): RequestResult<PostApiFleetByIdFsSheetSaveResponses, PostApiFleetByIdFsSheetSaveErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsSheetSaveResponses, PostApiFleetByIdFsSheetSaveErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/fs/sheet/save',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Trash items
+ */
+export const postApiFleetByIdFsTrash = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsTrashData, ThrowOnError>): RequestResult<PostApiFleetByIdFsTrashResponses, PostApiFleetByIdFsTrashErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsTrashResponses, PostApiFleetByIdFsTrashErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/fs/trash',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Upload file
+ */
+export const postApiFleetByIdFsUpload = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsUploadData, ThrowOnError>): RequestResult<PostApiFleetByIdFsUploadResponses, PostApiFleetByIdFsUploadErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsUploadResponses, PostApiFleetByIdFsUploadErrors, ThrowOnError>({
+    bodySerializer: null,
+    url: '/api/fleet/{id}/fs/upload',
+    ...options,
+    headers: {
+        'Content-Type': 'application/octet-stream',
+        ...options.headers
+    }
+});
+
+/**
+ * Upload file (unique name)
+ */
+export const postApiFleetByIdFsUploadUnique = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsUploadUniqueData, ThrowOnError>): RequestResult<PostApiFleetByIdFsUploadUniqueResponses, PostApiFleetByIdFsUploadUniqueErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsUploadUniqueResponses, PostApiFleetByIdFsUploadUniqueErrors, ThrowOnError>({
+    bodySerializer: null,
+    url: '/api/fleet/{id}/fs/upload-unique',
+    ...options,
+    headers: {
+        'Content-Type': 'application/octet-stream',
+        ...options.headers
+    }
+});
+
+/**
+ * Write file
+ */
+export const postApiFleetByIdFsWrite = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdFsWriteData, ThrowOnError>): RequestResult<PostApiFleetByIdFsWriteResponses, PostApiFleetByIdFsWriteErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdFsWriteResponses, PostApiFleetByIdFsWriteErrors, ThrowOnError>({
+    bodySerializer: null,
+    url: '/api/fleet/{id}/fs/write',
+    ...options,
+    headers: {
+        'Content-Type': 'text/plain',
+        ...options.headers
+    }
+});
+
+/**
+ * Prompt library
+ */
+export const getApiFleetByIdLibrary = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdLibraryData, ThrowOnError>): RequestResult<GetApiFleetByIdLibraryResponses, GetApiFleetByIdLibraryErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdLibraryResponses, GetApiFleetByIdLibraryErrors, ThrowOnError>({ url: '/api/fleet/{id}/library', ...options });
+
+/**
+ * Create command
+ */
+export const postApiFleetByIdLibraryCommand = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdLibraryCommandData, ThrowOnError>): RequestResult<PostApiFleetByIdLibraryCommandResponses, PostApiFleetByIdLibraryCommandErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdLibraryCommandResponses, PostApiFleetByIdLibraryCommandErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/library/command',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Create or overwrite a command
+ */
+export const putApiFleetByIdLibraryCommandByItem = <ThrowOnError extends boolean = false>(options: Options<PutApiFleetByIdLibraryCommandByItemData, ThrowOnError>): RequestResult<PutApiFleetByIdLibraryCommandByItemResponses, PutApiFleetByIdLibraryCommandByItemErrors, ThrowOnError> => (options.client ?? client).put<PutApiFleetByIdLibraryCommandByItemResponses, PutApiFleetByIdLibraryCommandByItemErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/library/command/{item}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete behaviour system override
+ */
+export const deleteApiFleetByIdLibrarySystemByItem = <ThrowOnError extends boolean = false>(options: Options<DeleteApiFleetByIdLibrarySystemByItemData, ThrowOnError>): RequestResult<DeleteApiFleetByIdLibrarySystemByItemResponses, DeleteApiFleetByIdLibrarySystemByItemErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiFleetByIdLibrarySystemByItemResponses, DeleteApiFleetByIdLibrarySystemByItemErrors, ThrowOnError>({ url: '/api/fleet/{id}/library/system/{item}', ...options });
+
+/**
+ * Read behaviour system raw
+ */
+export const getApiFleetByIdLibrarySystemByItem = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdLibrarySystemByItemData, ThrowOnError>): RequestResult<GetApiFleetByIdLibrarySystemByItemResponses, GetApiFleetByIdLibrarySystemByItemErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdLibrarySystemByItemResponses, GetApiFleetByIdLibrarySystemByItemErrors, ThrowOnError>({ url: '/api/fleet/{id}/library/system/{item}', ...options });
+
+/**
+ * Create or override behaviour system
+ */
+export const putApiFleetByIdLibrarySystemByItem = <ThrowOnError extends boolean = false>(options: Options<PutApiFleetByIdLibrarySystemByItemData, ThrowOnError>): RequestResult<PutApiFleetByIdLibrarySystemByItemResponses, PutApiFleetByIdLibrarySystemByItemErrors, ThrowOnError> => (options.client ?? client).put<PutApiFleetByIdLibrarySystemByItemResponses, PutApiFleetByIdLibrarySystemByItemErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/library/system/{item}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Agent enriched info
+ */
+export const getApiFleetByIdMeta = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdMetaData, ThrowOnError>): RequestResult<GetApiFleetByIdMetaResponses, GetApiFleetByIdMetaErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdMetaResponses, GetApiFleetByIdMetaErrors, ThrowOnError>({ url: '/api/fleet/{id}/meta', ...options });
+
+/**
+ * Agent metrics
+ */
+export const getApiFleetByIdMetrics = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdMetricsData, ThrowOnError>): RequestResult<GetApiFleetByIdMetricsResponses, GetApiFleetByIdMetricsErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdMetricsResponses, GetApiFleetByIdMetricsErrors, ThrowOnError>({ url: '/api/fleet/{id}/metrics', ...options });
+
+/**
+ * Rename agent
+ */
+export const postApiFleetByIdRename = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdRenameData, ThrowOnError>): RequestResult<PostApiFleetByIdRenameResponses, PostApiFleetByIdRenameErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdRenameResponses, PostApiFleetByIdRenameErrors, ThrowOnError>({
+    url: '/api/fleet/{id}/rename',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Restart agent
+ */
+export const postApiFleetByIdRestart = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdRestartData, ThrowOnError>): RequestResult<PostApiFleetByIdRestartResponses, PostApiFleetByIdRestartErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdRestartResponses, PostApiFleetByIdRestartErrors, ThrowOnError>({ url: '/api/fleet/{id}/restart', ...options });
+
+/**
+ * Retire agent
+ */
+export const postApiFleetByIdRetire = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdRetireData, ThrowOnError>): RequestResult<PostApiFleetByIdRetireResponses, PostApiFleetByIdRetireErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdRetireResponses, PostApiFleetByIdRetireErrors, ThrowOnError>({ url: '/api/fleet/{id}/retire', ...options });
+
+/**
+ * Unretire agent
+ */
+export const postApiFleetByIdUnretire = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetByIdUnretireData, ThrowOnError>): RequestResult<PostApiFleetByIdUnretireResponses, PostApiFleetByIdUnretireErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetByIdUnretireResponses, PostApiFleetByIdUnretireErrors, ThrowOnError>({ url: '/api/fleet/{id}/unretire', ...options });
+
+/**
+ * Usage analytics
+ */
+export const getApiFleetByIdUsage = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdUsageData, ThrowOnError>): RequestResult<GetApiFleetByIdUsageResponses, GetApiFleetByIdUsageErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdUsageResponses, GetApiFleetByIdUsageErrors, ThrowOnError>({ url: '/api/fleet/{id}/usage', ...options });
+
+/**
+ * Agent service vitals
+ */
+export const getApiFleetByIdVitals = <ThrowOnError extends boolean = false>(options: Options<GetApiFleetByIdVitalsData, ThrowOnError>): RequestResult<GetApiFleetByIdVitalsResponses, GetApiFleetByIdVitalsErrors, ThrowOnError> => (options.client ?? client).get<GetApiFleetByIdVitalsResponses, GetApiFleetByIdVitalsErrors, ThrowOnError>({ url: '/api/fleet/{id}/vitals', ...options });
+
+/**
  * Raw fleet view (rev-envelope)
  */
-export const getApiFleet = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetData, ThrowOnError>): RequestResult<GetApiFleetResponses, GetApiFleetErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetResponses, GetApiFleetErrors, ThrowOnError>({ url: '/api/fleet', ...options });
+export const getApiFleets = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetsData, ThrowOnError>): RequestResult<GetApiFleetsResponses, GetApiFleetsErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetsResponses, GetApiFleetsErrors, ThrowOnError>({ url: '/api/fleets', ...options });
 
 /**
  * Create a new agent
  */
-export const postApiFleetCreate = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetCreateData, ThrowOnError>): RequestResult<PostApiFleetCreateResponses, PostApiFleetCreateErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetCreateResponses, PostApiFleetCreateErrors, ThrowOnError>({
-    url: '/api/fleet/create',
+export const postApiFleetsCreate = <ThrowOnError extends boolean = false>(options: Options<PostApiFleetsCreateData, ThrowOnError>): RequestResult<PostApiFleetsCreateResponses, PostApiFleetsCreateErrors, ThrowOnError> => (options.client ?? client).post<PostApiFleetsCreateResponses, PostApiFleetsCreateErrors, ThrowOnError>({
+    url: '/api/fleets/create',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -527,12 +539,12 @@ export const postApiFleetCreate = <ThrowOnError extends boolean = false>(options
 /**
  * List all agents (enriched)
  */
-export const getApiFleetMeta = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetMetaData, ThrowOnError>): RequestResult<GetApiFleetMetaResponses, GetApiFleetMetaErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetMetaResponses, GetApiFleetMetaErrors, ThrowOnError>({ url: '/api/fleet/meta', ...options });
+export const getApiFleetsMeta = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetsMetaData, ThrowOnError>): RequestResult<GetApiFleetsMetaResponses, GetApiFleetsMetaErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetsMetaResponses, GetApiFleetsMetaErrors, ThrowOnError>({ url: '/api/fleets/meta', ...options });
 
 /**
  * List retired agents
  */
-export const getApiFleetRetired = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetRetiredData, ThrowOnError>): RequestResult<GetApiFleetRetiredResponses, GetApiFleetRetiredErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetRetiredResponses, GetApiFleetRetiredErrors, ThrowOnError>({ url: '/api/fleet/retired', ...options });
+export const getApiFleetsRetired = <ThrowOnError extends boolean = false>(options?: Options<GetApiFleetsRetiredData, ThrowOnError>): RequestResult<GetApiFleetsRetiredResponses, GetApiFleetsRetiredErrors, ThrowOnError> => (options?.client ?? client).get<GetApiFleetsRetiredResponses, GetApiFleetsRetiredErrors, ThrowOnError>({ url: '/api/fleets/retired', ...options });
 
 /**
  * Health check

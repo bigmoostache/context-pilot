@@ -70,6 +70,15 @@ pub(crate) const EVENT_POLL_MS: u64 = 8;
 /// Minimum time between renders (ms) - caps at 100fps
 pub(crate) const RENDER_THROTTLE_MS: u64 = 10;
 
+/// Fallback interval between forced full repaints (ms): rewrites every cell so
+/// terminal artifacts the cell diff cannot see get overwritten. Resize forces
+/// one immediately; the timer only catches stray output. Was 1 s, which pushed
+/// a full truecolor screen through the pty every second.
+pub(crate) const FULL_REDRAW_MS: u64 = 30_000;
+
+/// Redraw + snapshot interval of the F12 perf overlay while open (ms) - 30fps
+pub(crate) const PERF_OVERLAY_FRAME_MS: u64 = 33;
+
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub(crate) const PERF_STATS_REFRESH_MS: u64 = 500;
 

@@ -60,15 +60,15 @@ pub(crate) mod render_panel {
             text.iter().map(|line| count_wrapped_lines(line, viewport_width)).sum()
         };
         let max_scroll = content_height.saturating_sub(viewport_height).to_f32();
-        state.max_scroll = max_scroll;
-        state.scroll_offset = state.scroll_offset.clamp(0.0, max_scroll);
+        state.agent_mut().max_scroll = max_scroll;
+        state.agent_mut().scroll_offset = state.agent_mut().scroll_offset.clamp(0.0, max_scroll);
 
         let paragraph = {
             let _guard = crate::profile!("panel::paragraph_new");
             Paragraph::new(text)
                 .style(base_style)
                 .wrap(Wrap { trim: false })
-                .scroll((state.scroll_offset.round().to_u16(), 0))
+                .scroll((state.agent().scroll_offset.round().to_u16(), 0))
         };
 
         {
@@ -410,7 +410,7 @@ use cp_base::panels::now_ms;
 /// overlays. The body content (conversation OR active panel) is built lazily
 /// by the body renderer, so a frame never builds a region it does not draw.
 pub(crate) struct FrameChrome {
-    /// Sidebar IR; `None` when the threads list replaces the body (no sidebar).
+    /// Sidebar IR; `None` when the agents list replaces the body (no sidebar).
     pub sidebar: Option<Sidebar>,
     /// Bottom status bar IR.
     pub status_bar: StatusBar,
@@ -420,7 +420,7 @@ pub(crate) struct FrameChrome {
 
 /// Build the always-painted frame regions from application state.
 ///
-/// Called once per render tick. `with_sidebar` is false when the threads list
+/// Called once per render tick. `with_sidebar` is false when the agents list
 /// owns the body, where the sidebar is never drawn.
 #[must_use]
 pub(crate) fn build_frame(state: &State, with_sidebar: bool) -> FrameChrome {
@@ -453,7 +453,7 @@ pub(crate) fn build_conversation_ir(state: &State) -> cp_render::conversation::C
 /// Returns a [`PanelContent`] with title, blocks, and optional refresh timestamp.
 #[must_use]
 pub(crate) fn build_active_panel(state: &State) -> PanelContent {
-    let context_type = state.context.get(state.selected_context).map_or_else(
+    let context_type = state.agent().context.get(state.agent().selected_context).map_or_else(
         || cp_base::state::context::Kind::new(cp_base::state::context::Kind::CONVERSATION),
         |c| c.context_type.clone(),
     );
@@ -464,17 +464,19 @@ pub(crate) fn build_active_panel(state: &State) -> PanelContent {
 
     // Build "refreshed N ago" for dynamic panels
     let refreshed_ago =
-        state.context.get(state.selected_context).filter(|ctx| !ctx.context_type.is_fixed()).and_then(|ctx| {
-            let ts = ctx.last_refresh_ms;
-            if ts < 1_577_836_800_000 {
-                return None;
-            }
-            let now = now_ms();
-            if now <= ts {
-                return None;
-            }
-            Some(crate::ui::helpers::format_time_ago(now.saturating_sub(ts)))
-        });
+        state.agent().context.get(state.agent().selected_context).filter(|ctx| !ctx.context_type.is_fixed()).and_then(
+            |ctx| {
+                let ts = ctx.last_refresh_ms;
+                if ts < 1_577_836_800_000 {
+                    return None;
+                }
+                let now = now_ms();
+                if now <= ts {
+                    return None;
+                }
+                Some(crate::ui::helpers::format_time_ago(now.saturating_sub(ts)))
+            },
+        );
 
     PanelContent { title, blocks, refreshed_ago }
 }

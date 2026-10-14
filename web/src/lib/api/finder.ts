@@ -8,54 +8,70 @@ import type {
   FinderNode,
   FsPreview,
   SheetData,
+  SheetSaveResult,
   UploadResult,
   UploadUniqueResult,
   WriteResult,
 } from "./generated/types.gen"
 import {
-  getApiAgentByIdFs,
-  getApiAgentByIdFsDescriptions,
-  getApiAgentByIdFsPreview,
-  getApiAgentByIdFsSheet,
-  postApiAgentByIdFsUpload,
-  postApiAgentByIdFsUploadUnique,
-  postApiAgentByIdFsWrite,
+  getApiFleetByIdFs,
+  getApiFleetByIdFsDescriptions,
+  getApiFleetByIdFsPreview,
+  getApiFleetByIdFsSheet,
+  postApiFleetByIdFsSheetSave,
+  postApiFleetByIdFsUpload,
+  postApiFleetByIdFsUploadUnique,
+  postApiFleetByIdFsWrite,
 } from "./generated"
 import { BASE, getToken, sdk } from "./client"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { FinderNode, FsPreview, SheetData } from "./generated/types.gen"
+export type { FinderNode, FsPreview, SheetData, SheetSaveResult } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
-export function fetchFs(agentId: string, path = ""): Promise<FinderNode[]> {
-  return sdk(getApiAgentByIdFs({ path: { id: agentId }, query: { path } }))
+export function fetchFs(fleetId: string, path = ""): Promise<FinderNode[]> {
+  return sdk(getApiFleetByIdFs({ path: { id: fleetId }, query: { path } }))
 }
 
-export function fetchDescriptions(agentId: string): Promise<Record<string, string>> {
-  return sdk(getApiAgentByIdFsDescriptions({ path: { id: agentId } }))
+export function fetchDescriptions(fleetId: string): Promise<Record<string, string>> {
+  return sdk(getApiFleetByIdFsDescriptions({ path: { id: fleetId } }))
 }
 
-export function fetchFsPreview(agentId: string, path: string): Promise<FsPreview> {
-  return sdk(getApiAgentByIdFsPreview({ path: { id: agentId }, query: { path } }))
+export function fetchFsPreview(fleetId: string, path: string): Promise<FsPreview> {
+  return sdk(getApiFleetByIdFsPreview({ path: { id: fleetId }, query: { path } }))
 }
 
-export function fetchSheet(agentId: string, path: string): Promise<SheetData> {
-  return sdk(getApiAgentByIdFsSheet({ path: { id: agentId }, query: { path } }))
+export function fetchSheet(fleetId: string, path: string): Promise<SheetData> {
+  return sdk(getApiFleetByIdFsSheet({ path: { id: fleetId }, query: { path } }))
 }
 
 // ── POST endpoints (SDK) ─────────────────────────────────────────────
 
-export function writeFile(agentId: string, path: string, content: string): Promise<WriteResult> {
-  return sdk(postApiAgentByIdFsWrite({ path: { id: agentId }, query: { path }, body: content }))
+export function writeFile(fleetId: string, path: string, content: string): Promise<WriteResult> {
+  return sdk(postApiFleetByIdFsWrite({ path: { id: fleetId }, query: { path }, body: content }))
 }
 
-export function uploadFile(agentId: string, dir: string, file: File): Promise<UploadResult> {
+/**
+ * Save Univer edits to an xlsx/xlsm by patching the original file server-side
+ * (formatting Univer doesn't model is kept). `snapshot` = `workbook.save()`.
+ */
+export function saveSheet(
+  fleetId: string,
+  path: string,
+  snapshot: Record<string, unknown>,
+): Promise<SheetSaveResult> {
   return sdk(
-    postApiAgentByIdFsUpload({
-      path: { id: agentId },
+    postApiFleetByIdFsSheetSave({ path: { id: fleetId }, query: { path }, body: snapshot }),
+  )
+}
+
+export function uploadFile(fleetId: string, dir: string, file: File): Promise<UploadResult> {
+  return sdk(
+    postApiFleetByIdFsUpload({
+      path: { id: fleetId },
       query: { path: dir, name: file.name },
       body: file,
     }),
@@ -63,13 +79,13 @@ export function uploadFile(agentId: string, dir: string, file: File): Promise<Up
 }
 
 export function uploadUnique(
-  agentId: string,
+  fleetId: string,
   dir: string,
   file: File,
 ): Promise<UploadUniqueResult> {
   return sdk(
-    postApiAgentByIdFsUploadUnique({
-      path: { id: agentId },
+    postApiFleetByIdFsUploadUnique({
+      path: { id: fleetId },
       query: { path: dir, name: file.name },
       body: file,
     }),
@@ -82,19 +98,19 @@ export function uploadUnique(
  *  prompt). `fs/raw` is NOT a public route, so an `<img src>` / `<object data>`
  *  pointed straight at this URL can't carry the `Authorization` header and 401s
  *  once auth is on (C2). Kept only for the rare same-origin/no-auth caller. */
-export function rawUrl(agentId: string, path: string): string {
-  return `${BASE}/api/agent/${agentId}/fs/raw?path=${encodeURIComponent(path)}`
+export function rawUrl(fleetId: string, path: string): string {
+  return `${BASE}/api/fleet/${fleetId}/fs/raw?path=${encodeURIComponent(path)}`
 }
 
 /** Trigger a browser download for a file in the agent's realm. */
-export async function downloadFile(agentId: string, path: string): Promise<void> {
+export async function downloadFile(fleetId: string, path: string): Promise<void> {
   const headers: Record<string, string> = {}
   const token = getToken()
   if (token) headers["Authorization"] = `Bearer ${token}`
 
   const res = await fetch(
     // ok:manual — binary blob download, irreducible
-    `${BASE}/api/agent/${agentId}/fs/download?path=${encodeURIComponent(path)}`,
+    `${BASE}/api/fleet/${fleetId}/fs/download?path=${encodeURIComponent(path)}`,
     { headers },
   )
   if (!res.ok) {

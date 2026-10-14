@@ -2,7 +2,7 @@
 //!
 //! Supports both static (one-shot) and live (auto-refreshing) panels.
 //! Live panels store the SQL query in metadata and re-execute it every 2 seconds
-//! via the background cache thread.
+//! via the background cache agent.
 
 use cp_base::panels::{
     CacheRequest, CacheUpdate, ContextItem, Panel, hash_content, paginate_content, update_if_changed,
@@ -50,7 +50,7 @@ pub(crate) struct LivePanelMeta<'sql> {
 /// Create a live (auto-refreshing) entity result panel.
 ///
 /// Stores the SQL query and database path in metadata so the background cache
-/// thread can re-execute the query periodically. Returns the panel ID.
+/// agent can re-execute the query periodically. Returns the panel ID.
 pub(crate) fn create_live_result_panel(
     state: &mut State,
     title: &str,
@@ -84,12 +84,12 @@ fn create_panel_inner(state: &mut State, title: &str, content: &str, live: Optio
         drop(elem.metadata.insert(META_IS_LIVE.to_owned(), serde_json::Value::Bool(true)));
     }
 
-    state.context.push(elem);
+    state.agent_mut().context.push(elem);
     panel_id
 }
 
 // =============================================================================
-// Live query refresh (runs on background cache thread)
+// Live query refresh (runs on background cache agent)
 // =============================================================================
 
 /// Re-execute a live query and return a cache update if the result changed.
@@ -122,7 +122,7 @@ struct EntityRestoreRequest {
     content: String,
 }
 
-/// Cache request for live panels — re-executes SQL on background thread.
+/// Cache request for live panels — re-executes SQL on background agent.
 struct LiveQueryRequest {
     /// Panel context ID (e.g., "P15").
     context_id: String,
@@ -211,8 +211,11 @@ impl Panel for EntityResultPanel {
     }
 
     fn blocks(&self, state: &State) -> Vec<Block> {
-        let ctx_opt =
-            state.context.get(state.selected_context).filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
+        let ctx_opt = state
+            .agent()
+            .context
+            .get(state.agent().selected_context)
+            .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE));
 
         let Some(ctx) = ctx_opt else {
             return vec![Block::styled_text("No entity result panel".into(), Semantic::Muted)];
@@ -226,7 +229,11 @@ impl Panel for EntityResultPanel {
     }
 
     fn title(&self, state: &State) -> String {
-        state.context.get(state.selected_context).map_or_else(|| "Entity Result".to_owned(), |ctx| ctx.name.clone())
+        state
+            .agent()
+            .context
+            .get(state.agent().selected_context)
+            .map_or_else(|| "Entity Result".to_owned(), |ctx| ctx.name.clone())
     }
 
     fn max_freezes(&self) -> u8 {
@@ -235,6 +242,7 @@ impl Panel for EntityResultPanel {
 
     fn context(&self, state: &State) -> Vec<ContextItem> {
         state
+            .agent()
             .context
             .iter()
             .filter(|c| c.context_type == Kind::new(ENTITY_RESULT_TYPE))

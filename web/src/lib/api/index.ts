@@ -14,11 +14,11 @@
 // `ThrowOnError = false`, hence the `as` casts below — they align the
 // compile-time type with the runtime guarantee.
 
-import type { Agent, ThreadDetail } from "../types"
+import type { Fleet, AgentDetail } from "../types"
 import type {
-  AgentMetrics,
+  FleetMetrics,
   CommandReceipt as GenCommandReceipt,
-  CreateAgentReceipt,
+  CreateFleetReceipt,
   CreateCommandReceipt,
   LibraryItem,
   RestartReceipt,
@@ -37,32 +37,32 @@ import {
   postApiClaudeAccountsStore,
   postApiClaudeAccountsSwitch,
   deleteApiClaudeAccountsByEmail,
-  getApiFleetMeta,
-  getApiFleetRetired,
-  getApiAgentByIdMeta,
-  getApiAgentByIdMetrics,
-  getApiAgentByIdVitals,
-  getApiAgentByIdLibrary,
-  getApiAgentByIdLibraryAgentByItem,
-  putApiAgentByIdLibraryAgentByItem,
-  deleteApiAgentByIdLibraryAgentByItem,
-  getApiAgentByIdThreads,
+  getApiFleetsMeta,
+  getApiFleetsRetired,
+  getApiFleetByIdMeta,
+  getApiFleetByIdMetrics,
+  getApiFleetByIdVitals,
+  getApiFleetByIdLibrary,
+  getApiFleetByIdLibrarySystemByItem,
+  putApiFleetByIdLibrarySystemByItem,
+  deleteApiFleetByIdLibrarySystemByItem,
+  getApiFleetByIdAgents,
   getApiProviders,
   getApiUpdateStatus,
   postApiUpdateCheck,
   postApiUpdateApply,
   putApiUpdateMode,
   getApiMetrics,
-  postApiFleetCreate,
-  postApiAgentByIdRestart,
-  postApiAgentByIdRetire,
-  postApiAgentByIdUnretire,
-  postApiAgentByIdRename,
-  postApiAgentByIdAvatar,
-  postApiAgentByIdCommand,
-  postApiAgentByIdLibraryCommand,
-  putApiAgentByIdLibraryCommandByItem,
-  postApiAgentByIdConversationsSearch,
+  postApiFleetsCreate,
+  postApiFleetByIdRestart,
+  postApiFleetByIdRetire,
+  postApiFleetByIdUnretire,
+  postApiFleetByIdRename,
+  postApiFleetByIdAvatar,
+  postApiFleetByIdCommand,
+  postApiFleetByIdLibraryCommand,
+  putApiFleetByIdLibraryCommandByItem,
+  postApiFleetByIdConversationsSearch,
   postApiTicket,
 } from "./generated"
 import { buildCommandEnvelope, sdk } from "./client"
@@ -77,10 +77,10 @@ export * from "./it"
 
 // ── Type re-exports ───────────────────────────────────────────────────
 
-export type { CreateAgentReceipt } from "./generated/types.gen"
+export type { CreateFleetReceipt } from "./generated/types.gen"
 export type { RestartReceipt } from "./generated/types.gen"
 export type { RetireReceipt, UnretireReceipt } from "./generated/types.gen"
-export type { AgentMetrics } from "./generated/types.gen"
+export type { FleetMetrics } from "./generated/types.gen"
 export type { Vital } from "./generated/types.gen"
 export type { CreateCommandReceipt } from "./generated/types.gen"
 export type { ClaudeUsageResponse, ClaudeUsageLimit } from "./generated/types.gen"
@@ -96,77 +96,77 @@ export type { ConvHit } from "./generated/types.gen"
 
 // ── Fleet (SDK) ───────────────────────────────────────────────────────
 
-export function fetchFleet(): Promise<Agent[]> {
-  return sdk(getApiFleetMeta())
+export function fetchFleet(): Promise<Fleet[]> {
+  return sdk(getApiFleetsMeta())
 }
 
-export function fetchRetiredFleet(): Promise<Agent[]> {
-  return sdk(getApiFleetRetired())
+export function fetchRetiredFleet(): Promise<Fleet[]> {
+  return sdk(getApiFleetsRetired())
 }
 
 // ── Agent lifecycle (SDK) ─────────────────────────────────────────────
 
-export function createAgent(body: {
+export function createFleet(body: {
   name: string
   folder?: string
   model?: string
-}): Promise<CreateAgentReceipt> {
-  return sdk(postApiFleetCreate({ body }))
+}): Promise<CreateFleetReceipt> {
+  return sdk(postApiFleetsCreate({ body }))
 }
 
-export function restartAgent(agentId: string): Promise<RestartReceipt> {
-  return sdk(postApiAgentByIdRestart({ path: { id: agentId } }))
+export function restartFleet(fleetId: string): Promise<RestartReceipt> {
+  return sdk(postApiFleetByIdRestart({ path: { id: fleetId } }))
 }
 
-export function retireAgent(agentId: string): Promise<RetireReceipt> {
-  return sdk(postApiAgentByIdRetire({ path: { id: agentId } }))
+export function retireFleet(fleetId: string): Promise<RetireReceipt> {
+  return sdk(postApiFleetByIdRetire({ path: { id: fleetId } }))
 }
 
-export function unretireAgent(agentId: string): Promise<UnretireReceipt> {
-  return sdk(postApiAgentByIdUnretire({ path: { id: agentId } }))
+export function unretireFleet(fleetId: string): Promise<UnretireReceipt> {
+  return sdk(postApiFleetByIdUnretire({ path: { id: fleetId } }))
 }
 
-export function renameAgent(agentId: string, name: string): Promise<{ ok: boolean }> {
-  return sdk(postApiAgentByIdRename({ path: { id: agentId }, body: { name } }))
+export function renameFleet(fleetId: string, name: string): Promise<{ ok: boolean }> {
+  return sdk(postApiFleetByIdRename({ path: { id: fleetId }, body: { name } }))
 }
 
 // ── Agent meta (SDK) ──────────────────────────────────────────────────
 
-export function fetchAgentMeta(agentId: string): Promise<Agent> {
-  return sdk(getApiAgentByIdMeta({ path: { id: agentId } }))
+export function fetchFleetMeta(fleetId: string): Promise<Fleet> {
+  return sdk(getApiFleetByIdMeta({ path: { id: fleetId } }))
 }
 
 // ── Agent avatar ──────────────────────────────────────────────────────
 
-export function uploadAvatar(agentId: string, file: File): Promise<{ ok: boolean }> {
-  return sdk(postApiAgentByIdAvatar({ path: { id: agentId }, body: file }))
+export function uploadAvatar(fleetId: string, file: File): Promise<{ ok: boolean }> {
+  return sdk(postApiFleetByIdAvatar({ path: { id: fleetId }, body: file }))
 }
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */
-export function avatarUrl(agentId: string, cacheBust?: number): string {
+export function avatarUrl(fleetId: string, cacheBust?: number): string {
   const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
   const v = cacheBust ? `?v=${cacheBust}` : ""
-  return `${base}/api/agent/${agentId}/avatar${v}`
+  return `${base}/api/fleet/${fleetId}/avatar${v}`
 }
 
 // ── Tools / Radar / Entities (SDK) ────────────────────────────────────
 
-export function fetchMetrics(agentId: string): Promise<AgentMetrics> {
-  return sdk(getApiAgentByIdMetrics({ path: { id: agentId } }))
+export function fetchMetrics(fleetId: string): Promise<FleetMetrics> {
+  return sdk(getApiFleetByIdMetrics({ path: { id: fleetId } }))
 }
 
-export function fetchVitals(agentId: string): Promise<Vital[]> {
-  return sdk(getApiAgentByIdVitals({ path: { id: agentId } }))
+export function fetchVitals(fleetId: string): Promise<Vital[]> {
+  return sdk(getApiFleetByIdVitals({ path: { id: fleetId } }))
 }
 
-export function fetchFleetMetrics(): Promise<AgentMetrics[]> {
+export function fetchFleetMetrics(): Promise<FleetMetrics[]> {
   return sdk(getApiMetrics())
 }
 
 // ── Usage / Library (SDK) ─────────────────────────────────────────────
 
-export function fetchLibrary(agentId: string): Promise<LibraryItem[]> {
-  return sdk(getApiAgentByIdLibrary({ path: { id: agentId } }))
+export function fetchLibrary(fleetId: string): Promise<LibraryItem[]> {
+  return sdk(getApiFleetByIdLibrary({ path: { id: fleetId } }))
 }
 
 // ── Providers (SDK) ───────────────────────────────────────────────────
@@ -217,61 +217,64 @@ export function setUpdateMode(body: {
 export type CommandReceipt = GenCommandReceipt
 
 export async function sendCommand(
-  agentId: string,
+  fleetId: string,
   kind: Record<string, unknown>,
 ): Promise<CommandReceipt> {
   return sdk(
-    postApiAgentByIdCommand({
-      path: { id: agentId },
+    postApiFleetByIdCommand({
+      path: { id: fleetId },
       body: buildCommandEnvelope(kind) as Record<string, unknown>,
     }),
   )
 }
 
 export function createCommand(
-  agentId: string,
+  fleetId: string,
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
-  return sdk(postApiAgentByIdLibraryCommand({ path: { id: agentId }, body: cmd }))
+  return sdk(postApiFleetByIdLibraryCommand({ path: { id: fleetId }, body: cmd }))
 }
 
 /** Create or overwrite a `/command` `.md` by its file id (the bubble row's
- *  per-command Edit button). The command twin of {@link upsertLibraryAgent}:
+ *  per-command Edit button). The command twin of {@link upsertLibrarySystem}:
  *  `PUT …/library/command/{item}` deliberately overwrites, unlike the 409-on-
  *  clobber {@link createCommand}. */
 export function updateCommand(
-  agentId: string,
+  fleetId: string,
   itemId: string,
   cmd: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiAgentByIdLibraryCommandByItem({ path: { id: agentId, item: itemId }, body: cmd }),
+    putApiFleetByIdLibraryCommandByItem({ path: { id: fleetId, item: itemId }, body: cmd }),
   )
 }
 
 // ── Agent library CRUD (T581 footer editor) ───────────────────────────
 
-export type LibraryAgentRaw = import("./generated/types.gen").LibraryAgentRaw
+export type LibrarySystemRaw = import("./generated/types.gen").LibrarySystemRaw
 
 /** Read one behaviour agent's raw authoring fields (Export + Edit-prefill). */
-export function fetchLibraryAgent(agentId: string, itemId: string): Promise<LibraryAgentRaw> {
-  return sdk(getApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+export function fetchLibrarySystem(fleetId: string, itemId: string): Promise<LibrarySystemRaw> {
+  return sdk(getApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 /** Create or overwrite a behaviour agent `.md` (user agent or built-in override). */
-export function upsertLibraryAgent(
-  agentId: string,
+export function upsertLibrarySystem(
+  fleetId: string,
   itemId: string,
   agent: { name: string; description?: string; body: string },
 ): Promise<CreateCommandReceipt> {
   return sdk(
-    putApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId }, body: agent }),
+    putApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId }, body: agent }),
   )
 }
 
 /** Delete a behaviour agent's on-disk `.md` (override revert, or user agent removal). */
-export function deleteLibraryAgent(agentId: string, itemId: string): Promise<CreateCommandReceipt> {
-  return sdk(deleteApiAgentByIdLibraryAgentByItem({ path: { id: agentId, item: itemId } }))
+export function deleteLibrarySystem(
+  fleetId: string,
+  itemId: string,
+): Promise<CreateCommandReceipt> {
+  return sdk(deleteApiFleetByIdLibrarySystemByItem({ path: { id: fleetId, item: itemId } }))
 }
 
 // ── Ticket (SDK) ──────────────────────────────────────────────────────
@@ -281,7 +284,7 @@ export async function mintTicket(): Promise<string> {
   return res.ticket
 }
 
-// ── Threads (SDK + thin presentation wrapper) ────────────────────────
+// ── Agents (SDK + thin presentation wrapper) ────────────────────────
 
 /** Format an epoch-ms timestamp as a relative age string. */
 export function formatAge(epochMs: number): string {
@@ -295,12 +298,12 @@ export function formatAge(epochMs: number): string {
   return `${days}d ago`
 }
 
-export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
-  const res = await sdk<{ focusedThreadId?: string | null; threads: ThreadDetail[] }>(
-    getApiAgentByIdThreads({ path: { id: agentId } }),
+export async function fetchAgents(fleetId: string): Promise<AgentDetail[]> {
+  const res = await sdk<{ focusedAgentId?: string | null; agents: AgentDetail[] }>(
+    getApiFleetByIdAgents({ path: { id: fleetId } }),
   )
-  const focusedId = res.focusedThreadId ?? null
-  return res.threads.map((t) => {
+  const focusedId = res.focusedAgentId ?? null
+  return res.agents.map((t) => {
     // The generated type declares `lastActivity: string`, but the backend sends
     // an epoch number on the REST path and a display string on the SSE path.
     // Widen once (single assertion, no `unknown`) so the typeof-branch narrows
@@ -308,7 +311,6 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
     const la = t.lastActivity as string | number
     return {
       ...t,
-      agentId: t.agentId,
       lastActivity: typeof la === "number" ? formatAge(la) : la,
       lastActivityMs:
         typeof t.lastActivityMs === "number" ? t.lastActivityMs : typeof la === "number" ? la : 0,
@@ -324,22 +326,22 @@ export async function fetchThreads(agentId: string): Promise<ThreadDetail[]> {
  * Hybrid (keyword + semantic) search over an agent's conversation index.
  *
  * Forwards to the agent over the bridge; Meilisearch embeds the raw query
- * server-side, so no fabricated semantic query is needed. `threadId` scopes
- * the search to one thread (omit for realm-wide). Returns hits best-scored
+ * server-side, so no fabricated semantic query is needed. `agentId` scopes
+ * the search to one agent (omit for realm-wide). Returns hits best-scored
  * first; an empty array means no match.
  */
 export function searchConversations(
-  agentId: string,
+  fleetId: string,
   query: string,
-  opts?: { limit?: number; threadId?: string },
+  opts?: { limit?: number; agentId?: string },
 ): Promise<import("./generated/types.gen").ConvHit[]> {
   return sdk<{ hits: import("./generated/types.gen").ConvHit[] }>(
-    postApiAgentByIdConversationsSearch({
-      path: { id: agentId },
+    postApiFleetByIdConversationsSearch({
+      path: { id: fleetId },
       body: {
         query,
         ...(opts?.limit != null && { limit: opts.limit }),
-        ...(opts?.threadId != null && { thread_id: opts.threadId }),
+        ...(opts?.agentId != null && { agent_id: opts.agentId }),
       },
     }),
   ).then((r) => r.hits)

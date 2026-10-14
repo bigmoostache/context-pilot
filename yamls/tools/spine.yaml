@@ -12,15 +12,19 @@ tools:
       max_auto_retries: "Guard rail: max consecutive auto-continuations without human input. Null to disable."
       reset_counters: "Reset runtime counters (auto_continuation_count, autonomous_start_ms)"
 
-  coucou:
+  Coucou:
     description: |
-      Schedules a notification to fire after a delay (timer mode) or at a specific time (datetime mode). The notification appears in the Spine panel and triggers auto-continuation. Use for reminders, delayed checks, or timed follow-ups.
+      Schedules a reminder for an agent (default: you; any agent may be targeted). When it fires, the target gets a notification carrying the coucou id and the turn in the group. Give exactly one of delay, datetime (one-shot) or cron (recurring). Returns the id (coucou_<n>).
     parameters:
-      mode: "Scheduling mode: 'timer' for relative delay, 'datetime' for absolute time"
-      message: "Message to deliver when the notification fires"
-      delay: "Delay before firing (timer mode only). Examples: '30s', '5m', '1h30m', '2h15m30s'"
-      datetime: "When to fire (datetime mode only). Format: YYYY-MM-DDTHH:MM:SS (local time)"
-      thread_id: "Optional thread ID to scope this notification to a specific thread"
-      recurrence: "Repeat schedule: 'once' (default, fires once), 'hourly', 'daily', 'weekly', or 'custom' (requires interval param)"
-      interval: "Custom repeat interval (only with recurrence='custom'). Examples: '30m', '2h', '1d', '12h'"
-      cancel_id: "Cancel an existing coucou by its watcher ID (e.g. 'coucou_0'). When set, mode/message/delay/datetime are ignored."
+      message: "Message delivered when it fires"
+      agent_id: "Target agent (A<n>). Default: you"
+      group_id: "Group the reminder belongs to; you and the target must be members. Default: the target's human group"
+      delay: "One-shot after a delay: '30s', '5m', '1h30m'"
+      datetime: "One-shot at a local time: YYYY-MM-DDTHH:MM:SS (append Z for UTC)"
+      cron: "Recurring, 5-field POSIX cron in local time: 'min hour day month weekday', e.g. '0 * * * *' hourly, '30 8 * * 1-5' weekdays 08:30"
+
+  Coucou_delete:
+    description: |
+      Deletes a scheduled coucou. Only its creator or its target may. If the target deletes someone else's coucou, the creator is notified.
+    parameters:
+      coucou_id: "Coucou id (coucou_<n>)"

@@ -8,8 +8,7 @@
 mod boot;
 
 pub(crate) use boot::{
-    boot_extract_module_data, boot_init_modules, boot_load_thread_runtime, check_env, fresh_thread_runtime,
-    preflight_env,
+    boot_extract_module_data, boot_init_modules, boot_load_agent_runtime, check_env, fresh_agent_runtime, preflight_env,
 };
 pub(crate) mod config;
 pub(crate) mod message;
@@ -55,18 +54,23 @@ pub(crate) struct BootPanels {
     pub panel_count: usize,
 }
 
-/// The focused thread id recorded by the last save, from the threads module's
+/// The focused agent id recorded by the last save, from the agents module's
 /// shared blob in `config.json`.
 ///
 /// This is a raw peek rather than a `FocusState` read because boot has not
 /// initialised modules yet — the focus normally lives in the worker file this
 /// pointer selects, so reading it the usual way would be circular.
 fn saved_focus_pointer(shared: &SharedConfig) -> Option<&str> {
-    shared.modules.get("threads")?.get("focus_file")?.as_str()
+    shared.modules.get("agents")?.get("focus_file")?.as_str()
 }
 
 /// Phase 1: Load config.json and worker state from disk.
 pub(crate) fn boot_load_config() -> BootConfig {
+    // One-shot T860 store migration (threads → agents, T<n> → A<n>); must run
+    // before anything reads config.json or the worker files.
+    if let Err(e) = cp_mod_agents::types::persist::migrate::upgrade_store(std::path::Path::new(STORE_DIR)) {
+        log::error!("threads→agents store migration failed, retrying next boot: {e}");
+    }
     let shared = config::load_config().unwrap_or_default();
     let worker_id = worker::focused_worker_id(saved_focus_pointer(&shared), worker::exists);
     let worker = worker::load_worker(&worker_id).unwrap_or_default();

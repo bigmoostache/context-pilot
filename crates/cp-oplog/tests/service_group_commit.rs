@@ -40,10 +40,10 @@ mod tests {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    /// A `MessageCreated` for `thread`, tagged with `byte`.
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    /// A `MessageCreated` for `agent`, tagged with `byte`.
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -144,14 +144,14 @@ mod tests {
         // consumes a rev — the durable revs are exactly 0..400, contiguous.
         let service = Arc::new(Service::spawn(dir.path()).expect("spawn"));
 
-        let n_threads = 8u8;
-        let per_thread = 50u8;
+        let n_agents = 8u8;
+        let per_agent = 50u8;
         let mut handles = Vec::new();
-        for t in 0..n_threads {
+        for t in 0..n_agents {
             let svc = Arc::clone(&service);
             handles.push(thread::spawn(move || {
                 let mut revs = Vec::new();
-                for i in 0..per_thread {
+                for i in 0..per_agent {
                     let token = format!("t{t}-{i}");
                     revs.push(svc.append_durable(effect(&token)).expect("durable append"));
                 }
@@ -168,7 +168,7 @@ mod tests {
         // final batch, so the log is durable before we replay.
         drop(service);
 
-        let total = usize::from(n_threads).saturating_mul(usize::from(per_thread));
+        let total = usize::from(n_agents).saturating_mul(usize::from(per_agent));
         assert_unique_contiguous(&all_revs, total);
 
         // Replay confirms the durable truth: every token landed exactly once.
@@ -221,7 +221,7 @@ mod tests {
 
         let recovered = replay(dir.path()).expect("replay");
         assert_eq!(recovered.rev_head, Some(last), "the last durable rev survived shutdown");
-        let t1 = recovered.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
+        let t1 = recovered.heads.agents.iter().find(|h| h.agent_id == "T1").expect("T1 head present");
         assert_eq!(t1.last_message_hash, ContentHash::new([29; 32]), "the final head is durable");
     }
 
@@ -247,7 +247,7 @@ mod tests {
             assert!(recovered.seen.contains(token), "durable token {token} survived the interleave");
         }
         assert_eq!(recovered.seen.len(), tokens.len(), "no durable effect lost or duplicated");
-        let t1 = recovered.heads.threads.iter().find(|h| h.thread_id == "T1").expect("T1 head present");
+        let t1 = recovered.heads.agents.iter().find(|h| h.agent_id == "T1").expect("T1 head present");
         assert_eq!(t1.last_message_hash, ContentHash::new([19; 32]), "last durable head is correct");
     }
 }

@@ -18,31 +18,29 @@ pub mod textarea;
 /// Runtime application state.
 ///
 /// `State` holds **only fleet-shared data** — things that are single-instance
-/// across every thread: the active model/provider, the theme, the tool set, the
+/// across every agent: the active model/provider, the theme, the tool set, the
 /// fleet-shared module `TypeMap`, the global UID counter, UI-global flags, and
 /// the ephemeral reverie sessions.
 ///
-/// **No conversation, no panels, no per-thread anything lives here as a field.**
-/// Everything a thread owns (its messages, its panel/context set, its editor and
+/// **No conversation, no panels, no per-agent anything lives here as a field.**
+/// Everything an agent owns (its messages, its panel/context set, its editor and
 /// scroll state, its token/cost telemetry, its cache/freeze engine snapshots,
-/// its per-thread module data, its stream phase) lives on a
-/// [`ThreadRuntime`](bundle::ThreadRuntime). The currently-loaded thread sits in
-/// [`resident`](Self::resident); every other thread is parked in the fleet
-/// registry. `State` [`Deref`](std::ops::Deref)s to `resident`, so existing code
-/// that reads `state.messages` / `state.context` / `state.stream` transparently
-/// reaches the resident thread's data — but those are the **thread's** fields,
-/// not `State`'s.
+/// its per-agent module data, its stream phase) lives on a
+/// [`AgentRuntime`](bundle::AgentRuntime) stored in
+/// [`agent_store`](Self::agent_store), keyed by agent id. Code reaches the
+/// executing agent's data explicitly through [`agent`](Self::agent) /
+/// [`agent_mut`](Self::agent_mut); `State` itself holds only shared data.
 pub struct State {
-    /// The per-thread context of the currently-resident thread (the focused
-    /// thread at rest, or a background thread while it is being stepped). Owns
-    /// the conversation, panels, editor/scroll, token/cost telemetry, the
-    /// cache/freeze engine snapshots, the per-thread stream phase, and the
-    /// per-thread module `TypeMap`. `State` derefs to this.
-    pub resident: bundle::ThreadRuntime,
+    /// Every agent's per-agent context (conversation, panels, editor/scroll,
+    /// token/cost telemetry, cache/freeze snapshots, stream phase, per-agent
+    /// module `TypeMap`), stored permanently by agent id, plus the id of the
+    /// agent executing right now. `State` derefs to the executing agent's
+    /// runtime; changing it moves no data.
+    pub agent_store: agents::AgentStore,
 
     /// Boolean status flags that are fleet-global (UI redraw, config overlay,
     /// reload lifecycle, module overlays). Per-thread stream/scroll state is on
-    /// [`resident.stream`](bundle::ThreadRuntime::stream), reached via deref as
+    /// [`executing.stream`](bundle::AgentRuntime::stream), reached via deref as
     /// `state.stream`.
     pub flags: StatusBools,
     /// Selected bar in config view (0=budget, 1=threshold, 2=target)
@@ -50,7 +48,7 @@ pub struct State {
     /// Global UID counter for all shared elements (messages, panels)
     pub global_next_uid: usize,
     /// Cleaning threshold (0.0–1.0) of the context budget that triggers
-    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every thread.
+    /// auto-cleaning. Fleet-wide: the Ctrl+H setting applies to every agent.
     pub cleaning_threshold: f32,
     /// Context budget in tokens (`None` = model's full window). Fleet-wide.
     pub context_budget: Option<usize>,
@@ -76,9 +74,9 @@ pub struct State {
     pub openrouter_model: crate::config::llm::openrouter_model::OpenRouterModel,
     /// Active Claude Code V2 model variant.
     pub claude_code_v2_model: crate::config::llm::models::ClaudeCodeV2Model,
-    /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Threads
+    /// View mode: Normal (full sidebar), Collapsed (icons), Hidden, Agents
     pub view_mode: ViewMode,
-    /// Active reverie sessions keyed by `agent_id` (e.g., "cleaner", "cartographer").
+    /// Active reverie sessions keyed by `system_id` (e.g., "cleaner", "cartographer").
     /// Ephemeral — not persisted, discarded after each run.
     pub reveries: HashMap<String, reverie::Session>,
     /// Result of the last API check
@@ -89,10 +87,10 @@ pub struct State {
     /// Takes `(file_path, content)` and returns `cp_render::Span` per line.
     pub highlight_ir_fn: Option<HighlightIrFn>,
 
-    // === Module extension data (fleet-shared half; per-thread half on resident) ===
+    // === Module extension data (fleet-shared half; per-agent half on executing) ===
     /// Fleet-shared module-owned state stored by `TypeId` (one instance across
-    /// all threads — e.g. memory, logs, entities, the threads registry). The
-    /// per-thread half lives on [`resident.thread_module_data`](bundle::ThreadRuntime::thread_module_data).
+    /// all agents — e.g. memory, logs, entities, the agents registry). The
+    /// per-agent half lives on [`executing.agent_module_data`](bundle::AgentRuntime::agent_module_data).
     ///
     /// A given `TypeId` lives in exactly ONE of the two maps, so the `get_ext`
     /// family searches both and `set_ext` updates whichever already holds the
@@ -101,37 +99,14 @@ pub struct State {
     /// Ambient scope for the *next* first-insert via [`set_ext`](Self::set_ext),
     /// set by the boot/init loops around `init_state` / `load_module_data`:
     /// `Some(true)` → [`shared_module_data`](Self::shared_module_data),
-    /// `Some(false)` or `None` → the resident's per-thread map.
+    /// `Some(false)` or `None` → the executing agent's per-agent map.
     /// Updates to already-registered types ignore this (they stay in place).
     pub init_is_global: Option<bool>,
-
-    /// Id of the thread whose per-thread context currently lives in
-    /// [`resident`](Self::resident): the focused thread normally, or the
-    /// background thread being advanced during its step. Residence metadata —
-    /// NOT part of [`resident`](Self::resident) so it tracks the current occupant
-    /// across a swap. Read by the stream tee to tag each frame's `thread_id`.
-    /// Runtime-only; `None` on cold boot.
-    pub resident_thread_id: Option<String>,
 }
 
-impl std::ops::Deref for State {
-    type Target = bundle::ThreadRuntime;
-
-    /// `State` derefs to its resident thread so existing `state.<per-thread>`
-    /// access keeps working after the fields moved onto [`ThreadRuntime`](bundle::ThreadRuntime).
-    /// The per-thread data is owned by the thread, not by `State`.
-    fn deref(&self) -> &Self::Target {
-        &self.resident
-    }
-}
-
-impl std::ops::DerefMut for State {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.resident
-    }
-}
-
-/// Per-thread runtime bundle + the resident-thread swap (`ThreadRuntime`).
+/// Thread-runtime storage keyed by id + the executing-thread id (`AgentStore`).
+pub mod agents;
+/// Per-thread runtime bundle (`AgentRuntime`).
 pub mod bundle;
 /// `Default` for `State` (extracted for the 500-line cap).
 mod default;
@@ -139,26 +114,90 @@ mod default;
 mod ext;
 
 impl State {
+    /// The agent executing right now: owner of every per-agent write (todos,
+    /// scratchpad, tool traces, notifications). Never the human's focus — that
+    /// is UI-only and can point at another agent while this one runs.
+    /// `None` when no agent is placed (cold boot, focus cleared).
+    #[must_use]
+    pub fn executing_agent_id(&self) -> Option<&str> {
+        self.agent_store.executing()
+    }
+
+    /// The executing agent's runtime (conversation, panels, stream, per-agent
+    /// module data). The unbound runtime when no agent is executing.
+    #[must_use]
+    pub fn agent(&self) -> &bundle::AgentRuntime {
+        self.agent_store.current()
+    }
+
+    /// Mutable twin of [`agent`](Self::agent).
+    pub fn agent_mut(&mut self) -> &mut bundle::AgentRuntime {
+        self.agent_store.current_mut()
+    }
+
+    /// Directory the executing agent works in: its worktree, else the
+    /// project root. Every project-relative path and subprocess cwd goes
+    /// through here; `.context-pilot/` state stays anchored to the root.
+    #[must_use]
+    pub fn workdir(&self) -> std::path::PathBuf {
+        self.agent().workdir.clone().unwrap_or_else(crate::config::constants::project_root)
+    }
+
+    /// Resolve a tool-supplied path: absolute kept, relative joined onto
+    /// [`workdir`](Self::workdir).
+    #[must_use]
+    pub fn resolve_path(&self, path: &str) -> std::path::PathBuf {
+        let p = std::path::Path::new(path);
+        if p.is_absolute() { p.to_path_buf() } else { self.workdir().join(p) }
+    }
+
+    /// Error text when the agent's worktree folder vanished (removed by hand
+    /// or by another agent); `None` while it exists or at the project root.
+    #[must_use]
+    pub fn workdir_error(&self) -> Option<String> {
+        let dir = self.agent().workdir.as_ref()?;
+        (!dir.is_dir()).then(|| {
+            format!(
+                "this agent's workdir {} no longer exists (worktree removed?). Run Worktree(action=leave) to return to the project root.",
+                dir.display()
+            )
+        })
+    }
+
+    /// [`resolve_path`](Self::resolve_path), refusing relative paths while
+    /// the worktree folder is gone, so callers never recreate it by accident.
+    ///
+    /// # Errors
+    /// The [`workdir_error`](Self::workdir_error) text.
+    pub fn try_resolve_path(&self, path: &str) -> Result<std::path::PathBuf, String> {
+        if std::path::Path::new(path).is_relative()
+            && let Some(e) = self.workdir_error()
+        {
+            return Err(e);
+        }
+        Ok(self.resolve_path(path))
+    }
+
     // === Boot builder (cross-crate reconstruction from persisted state) ===
 
     /// Set the loaded context panels (builder).
     #[must_use]
     pub fn with_context(mut self, context: Vec<Entry>) -> Self {
-        self.context = context;
+        self.agent_mut().context = context;
         self
     }
 
     /// Set the loaded conversation messages (builder).
     #[must_use]
     pub fn with_messages(mut self, messages: Vec<Message>) -> Self {
-        self.messages = messages;
+        self.agent_mut().messages = messages;
         self
     }
 
     /// Set the selected-panel index (builder).
     #[must_use]
     pub fn with_selected_context(mut self, idx: usize) -> Self {
-        self.selected_context = idx;
+        self.agent_mut().selected_context = idx;
         self
     }
 
@@ -166,18 +205,18 @@ impl State {
     #[must_use]
     pub fn with_id_counters(mut self, counters: (usize, usize, usize, usize)) -> Self {
         let (user, assistant, tool, result) = counters;
-        self.next_user_id = user;
-        self.next_assistant_id = assistant;
-        self.next_tool_id = tool;
-        self.next_result_id = result;
+        self.agent_mut().next_user_id = user;
+        self.agent_mut().next_assistant_id = assistant;
+        self.agent_mut().next_tool_id = tool;
+        self.agent_mut().next_result_id = result;
         self
     }
 
     /// Set the draft input text and cursor byte-offset (builder).
     #[must_use]
     pub fn with_draft(mut self, input: String, cursor: usize) -> Self {
-        self.composer.text = input;
-        self.composer.cursor = cursor;
+        self.agent_mut().composer.text = input;
+        self.agent_mut().composer.cursor = cursor;
         self
     }
 
@@ -198,7 +237,7 @@ impl State {
     /// Set the persisted cache-engine JSON blob (builder).
     #[must_use]
     pub fn with_cache_engine_json(mut self, json: Option<String>) -> Self {
-        self.cache_engine_json = json;
+        self.agent_mut().cache_engine_json = json;
         self
     }
 
@@ -207,7 +246,7 @@ impl State {
 
     /// Update the `last_refresh_ms` timestamp for a panel by its context type.
     pub fn touch_panel(&mut self, context_type: &str) {
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
+        if let Some(ctx) = self.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == context_type) {
             ctx.last_refresh_ms = crate::panels::now_ms();
             ctx.cache_deprecated = true;
         }
@@ -218,6 +257,7 @@ impl State {
     #[must_use]
     pub fn next_available_context_id(&self) -> String {
         let used_ids: std::collections::HashSet<usize> = self
+            .agent()
             .context
             .iter()
             .filter_map(|c| {
@@ -233,18 +273,18 @@ impl State {
 
     /// Allocate the next user message ID and UID, returning (id, uid).
     pub fn alloc_user_ids(&mut self) -> (String, String) {
-        let id = format!("U{}", self.next_user_id);
+        let id = format!("U{}", self.agent().next_user_id);
         let uid = format!("UID_{}_U", self.global_next_uid);
-        self.next_user_id = self.next_user_id.saturating_add(1);
+        self.agent_mut().next_user_id = self.agent_mut().next_user_id.saturating_add(1);
         self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
 
     /// Allocate the next assistant message ID and UID, returning (id, uid).
     pub fn alloc_assistant_ids(&mut self) -> (String, String) {
-        let id = format!("A{}", self.next_assistant_id);
+        let id = format!("A{}", self.agent().next_assistant_id);
         let uid = format!("UID_{}_A", self.global_next_uid);
-        self.next_assistant_id = self.next_assistant_id.saturating_add(1);
+        self.agent_mut().next_assistant_id = self.agent_mut().next_assistant_id.saturating_add(1);
         self.global_next_uid = self.global_next_uid.saturating_add(1);
         (id, uid)
     }
@@ -257,13 +297,13 @@ impl State {
         let (id, uid) = self.alloc_user_ids();
         let msg = Message::new_user(id, uid, content, token_count);
 
-        if let Some(ctx) = self.context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
+        if let Some(ctx) = self.agent_mut().context.iter_mut().find(|c| c.context_type.as_str() == Kind::CONVERSATION) {
             ctx.token_count = ctx.token_count.saturating_add(token_count);
             ctx.last_refresh_ms = crate::panels::now_ms();
         }
 
-        self.messages.push(msg);
-        self.messages.len().saturating_sub(1)
+        self.agent_mut().messages.push(msg);
+        self.agent().messages.len().saturating_sub(1)
     }
 
     /// Remove all injected `/* Notification [...] */` user messages from the
@@ -276,44 +316,46 @@ impl State {
     /// from the persisted `message_uids` index, which is regenerated from this
     /// (stripped) message list on the next state save.
     pub fn strip_notification_messages(&mut self) -> usize {
-        let before = self.messages.len();
-        self.messages.retain(|m| !(m.role == "user" && m.content.trim_start().starts_with("/* Notification [")));
-        before.saturating_sub(self.messages.len())
+        let before = self.agent().messages.len();
+        self.agent_mut()
+            .messages
+            .retain(|m| !(m.role == "user" && m.content.trim_start().starts_with("/* Notification [")));
+        before.saturating_sub(self.agent().messages.len())
     }
 
     /// Create an empty assistant message for streaming into, add it, return its index.
     pub fn push_empty_assistant(&mut self) -> usize {
         let (id, uid) = self.alloc_assistant_ids();
         let msg = Message::new_assistant(id, uid);
-        self.messages.push(msg);
-        self.messages.len().saturating_sub(1)
+        self.agent_mut().messages.push(msg);
+        self.agent().messages.len().saturating_sub(1)
     }
 
     /// Prepare state for a new stream: transition to [`StreamPhase::Receiving`],
     /// clear stop reason, reset tick counters.
     pub fn begin_streaming(&mut self) {
-        self.stream.phase.transition(StreamPhase::Receiving);
-        self.last_stop_reason = None;
-        self.streaming_estimated_tokens = 0;
-        self.tick_cache_hit_tokens = 0;
-        self.tick_cache_miss_tokens = 0;
-        self.tick_output_tokens = 0;
-        self.tick_uncached_input_tokens = 0;
-        self.tick_cost_hit_usd = 0.0f64;
-        self.tick_cost_miss_usd = 0.0f64;
-        self.tick_cost_output_usd = 0.0f64;
+        self.agent_mut().stream.phase.transition(StreamPhase::Receiving);
+        self.agent_mut().last_stop_reason = None;
+        self.agent_mut().streaming_estimated_tokens = 0;
+        self.agent_mut().tick_cache_hit_tokens = 0;
+        self.agent_mut().tick_cache_miss_tokens = 0;
+        self.agent_mut().tick_output_tokens = 0;
+        self.agent_mut().tick_uncached_input_tokens = 0;
+        self.agent_mut().tick_cost_hit_usd = 0.0f64;
+        self.agent_mut().tick_cost_miss_usd = 0.0f64;
+        self.agent_mut().tick_cost_output_usd = 0.0f64;
     }
 }
 
 impl std::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("State")
-            .field("context_len", &self.resident.context.len())
-            .field("messages_len", &self.resident.messages.len())
-            .field("stream_phase", &self.resident.stream.phase)
+            .field("context_len", &self.agent().context.len())
+            .field("messages_len", &self.agent().messages.len())
+            .field("stream_phase", &self.agent().stream.phase)
             .field(
                 "module_data_keys",
-                &self.shared_module_data.len().saturating_add(self.resident.thread_module_data.len()),
+                &self.shared_module_data.len().saturating_add(self.agent().agent_module_data.len()),
             )
             .finish_non_exhaustive()
     }

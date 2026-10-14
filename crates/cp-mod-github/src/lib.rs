@@ -1,6 +1,6 @@
 //! GitHub module — PR/issue management via the `gh` CLI.
 //!
-//! One tool: `gh_execute`. Read-only commands create auto-refreshing panels;
+//! One tool: `Gh`. Read-only commands create auto-refreshing panels;
 //! mutating commands execute directly. Depends on the git module and requires
 //! `GITHUB_TOKEN` in the environment.
 
@@ -11,7 +11,9 @@ pub mod classify;
 mod panel;
 /// Output parsing: extract PR/issue data from `gh` CLI output.
 pub mod parse;
-/// Tool implementations for `gh_execute`.
+/// Non-blocking per-worktree PR badge for the threads list.
+pub mod pr_badge;
+/// Tool implementations for `Gh`.
 mod tools;
 /// GitHub state types: `GithubState`, `GhCommand`, `GhWatch`.
 pub mod types;
@@ -84,7 +86,7 @@ impl Module for GithubModule {
     fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let t = &*TOOL_TEXTS;
         vec![
-            ToolDefinition::from_yaml("gh_execute", t)
+            ToolDefinition::from_yaml("Gh", t)
                 .declares_task()
                 .short_desc("Run gh commands")
                 .category("Git")
@@ -103,13 +105,13 @@ impl Module for GithubModule {
 
     fn execute_tool(&self, tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
         match tool.name.as_str() {
-            "gh_execute" => Some(tools::execute_gh_command(tool, state)),
+            "Gh" => Some(tools::execute_gh_command(tool, state)),
             _ => None,
         }
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("gh_execute", visualize_gh_output)]
+        vec![("Gh", visualize_gh_output)]
     }
 
     fn context_type_metadata(&self) -> Vec<cp_base::state::context::TypeMeta> {
@@ -140,9 +142,9 @@ impl Module for GithubModule {
 
     /// Fleet-shared (thread-centric model): `GithubState` holds the GitHub token
     /// (read once at boot from the vault) and the current branch's PR info — both
-    /// fleet/project-level, not per-thread. If it rode the per-thread swap, only
-    /// the resident thread at boot would receive the token and other threads
-    /// would see `None`. The github *result panels* are per-thread (in
+    /// fleet/project-level, not per-agent. If it were per-agent data, only
+    /// the executing agent at boot would receive the token and other agents
+    /// would see `None`. The github *result panels* are per-agent (in
     /// `state.context`); the token/PR data stays shared. Inert at N=1.
     fn is_global(&self) -> bool {
         true
@@ -260,7 +262,7 @@ fn gh_ref_semantic(line: &str) -> Option<cp_render::Semantic> {
     }
 }
 
-/// Pick the semantic color for one line of `gh_execute` output.
+/// Pick the semantic color for one line of `Gh` output.
 fn gh_line_semantic(line: &str) -> cp_render::Semantic {
     gh_notice_semantic(line)
         .or_else(|| gh_state_semantic(line))
@@ -268,7 +270,7 @@ fn gh_line_semantic(line: &str) -> cp_render::Semantic {
         .unwrap_or(cp_render::Semantic::Default)
 }
 
-/// Visualizer for `gh_execute` tool results.
+/// Visualizer for `Gh` tool results.
 /// Color-codes PR/issue output with status badges, labels, authors, and highlights URLs and PR numbers.
 fn visualize_gh_output(content: &str, width: usize) -> Vec<cp_render::Block> {
     use cp_render::{Block, Span};

@@ -2,11 +2,11 @@ import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
 import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
-import { rawUrl } from "@/lib/api"
+import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited. */
 const LazyMarkdownEditor = lazy(() =>
-  import("@/components/agents/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
+  import("@/components/fleets/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
@@ -19,14 +19,14 @@ const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m
  * placeholder; a binary file (415) or read fault resolves the fetch as an error,
  * which falls back to the honest "No preview available" state.
  */
-export function LivePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsPreview(agentId, node.path, true)
+export function LivePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsPreview(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading preview…" />
   if (error || !data) return <Generic node={node} />
   if (node.kind === "markdown")
     return (
       <EditableMarkdown
-        agentId={agentId}
+        fleetId={fleetId}
         path={node.path}
         content={data.content}
         truncated={data.truncated}
@@ -45,11 +45,11 @@ export function LivePreview({ agentId, node }: { agentId: string; node: FinderNo
  * decode error) flips to the honest no-preview fallback. A checkerboard backing
  * shows transparency, and a zoom control mirrors the mock image preview.
  */
-export function LiveImagePreview({ agentId, node }: { agentId: string; node: FinderNode }) {
+export function LiveImagePreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
   const [zoom, setZoom] = useState(100)
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
   const [failed, setFailed] = useState(false)
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   if (failed) return <Generic node={node} />
   return (
     <div className="flex flex-col gap-2">
@@ -100,8 +100,8 @@ export function LiveImagePreview({ agentId, node }: { agentId: string; node: Fin
  * its child is the fallback the browser shows when it can't render PDFs inline
  * (or the file failed to load) — a link that opens the raw bytes in a new tab.
  */
-export function LivePdfPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const src = useMemo(() => rawUrl(agentId, node.path), [agentId, node.path])
+export function LivePdfPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const src = useMemo(() => rawUrl(fleetId, node.path), [fleetId, node.path])
   return (
     // h-full fills the (definite-height) scroll container so the embedded PDF
     // viewer claims ALL available height in the pane / file tab — flex-1 alone
@@ -136,25 +136,55 @@ export function LivePdfPreview({ agentId, node }: { agentId: string; node: Finde
  * formulas, sheet tabs, freeze panes, merge cells — all from the free
  * Apache 2.0 tier. XLSX download via ExcelJS reflects all edits.
  */
-export function LiveSheetPreview({ agentId, node }: { agentId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSheet(agentId, node.path, true)
+export function LiveSheetPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSheet(fleetId, node.path, true)
   if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error || !data || data.sheets.length === 0) return <Generic node={node} />
+  if (error && isTooLarge(error)) return <SheetTooLarge fleetId={fleetId} path={node.path} />
+  if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={<PreviewStatus label="Loading spreadsheet…" />}>
-        <LazySheetGrid sheets={data.sheets} path={node.path} agentId={agentId} />
+        <LazySheetGrid
+          sheets={data.sheets}
+          workbook={data.workbook}
+          activeSheet={data.activeSheet}
+          path={node.path}
+          fleetId={fleetId}
+        />
       </Suspense>
 
       {/* truncation status */}
       {data.truncated && (
         <div className="flex items-center border-t border-border bg-muted/20 px-3 py-1">
           <span className="text-[10.5px] text-muted-foreground/50 italic">
-            Preview clipped — large sheet capped at 1 000 rows × 50 columns
+            Preview truncated — sheets are capped at 100 000 rows × 500 columns
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+/** The backend refuses workbooks over its size cap with a 413 "too large". */
+function isTooLarge(error: Error): boolean {
+  return error.message.includes("too large")
+}
+
+/** "Too large to preview" state with a download fallback. */
+function SheetTooLarge({ fleetId, path }: { fleetId: string; path: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6">
+      <span className="text-[12px] text-muted-foreground">
+        Workbook too large to preview (over 25 MB)
+      </span>
+      <button
+        type="button"
+        className="rounded-md bg-muted px-3 py-1 text-[11px] font-medium hover:bg-muted/70"
+        onClick={() => void downloadFile(fleetId, path)}
+      >
+        Download
+      </button>
     </div>
   )
 }
@@ -215,19 +245,19 @@ function HighlightedCode({
  * (>256 KiB preview cap) fall back to read-only {@link MarkdownPreview}.
  */
 function EditableMarkdown({
-  agentId,
+  fleetId,
   path,
   content,
   truncated,
 }: {
-  agentId: string
+  fleetId: string
   path: string
   content: string
   truncated?: boolean
 }) {
   const draftRef = useRef(content)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const write = useWriteFile(agentId)
+  const write = useWriteFile(fleetId)
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [err, setErr] = useState<string | null>(null)
 

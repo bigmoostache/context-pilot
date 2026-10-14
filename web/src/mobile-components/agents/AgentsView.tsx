@@ -1,0 +1,319 @@
+import { useCallback, useEffect, useRef, useState } from "react"
+import { animate, createSpring } from "animejs"
+import { FolderGit2, AlertTriangle, Plus, PanelLeft, Settings2 } from "lucide-react"
+import { AgentList } from "@/mobile-components/agents/AgentList"
+import { AgentConversation } from "@/mobile-components/agents/AgentConversation"
+import { CornerButton } from "@/mobile-components/shell/chrome/CornerButton"
+import { useFleet, useAgents } from "@/lib/live"
+import { useAgentSelection, useAgentActions, type Actions, type Notice } from "@/lib/live/agentView"
+import { NewAgentDialog } from "@/mobile-components/agents/dialogs/NewAgentDialog"
+import type { AgentDetail } from "@/lib/types"
+import { useTopButtons } from "@/lib/providers/topButtons"
+import { prefersReducedMotion } from "@/lib/utils"
+
+/**
+ * Mobile agent surface — the divergent twin of `components/agents/AgentsView`.
+ *
+ * The desktop view is a two-pane master-detail (a permanent list rail beside the
+ * conversation). At phone width a permanent rail steals the entire screen from
+ * the conversation and makes reading it impossible (T609), so mobile forks the
+ * SAME behaviour into a **conversation-primary + drawer** layout: the
+ * conversation is the full-bleed base layer, and the agent list lives in a
+ * slide-in left drawer toggled by a fixed top-left button (hamburger). Opening a
+ * agent closes the drawer, handing the whole screen back to the conversation.
+ *
+ * Only the presentation differs; every piece of logic (selection persistence,
+ * archive/pause/delete/create/send/attach, the failure notice) comes from the
+ * shared `@/lib/live/agentView` hooks the desktop view also consumes, so the
+ * two trees can never drift (design-mobile.md §3.2, architecture rule M141).
+ */
+export function AgentsView({
+  activeFleetId,
+  onShowInFinder,
+  onGoToFleets,
+  onOpenSettings,
+  disconnected,
+  onReconnect,
+}: {
+  activeFleetId: string
+  /** navigate the Finder to a file's parent directory and select it (T334) */
+  onShowInFinder?: (path: string) => void
+  /** leave the conversation for the agents (fleet) page — wired to the agent
+   *  drawer's top-left corner button (T631) */
+  onGoToFleets?: (() => void) | undefined
+  /** open this agent's full-screen Settings page — wired to the conversation's
+   *  top-right corner button (T636). Undefined when no live agent. */
+  onOpenSettings?: (() => void) | undefined
+  disconnected?: boolean
+  onReconnect?: () => void
+}) {
+  const { data: fleets = [] } = useFleet()
+  const { data: agents = [] } = useAgents(activeFleetId)
+  const hasFleet = fleets.some((a) => a.id === activeFleetId)
+
+  const sel = useAgentSelection(activeFleetId, agents)
+  const actions = useAgentActions(activeFleetId, agents, sel)
+
+  // The one piece of state desktop's always-open rail doesn't need: whether the
+  // agent-list drawer is showing. Closed by default when a realm opens (the
+  // conversation owns the screen); the user taps the top-left toggle to browse
+  // agents, and picking one closes it again.
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Signal the top-buttons provider on every drawer edge (T637): the corner
+  // controls swap between the conversation's set (drawer toggle / settings) and
+  // the agent-list's set (agents grid / archived toggle), so their glyphs
+  // re-spring in sync with the slide.
+  const { bump } = useTopButtons()
+  useEffect(bump, [drawerOpen, bump])
+
+  const openAgent = useCallback(
+    (id: string) => {
+      sel.setSelectedId(id)
+      setDrawerOpen(false)
+    },
+    [sel],
+  )
+
+  // #2 Drawer settle (anime.js): spring the drawer's slide instead of the flat
+  // CSS transition, for the subtle iOS overshoot-and-settle. anime owns the
+  // aside's transform (translateX 0% ↔ -100%); the first run is skipped (the
+  // drawer mounts closed off-screen — a spring there would flash it in) and
+  // reduced-motion snaps to the end position. The `-translate-x-full` class is
+  // dropped from the aside so React and anime never both write transform.
+  const drawerRef = useRef<HTMLElement>(null)
+  const firstRunRef = useRef(true)
+  useEffect(() => {
+    const el = drawerRef.current
+    if (!el) return
+    const to = drawerOpen ? "0%" : "-100%"
+    if (firstRunRef.current || prefersReducedMotion()) {
+      firstRunRef.current = false
+      el.style.transform = `translateX(${to})`
+      return
+    }
+    animate(el, { translateX: to, ease: createSpring({ stiffness: 300, damping: 30 }) })
+  }, [drawerOpen])
+
+  // No agent at all → bare empty state (no realm to render a roster for).
+  if (!hasFleet) {
+    return <EmptyRealm fleetName={undefined} />
+  }
+
+  const agent = agents.find((t) => t.id === sel.effectiveSelectedId)
+
+  return (
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      style={
+        disconnected
+          ? { filter: "blur(3px) grayscale(0.5)", transition: "filter 300ms" }
+          : { transition: "filter 300ms" }
+      }
+    >
+      {disconnected && (
+        <button
+          onClick={onReconnect}
+          className="absolute inset-0 z-40 cursor-pointer bg-background/30"
+          aria-label="Reconnect to fleet"
+        />
+      )}
+
+      {/* Base layer: the conversation (or an empty-realm hint). Full-bleed — the
+          list no longer shares the screen with it. */}
+      {agent ? (
+        <AgentConversation
+          agent={agent}
+          fleetId={activeFleetId}
+          onSend={actions.handleSend}
+          onAttach={actions.handleAttach}
+          pendingFiles={sel.pendingFiles}
+          onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+          onShowInFinder={onShowInFinder}
+          onBranch={actions.openBranch}
+          parentName={parentNameOf(agents, agent)}
+          onOpenAgent={openAgent}
+        />
+      ) : (
+        <EmptyRealm
+          fleetName={fleets.find((a) => a.id === activeFleetId)?.name}
+          onNewAgent={() => setDrawerOpen(true)}
+        />
+      )}
+
+      {/* Drawer toggle — the shared top-left corner button (see CornerButton:
+          fixed, safe-area-offset so it clears the iOS status bar in standalone,
+          T621). It carries `z-20` so it sits UNDER the drawer scrim (z-40): a
+          tap while the drawer is open lands on the scrim and closes it. */}
+      <CornerButton
+        side="left"
+        label="Show agents"
+        onClick={() => setDrawerOpen(true)}
+        className="z-20"
+      >
+        <PanelLeft />
+      </CornerButton>
+
+      {/* Settings button — top-right of the conversation (that corner is free;
+          top-left is the drawer toggle). Opens this agent's full-screen Settings
+          page (T636). z-20 so the drawer scrim (z-40) covers it when open. */}
+      {onOpenSettings && (
+        <CornerButton side="right" label="Fleet settings" onClick={onOpenSettings} className="z-20">
+          <Settings2 />
+        </CornerButton>
+      )}
+
+      {/* Scrim — dims the conversation while the drawer is open; tapping it (or
+          the toggle beneath it) closes the drawer. A <button> not a <div> so it
+          carries keyboard semantics (jsx-a11y). `fixed` (not `absolute`) so it
+          covers the viewport, not the tall scrolling AgentsView container. */}
+      <button
+        aria-label="Close agent list"
+        onClick={() => setDrawerOpen(false)}
+        tabIndex={drawerOpen ? 0 : -1}
+        className={
+          "fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 " +
+          (drawerOpen ? "opacity-100" : "pointer-events-none opacity-0")
+        }
+      />
+
+      {/* Drawer — the agent list, sliding in from the left. Always mounted (so
+          it animates) but shoved off-screen and non-interactive when closed.
+          `fixed inset-y-0` pins it to the VIEWPORT height, not the tall
+          scrolling AgentsView container beneath it — so AgentList's own
+          ScrollArea scrolls independently of the conversation (T616). Full
+          viewport width (`inset-0`, not a partial `w-[85%]`) — on a phone a
+          sliver of the dimmed conversation peeking at the edge just cramps the
+          list for no benefit (T619). */}
+      <aside
+        ref={drawerRef}
+        aria-hidden={!drawerOpen}
+        style={{ transform: "translateX(-100%)" }}
+        className={
+          "fixed inset-0 z-50 flex flex-col bg-surface " + (drawerOpen ? "" : "pointer-events-none")
+        }
+      >
+        <AgentList
+          agents={agents}
+          selectedId={sel.effectiveSelectedId}
+          onSelect={openAgent}
+          onGoToFleets={onGoToFleets}
+          query={sel.query}
+          onQueryChange={sel.setQuery}
+          showArchived={sel.showArchived}
+          onToggleArchived={sel.setShowArchived}
+          onArchive={actions.handleArchive}
+          onDelete={actions.handleDelete}
+          onPause={actions.handlePause}
+          onNewAgent={(name) => {
+            actions.handleCreate({ title: name, firstMessage: "", files: [], paused: false })
+            setDrawerOpen(false)
+          }}
+        />
+      </aside>
+
+      <BranchDialog actions={actions} agents={agents} fleetId={activeFleetId} />
+
+      <UndoNotice notice={actions.notice} />
+    </div>
+  )
+}
+
+/** Shown when there is no agent (no realm) or no agent picked yet — the mobile
+ *  twin of the desktop EmptyRealm. When `onNewAgent` is supplied it offers a
+ *  primary action so an empty realm can bootstrap its first agent. */
+function EmptyRealm({
+  fleetName,
+  onNewAgent,
+}: {
+  fleetName?: string | undefined
+  onNewAgent?: (() => void) | undefined
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground/60">
+        <FolderGit2 className="size-6" />
+      </span>
+      <p className="max-w-[320px] text-[13px] text-muted-foreground">
+        {fleetName ? (
+          <>
+            <span className="font-medium text-foreground/80">{fleetName}</span> has no agents yet —
+            tap the menu (top-left) to browse, or start one to put it to work in its folder.
+          </>
+        ) : (
+          "Select a fleet to see its agents."
+        )}
+      </p>
+      {onNewAgent && (
+        <button
+          onClick={onNewAgent}
+          className="flex items-center gap-2 rounded-lg bg-(--signal) px-3.5 py-2 text-[12.5px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
+        >
+          <Plus className="size-4" />
+          New Agent
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Bottom transient toast — an error banner, or a Gmail-style undo prompt after
+ *  a reversible action (T636). Extracted from the view body so its tone/undo
+ *  branches don't count against AgentsView's complexity + line budgets. */
+function UndoNotice({ notice }: { notice: Notice | null }) {
+  if (!notice) return null
+  return (
+    <div
+      role="alert"
+      className={
+        "card-shadow fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90 " +
+        (notice.tone === "error" ? "border-(--danger)/40" : "border-border")
+      }
+    >
+      {notice.tone === "error" && <AlertTriangle className="size-4 shrink-0 text-(--danger)" />}
+      <span>{notice.message}</span>
+      {notice.undo && (
+        <button
+          onClick={notice.undo}
+          className="ml-1 shrink-0 rounded-md px-2 py-0.5 text-[12px] font-medium text-(--signal) transition-colors hover:bg-(--signal)/10"
+        >
+          Undo
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** The branch-out dialog: name + first message of a agent branched out of the
+ *  open one at a given message. Keyed by the branch point so each opening
+ *  starts from a blank (non-persisted) draft; absent while no branch is open. */
+function BranchDialog({
+  actions,
+  agents,
+  fleetId,
+}: {
+  actions: Actions
+  agents: AgentDetail[]
+  fleetId: string
+}) {
+  const target = actions.branchTarget
+  if (!target) return null
+  return (
+    <NewAgentDialog
+      key={`${target.agentId}-${target.messageTs}`}
+      open
+      onClose={actions.closeBranch}
+      onCreate={actions.handleBranch}
+      fleetId={fleetId}
+      branch={{
+        parentName: agents.find((t) => t.id === target.agentId)?.name ?? target.agentId,
+        excerpt: target.excerpt,
+      }}
+    />
+  )
+}
+
+/** Name of `agent`'s parent when it was branched out of one that still exists. */
+function parentNameOf(agents: AgentDetail[], agent: AgentDetail): string | undefined {
+  return agent.branchedFrom ? agents.find((t) => t.id === agent.branchedFrom)?.name : undefined
+}

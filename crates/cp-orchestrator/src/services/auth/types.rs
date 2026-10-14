@@ -102,26 +102,26 @@ impl Ord for UserRole {
 /// Per-agent role — stored in the `agent_acl` table (FR-14a).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum AgentRole {
+pub(crate) enum FleetRole {
     /// Can invite/remove users and change roles on this agent (FR-14b).
-    AgentAdmin,
+    FleetAdmin,
     /// Can interact with the agent but cannot manage access.
-    AgentUser,
+    FleetUser,
 }
 
-impl AgentRole {
+impl FleetRole {
     /// SQL column value.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
-            Self::AgentAdmin => "agent-admin",
-            Self::AgentUser => "agent-user",
+            Self::FleetAdmin => "agent-admin",
+            Self::FleetUser => "agent-user",
         }
     }
 
     /// Parse from the stored SQL text.  Falls back to
-    /// [`AgentUser`](Self::AgentUser) on unknown values.
+    /// [`FleetUser`](Self::FleetUser) on unknown values.
     pub(crate) const fn from_sql(value: &str) -> Self {
-        if value.eq_ignore_ascii_case("agent-admin") { Self::AgentAdmin } else { Self::AgentUser }
+        if value.eq_ignore_ascii_case("agent-admin") { Self::FleetAdmin } else { Self::FleetUser }
     }
 }
 
@@ -172,11 +172,11 @@ pub(crate) struct NewUser<'req> {
 #[derive(Clone, Copy)]
 pub(crate) struct AccessGrant<'req> {
     /// The agent being granted access to.
-    pub agent_id: &'req str,
+    pub fleet_id: &'req str,
     /// The user receiving access.
     pub user_id: &'req str,
     /// The per-agent role to grant.
-    pub role: AgentRole,
+    pub role: FleetRole,
     /// Who granted the access (`None` for a system/bootstrap grant).
     pub granted_by: Option<&'req str>,
 }
@@ -185,12 +185,12 @@ pub(crate) struct AccessGrant<'req> {
 /// joined with their profile info for display.
 #[derive(Clone, Debug, serde::Serialize)]
 pub(crate) struct AclEntry {
-    /// The agent this entry grants access to.
-    pub agent_id: String,
+    /// The fleet this entry grants access to.
+    pub fleet_id: String,
     /// The authorized user's UUID.
     pub user_id: String,
     /// Per-agent role (FR-14a).
-    pub role: AgentRole,
+    pub role: FleetRole,
     /// When access was granted (ms since Unix epoch).
     pub granted_at: u64,
     /// UUID of the user who granted access (nullable).

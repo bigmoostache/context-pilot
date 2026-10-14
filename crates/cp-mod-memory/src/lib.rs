@@ -75,6 +75,10 @@ impl Module for MemoryModule {
         state.set_ext(MemoryState::new());
     }
 
+    fn save_revision(&self, state: &State) -> Option<u64> {
+        Some(MemoryState::get(state).revision)
+    }
+
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ms = MemoryState::get(state);
         json!({ "slots": ms.slots })

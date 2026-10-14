@@ -11,12 +11,13 @@ use crate::state::context::Kind;
 /// Controls the current view mode.
 ///
 /// `Normal` shows the standard panel view (sidebar + content panel).
-/// `Threads` replaces the entire layout with a dedicated threads view.
+/// `Agents` replaces the entire layout with a dedicated threads view.
 /// Ctrl+V toggles between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ViewMode {
-    /// Threads view: dedicated layout for thread management (no panels).
-    Threads,
+    /// Agents view: dedicated layout for agent management (no panels).
+    #[serde(rename = "Threads")]
+    Agents,
     #[default]
     #[serde(other)]
     /// Full sidebar with panel names and details.
@@ -24,22 +25,22 @@ pub enum ViewMode {
 }
 
 impl ViewMode {
-    /// Toggle between Normal and Threads.
+    /// Toggle between Normal and Agents.
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
-            Self::Normal => Self::Threads,
-            Self::Threads => Self::Normal,
+            Self::Normal => Self::Agents,
+            Self::Agents => Self::Normal,
         }
     }
 
     /// Width in columns for the sidebar in this mode.
-    /// Returns 0 for Threads (sidebar is not rendered).
+    /// Returns 0 for Agents (sidebar is not rendered).
     #[must_use]
     pub const fn width(self) -> u16 {
         match self {
-            Self::Normal => 36,
-            Self::Threads => 0,
+            Self::Normal => crate::config::constants::SIDEBAR_WIDTH,
+            Self::Agents => 0,
         }
     }
 
@@ -84,7 +85,7 @@ pub struct Shared {
     /// Cursor position in draft input
     #[serde(default)]
     pub draft_cursor: usize,
-    /// View mode (Normal/Threads)
+    /// View mode (Normal/Agents)
     #[serde(default, alias = "sidebar_mode")]
     pub view_mode: ViewMode,
 
@@ -175,9 +176,9 @@ pub struct WorkerState {
     #[serde(default = "default_one")]
     pub next_result_id: usize,
 
-    // === Composer draft (per-thread, survives reload) ===
-    /// Unsent composer text of this thread. `None` in files saved before
-    /// per-thread drafts — boot then falls back to the legacy shared draft.
+    // === Composer draft (per-agent, survives reload) ===
+    /// Unsent composer text of this agent. `None` in files saved before
+    /// per-agent drafts — boot then falls back to the legacy shared draft.
     #[serde(default)]
     pub draft_input: Option<String>,
     /// Composer cursor byte-offset within `draft_input`.
@@ -234,7 +235,7 @@ impl WorkerState {
         self
     }
 
-    /// Set this thread's composer draft text + cursor (builder).
+    /// Set this agent's composer draft text + cursor (builder).
     #[must_use]
     pub fn with_draft(mut self, text: String, cursor: usize) -> Self {
         self.draft_input = Some(text);

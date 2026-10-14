@@ -1,0 +1,20 @@
+//! Groups — conversations shared by agents and the human (T860 phase C).
+//!
+//! Every agent owns one [`GroupKind::Human`](types::GroupKind::Human) group
+//! holding its conversation with the user; coordination and custom groups
+//! connect agents with each other. Each group has exactly one owner agent.
+
+/// Group message types (formerly the agents' own message types).
+pub mod chat;
+/// `groups` (fixed) and `group` (dynamic) panels.
+pub mod panels;
+/// Per-group message files (`groups/<id>.json`), written only when dirty.
+pub mod persist;
+/// LLM-facing YAML rendering of groups.
+pub mod render;
+/// Social substates (who acts next), the `next` DSL, and the tick.
+pub mod social;
+/// `Group`, `GroupKind`, `GroupsState`.
+pub mod types;
+/// `GroupsModule`: state registration + metadata persistence.
+pub mod wiring;

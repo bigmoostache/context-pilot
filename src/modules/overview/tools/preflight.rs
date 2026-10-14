@@ -28,9 +28,9 @@ fn preflight_close_panel(tool: &ToolUse, state: &State) -> Verdict {
     let Some(ids) = tool.input.get("ids").and_then(serde_json::Value::as_array) else { return pf };
     for id_val in ids {
         let Some(id) = id_val.as_str() else { continue };
-        if !state.context.iter().any(|c| c.id == id) {
+        if !state.agent().context.iter().any(|c| c.id == id) {
             pf.warnings.push(format!("Panel '{id}' not found — will be skipped"));
-        } else if state.context.iter().any(|c| c.id == id && c.context_type.is_fixed()) {
+        } else if state.agent().context.iter().any(|c| c.id == id && c.context_type.is_fixed()) {
             pf.warnings.push(format!("Panel '{id}' is a fixed panel and cannot be closed — will be skipped"));
         } else {
             check_tree_description_gate(&mut pf, state, id);
@@ -46,15 +46,18 @@ fn check_tree_description_gate(pf: &mut Verdict, state: &State, id: &str) {
     if !state.active_modules.contains("tree") {
         return;
     }
-    let Some(ctx) = state.context.iter().find(|c| c.id == id && c.context_type.as_str() == Kind::FILE) else {
+    let Some(ctx) = state.agent().context.iter().find(|c| c.id == id && c.context_type.as_str() == Kind::FILE) else {
         return;
     };
     let Some(file_path) = ctx.get_meta_str("file_path") else { return };
     if !std::path::Path::new(file_path).exists() {
         return;
     }
-    let Ok(cwd) = std::env::current_dir().and_then(|d| d.canonicalize()) else { return };
+    let Ok(cwd) = state.workdir().canonicalize() else { return };
     let Ok(rel) = std::path::Path::new(file_path).strip_prefix(&cwd) else { return };
+    if rel.starts_with(cp_base::config::constants::WORKTREES_DIR) {
+        return;
+    }
     let rel_str = rel.to_string_lossy();
     let ts = cp_mod_tree::types::TreeState::get(state);
     if let Some(desc) = ts.descriptions.iter().find(|d| d.path == rel_str.as_ref()) {

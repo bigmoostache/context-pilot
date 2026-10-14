@@ -42,11 +42,11 @@ mod tests {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    /// A `MessageCreated` for `thread`, tagged with `byte` so the head hash is
+    /// A `MessageCreated` for `agent`, tagged with `byte` so the head hash is
     /// distinguishable per write.
-    fn msg(thread: &str, byte: u8) -> OpEntryKind {
+    fn msg(agent: &str, byte: u8) -> OpEntryKind {
         OpEntryKind::MessageCreated {
-            thread_id: thread.to_owned(),
+            agent_id: agent.to_owned(),
             message_id: format!("m{byte}"),
             head: ContentHash::new([byte; 32]),
             inline_body: None,
@@ -164,12 +164,12 @@ mod tests {
 
     // ── replay rebuilds ground truth ──────────────────────────────────────────
 
-    /// Ground truth tracked alongside the writes: the last head byte per thread
+    /// Ground truth tracked alongside the writes: the last head byte per agent
     /// and the set of committed dedup tokens.
     type GroundTruth = (BTreeMap<String, u8>, BTreeSet<String>);
 
-    /// Seed a rolled log with three interleaved threads plus periodic command
-    /// effects, returning the ground truth to check replay against. The thread
+    /// Seed a rolled log with three interleaved agents plus periodic command
+    /// effects, returning the ground truth to check replay against. The agent
     /// rotation and every-fourth effect cadence are tracked with explicit
     /// counters rather than `%` (the modulo operator is disallowed in this
     /// foundational crate). Extracted from the test to keep it under the
@@ -179,15 +179,15 @@ mod tests {
         let mut expected_tokens: BTreeSet<String> = BTreeSet::new();
 
         let mut writer = OplogWriter::open_with_segment_limit(dir, TINY_LIMIT).expect("open");
-        let threads = ["T1", "T2", "T3"];
-        let mut thread_idx = 0usize;
+        let agents = ["T1", "T2", "T3"];
+        let mut agent_idx = 0usize;
         let mut since_effect = 0u8;
         for step in 0..18u8 {
-            let thread = *threads.get(thread_idx).expect("thread_idx stays in 0..3");
-            thread_idx = if thread_idx == 2 { 0 } else { thread_idx.wrapping_add(1) };
+            let agent = *agents.get(agent_idx).expect("thread_idx stays in 0..3");
+            agent_idx = if agent_idx == 2 { 0 } else { agent_idx.wrapping_add(1) };
 
-            let _msg_rev = writer.append(msg(thread, step)).expect("append");
-            let _prev = expected_last.insert(thread.to_owned(), step);
+            let _msg_rev = writer.append(msg(agent, step)).expect("append");
+            let _prev = expected_last.insert(agent.to_owned(), step);
 
             if since_effect == 0 {
                 let token = format!("tok-{step}");
@@ -201,47 +201,47 @@ mod tests {
         (expected_last, expected_tokens)
     }
 
-    /// Assert every thread's recovered head is exactly the last byte written for
-    /// it, with no phantom threads. Extracted from the test to keep it under the
+    /// Assert every agent's recovered head is exactly the last byte written for
+    /// it, with no phantom agents. Extracted from the test to keep it under the
     /// cognitive-complexity cap.
     fn assert_recovered_heads(recovered: &Recovered, expected_last: &BTreeMap<String, u8>) {
-        for (thread, byte) in expected_last {
+        for (agent, byte) in expected_last {
             let head = recovered
                 .heads
-                .threads
+                .agents
                 .iter()
-                .find(|h| &h.thread_id == thread)
-                .unwrap_or_else(|| panic!("thread {thread} missing from recovered heads"));
+                .find(|h| &h.agent_id == agent)
+                .unwrap_or_else(|| panic!("agent {agent} missing from recovered heads"));
             assert_eq!(
                 head.last_message_hash,
                 ContentHash::new([*byte; 32]),
-                "thread {thread} head must be its last write",
+                "agent {agent} head must be its last write",
             );
         }
-        assert_eq!(recovered.heads.threads.len(), expected_last.len(), "no phantom threads in recovered heads");
+        assert_eq!(recovered.heads.agents.len(), expected_last.len(), "no phantom agents in recovered heads");
     }
 
     #[test]
     fn replay_rebuilds_ground_truth_heads_and_seen_over_a_rolled_reopened_log() {
         let dir = tempfile::tempdir().expect("tempdir");
 
-        // Interleave three threads' messages with command effects, forcing many
+        // Interleave three agents' messages with command effects, forcing many
         // rolls so replay must lean on the checkpoint fast path.
         let (mut expected_last, expected_tokens) = seed_ground_truth(dir.path());
 
-        // Reopen and add one more head per thread, so replay must also cross the
+        // Reopen and add one more head per agent, so replay must also cross the
         // session boundary correctly.
         {
             let mut writer = OplogWriter::open_with_segment_limit(dir.path(), TINY_LIMIT).expect("reopen");
-            for (thread, byte) in [("T1", 200u8), ("T2", 201u8), ("T3", 202u8)] {
-                let _rev = writer.append(msg(thread, byte)).expect("append");
-                let _prev = expected_last.insert(thread.to_owned(), byte);
+            for (agent, byte) in [("T1", 200u8), ("T2", 201u8), ("T3", 202u8)] {
+                let _rev = writer.append(msg(agent, byte)).expect("append");
+                let _prev = expected_last.insert(agent.to_owned(), byte);
             }
         }
 
         let recovered = replay(dir.path()).expect("replay");
 
-        // Every thread's recovered head must be the last byte we wrote for it.
+        // Every agent's recovered head must be the last byte we wrote for it.
         assert_recovered_heads(&recovered, &expected_last);
 
         // Every committed dedup token must be in the recovered seen-set, and none
