@@ -32,5 +32,16 @@ export default defineConfig({
     trace: "off",
     actionTimeout: 10_000,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Mobile specs live in e2e/mobile/ and run ONLY under the phone project: an
+  // iPhone 15 viewport + touch + mobile UA, which flips useIsMobile and loads
+  // the mobile component tree. Chromium engine (the harness ships no WebKit),
+  // so this covers layout/tree selection, not Safari rendering quirks.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /e2e\/mobile\// },
+    {
+      name: "mobile",
+      use: { ...devices["iPhone 15"], browserName: "chromium" },
+      testMatch: /e2e\/mobile\/.*\.spec\.ts/,
+    },
+  ],
 })
