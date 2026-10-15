@@ -91,37 +91,53 @@ impl StatusPoller {
         self.stop.store(true, Ordering::Relaxed);
     }
 
-    /// One status query. Returns `true` when the loop should stop (exited or
-    /// server unreachable), `false` to keep polling.
-    fn poll_once(&self) -> bool {
+    /// One status query. `Some(true)` = exited (stop), `Some(false)` = still
+    /// running, `None` = server unreachable (the caller decides when to give up).
+    fn poll_once(&self) -> Option<bool> {
         let req = serde_json::json!({"cmd": "status", "key": self.key});
-        let Ok(resp) = server_request(&req) else {
-            // Server unreachable — mark as dead
-            self.mark_terminal(ProcessStatus::Failed(-1));
-            return true;
-        };
+        let resp = server_request(&req).ok()?;
         let st = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
         if !st.starts_with("exited") {
-            return false;
+            return Some(false);
         }
         let code = resp.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(-1).to_i32();
         let status = if code == 0i32 { ProcessStatus::Finished(code) } else { ProcessStatus::Failed(code) };
         self.mark_terminal(status);
-        true
+        Some(true)
     }
 
-    /// Consume self and poll until the process exits or the server becomes unreachable.
+    /// Consume self and poll until the process exits or the server stays
+    /// unreachable for [`MAX_STATUS_FAILURES`] consecutive polls.
     pub(crate) fn run(self) {
+        let mut failures = 0u32;
         loop {
             if self.stop.load(Ordering::Relaxed) {
                 break;
             }
-            if self.poll_once() {
-                break;
+            match self.poll_once() {
+                Some(true) => break,
+                Some(false) => failures = 0,
+                None => {
+                    failures = failures.saturating_add(1);
+                    if unreachable_is_fatal(failures) {
+                        self.mark_terminal(ProcessStatus::Failed(-1));
+                        break;
+                    }
+                }
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     }
+}
+
+/// Consecutive unreachable status polls (500 ms apart) tolerated before a
+/// session is declared `Failed(-1)`: rides out a console-server restart
+/// instead of reporting a still-running process as crashed.
+const MAX_STATUS_FAILURES: u32 = 6;
+
+/// Whether `failures` consecutive unreachable polls mean the session is lost.
+pub(crate) const fn unreachable_is_fatal(failures: u32) -> bool {
+    failures >= MAX_STATUS_FAILURES
 }
 
 /// Build the console-server `create` request for a session.

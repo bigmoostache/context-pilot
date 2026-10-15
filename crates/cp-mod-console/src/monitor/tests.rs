@@ -6,7 +6,7 @@ use super::engine::{
     BATCH_WINDOW_MS, Budget, Engine, FLOOD_MAX_EVENTS, FLOOD_WINDOW_MS, Filter, INLINE_MAX_BYTES, render_payload,
 };
 use super::spec::{self, Frequency, Mode, Source};
-use crate::ring_buffer::RingBuffer;
+use crate::ring_buffer::{Matcher, RingBuffer};
 
 /// Keep every non-blank line.
 const LINE: Filter<'static> = Filter { mode: Mode::Line, pattern: None };
@@ -162,4 +162,70 @@ fn ring_read_since_across_wrap() {
     // Cursor older than retained data resumes at the oldest held byte.
     let (all, _) = rb.read_since(0);
     assert_eq!(all.len(), cap);
+}
+
+#[test]
+fn ring_write_slices_match_bytewise() {
+    let rb = RingBuffer::new();
+    let cap = crate::ring_buffer::RING_BUFFER_CAPACITY;
+    rb.write(&vec![b'x'; cap - 2]);
+    rb.write(b"abcd");
+    let (all, total) = rb.read_since(0);
+    assert_eq!(total, u64::try_from(cap + 2).unwrap_or(u64::MAX));
+    assert_eq!(all.len(), cap);
+    assert!(all.ends_with(b"xxabcd"));
+    // Oversized single write keeps only its last `cap` bytes.
+    let mut big = vec![b'y'; cap];
+    big.extend_from_slice(b"END");
+    rb.write(&big);
+    let (held, _) = rb.read_since(0);
+    assert_eq!(held.len(), cap);
+    assert!(held.ends_with(b"yyEND"));
+}
+
+#[test]
+fn pattern_ignores_output_before_cursor() {
+    let rb = RingBuffer::new();
+    let m = Matcher::new("error|done");
+    rb.write(b"old error\n");
+    let cursor = rb.total_written();
+    assert_eq!(rb.find_since(cursor, &m), None, "stale match must not fire");
+    rb.write(b"build done\n");
+    let end = rb.find_since(cursor, &m).expect("new output matches");
+    assert_eq!(end, cursor + 10u64, "end lands just past 'build done'");
+    // Advancing past the match consumes it.
+    assert_eq!(rb.find_since(end, &m), None);
+}
+
+#[test]
+fn invalid_regex_falls_back_to_literal() {
+    let rb = RingBuffer::new();
+    rb.write(b"value [x( here");
+    assert!(rb.find_since(0, &Matcher::new("[x(")).is_some());
+}
+
+#[test]
+fn last_n_lines_reads_tail() {
+    let rb = RingBuffer::new();
+    for i in 0u32..10_000u32 {
+        rb.write(format!("line {i}\n").as_bytes());
+    }
+    assert_eq!(rb.last_n_lines(2), "line 9998\nline 9999");
+}
+
+#[test]
+fn orphan_owner_parsing() {
+    use crate::manager::owner_of;
+    assert_eq!(owner_of("c_A984_3"), Some("A984"));
+    assert_eq!(owner_of("eb_root_12"), Some("root"));
+    assert_eq!(owner_of("c_3"), None, "legacy key without owner is never killed");
+    assert_eq!(owner_of("c_A1_x"), None);
+}
+
+#[test]
+fn status_poller_tolerates_brief_outage() {
+    use crate::pollers::unreachable_is_fatal;
+    assert!(!unreachable_is_fatal(1));
+    assert!(!unreachable_is_fatal(5));
+    assert!(unreachable_is_fatal(6));
 }

@@ -5,7 +5,7 @@ use std::io::{BufRead as _, BufReader, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cp_base::config::constants;
@@ -13,7 +13,7 @@ use cp_base::panels::now_ms;
 
 use crate::CONSOLE_DIR;
 use crate::pollers::{DetachedLaunch, FilePoller, StatusPoller, create_request, start_file_poller};
-use crate::ring_buffer::RingBuffer;
+use crate::ring_buffer::{Matcher, RingBuffer};
 use crate::types::ProcessStatus;
 use cp_base::cast::Safe as _;
 
@@ -171,11 +171,16 @@ pub fn find_or_create_server() -> Result<(), String> {
     Err("Console server failed to start within 3 seconds".to_owned())
 }
 
-/// Kill orphaned processes by asking the server for its session list and
-/// comparing against known session keys.
-pub fn kill_orphaned_processes<S>(known_keys: &HashSet<String, S>)
+/// Kill orphaned processes: server sessions owned by one of `owners` (agents
+/// loaded in this process) whose key is not in `known_keys`.
+///
+/// The console server is shared by every cpilot process on the project, so a
+/// session owned by an agent this process did not load is never touched, and
+/// keys with no recognisable owner are left alone.
+pub fn kill_orphaned_processes<S, T>(known_keys: &HashSet<String, S>, owners: &HashSet<String, T>)
 where
     S: BuildHasher,
+    T: BuildHasher,
 {
     let list = serde_json::json!({"cmd": "list"});
     if let Ok(resp) = server_request(&list)
@@ -183,7 +188,7 @@ where
     {
         for session in sessions {
             if let Some(key) = session.get("key").and_then(|v| v.as_str())
-                && !known_keys.contains(key)
+                && is_orphan(key, known_keys, owners)
             {
                 // Orphan — remove it from server (kills process)
                 let remove = serde_json::json!({"cmd": "remove", "key": key});
@@ -191,6 +196,23 @@ where
             }
         }
     }
+}
+
+/// Owner agent of a session key `{prefix}_{agent}_{n}` (see `ConsoleState::alloc_key`).
+#[must_use]
+pub fn owner_of(key: &str) -> Option<&str> {
+    let (_, rest) = key.split_once('_')?;
+    let (agent, n) = rest.rsplit_once('_')?;
+    (!agent.is_empty() && !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).then_some(agent)
+}
+
+/// Whether `key` is an orphan this process may kill.
+fn is_orphan<S, T>(key: &str, known_keys: &HashSet<String, S>, owners: &HashSet<String, T>) -> bool
+where
+    S: BuildHasher,
+    T: BuildHasher,
+{
+    !known_keys.contains(key) && owner_of(key).is_some_and(|o| owners.contains(o))
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +244,12 @@ pub struct SessionHandle {
     pub finished_at: Arc<Mutex<Option<u64>>>,
     /// Signal to stop background poller threads.
     pub stop_polling: Arc<AtomicBool>,
+    /// Buffer offset where the next `console_wait` pattern search starts:
+    /// advanced past each match and on every `send_input`, so a wait never
+    /// fires on output an earlier wait or command already consumed.
+    pub wait_cursor: Arc<AtomicU64>,
 }
+
 
 /// Parameters for reconnecting to an existing server-managed session.
 #[derive(Debug)]
@@ -319,7 +346,19 @@ impl SessionHandle {
             started_at: now_ms(),
             finished_at: Arc::new(Mutex::new(None)),
             stop_polling: Arc::new(AtomicBool::new(false)),
+            wait_cursor: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Match `matcher` against output after the wait cursor; on a hit, advance
+    /// the cursor past the match so the same output never satisfies a later wait.
+    #[must_use]
+    pub fn take_pattern_match(&self, matcher: &Matcher) -> bool {
+        let Some(end) = self.buffer.find_since(self.wait_cursor.load(Ordering::Relaxed), matcher) else {
+            return false;
+        };
+        let _prev = self.wait_cursor.fetch_max(end, Ordering::Relaxed);
+        true
     }
 
     /// Status poller bound to this handle's shared status/finish/stop state.
@@ -350,6 +389,8 @@ impl SessionHandle {
             }
             content.len().to_u64()
         });
+        // Pre-reload output was already visible to earlier waits.
+        let wait_cursor = Arc::new(AtomicU64::new(buffer.total_written()));
 
         // Check if server knows about this session
         let server_alive = probe_session_alive(&name, &status, &finished_at, &stop_polling);
@@ -365,19 +406,9 @@ impl SessionHandle {
                 }));
             }
 
-            // Status poller
-            {
-                let status_clone = Arc::clone(&status);
-                let finished_clone = Arc::clone(&finished_at);
-                let stop_clone = Arc::clone(&stop_polling);
-                let key = name.clone();
-                drop(std::thread::spawn(move || {
-                    StatusPoller { key, status: status_clone, finished_at: finished_clone, stop: stop_clone }.run();
-                }));
-            }
         }
 
-        Self {
+        let handle = Self {
             name,
             command,
             cwd,
@@ -388,7 +419,13 @@ impl SessionHandle {
             started_at,
             finished_at,
             stop_polling,
+            wait_cursor,
+        };
+        if server_alive {
+            let poller = handle.status_poller();
+            drop(std::thread::spawn(move || poller.run()));
         }
+        handle
     }
 
     /// Send input to the process via the server.
@@ -402,6 +439,8 @@ impl SessionHandle {
             "key": self.name,
             "input": input,
         });
+        // Waits after this input should only match the reply to it.
+        let _prev = self.wait_cursor.fetch_max(self.buffer.total_written(), Ordering::Relaxed);
         if server_request(&req).is_err() {
             // Server may have died — try to respawn and retry
             let _p = cp_base::perf_span!("console_respawn_server");

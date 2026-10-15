@@ -47,6 +47,10 @@ impl App {
         // Executing (focused) agent's live session keys.
         let mut known: std::collections::HashSet<String> =
             ConsoleState::get(&self.state).sessions.keys().cloned().collect();
+        // Agents loaded here: only their sessions may be pruned (the server is
+        // shared with other cpilot processes on the same project).
+        let mut owners: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let _new = owners.insert(self.state.executing_agent_id().unwrap_or("root").to_owned());
 
         // Union in each background thread's keys (pure read, no stream spawned).
         let bg_ids: Vec<String> = self.fleet.iter().map(|entry| entry.0.clone()).collect();
@@ -54,9 +58,10 @@ impl App {
             self.deliver_to_agent(Some(&id), |state| {
                 known.extend(ConsoleState::get(state).sessions.keys().cloned());
             });
+            let _bg_new = owners.insert(id);
         }
 
-        cp_mod_console::manager::kill_orphaned_processes(&known);
+        cp_mod_console::manager::kill_orphaned_processes(&known, &owners);
     }
 
     /// Persist **every** agent to disk — the focused agent first, then each
