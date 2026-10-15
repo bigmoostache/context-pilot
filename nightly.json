@@ -1,36 +1,36 @@
 {
   "schema": 1,
   "channel": "nightly",
-  "version": "v0.2.13-242fbb0",
-  "released_at": "2026-10-15T15:41:46Z",
-  "expires_at": "2026-10-29T15:41:46Z",
+  "version": "v0.2.14-d001f3d",
+  "released_at": "2026-10-15T16:14:29Z",
+  "expires_at": "2026-10-29T16:14:29Z",
   "min_from": "v0.1.0",
-  "notes_url": "https://github.com/bigmoostache/context-pilot/releases/tag/v0.2.13-242fbb0",
+  "notes_url": "https://github.com/bigmoostache/context-pilot/releases/tag/v0.2.14-d001f3d",
   "artifacts": {
     "linux-aarch64": {
-      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.13-242fbb0/cpilot-linux-aarch64.tar.gz",
-      "sha256": "7068b87ad9a4d9d2b83abb677501c4b7d05f60ff3ff77a1de26e109795369d56",
-      "size": 116548260
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.14-d001f3d/cpilot-linux-aarch64.tar.gz",
+      "sha256": "4065ca2bbfd2a9f65e9c7b290b35f2227312680e0968dd01c05332f4cd8824ee",
+      "size": 116550924
     },
     "linux-aarch64-musl": {
-      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.13-242fbb0/cpilot-linux-aarch64-musl.tar.gz",
-      "sha256": "3ddc49adf82ae11cdeed6bb1274c5169aceae5068eacca6e17b2491c5ce56dfe",
-      "size": 30565178
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.14-d001f3d/cpilot-linux-aarch64-musl.tar.gz",
+      "sha256": "064d8c86c9ffc26d8e16c81c87d913155d3ea42f106ada45ddb0da466e989267",
+      "size": 30558688
     },
     "linux-x86_64": {
-      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.13-242fbb0/cpilot-linux-x86_64.tar.gz",
-      "sha256": "f31b46b5fcc1260a492d013fcd5af166f918e80565b2d618c2fd66dd1043a4f3",
-      "size": 117180128
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.14-d001f3d/cpilot-linux-x86_64.tar.gz",
+      "sha256": "9c92bb5f26e893a0e34c66b304acd7ded44aa84a9a14370ef025c4fd6b6f2301",
+      "size": 117176571
     },
     "macos-aarch64": {
-      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.13-242fbb0/cpilot-macos-aarch64.tar.gz",
-      "sha256": "e851405f4603ae36c4212e2c366578a9932cf2f4d17f909072382ba46432eb29",
-      "size": 110024879
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.14-d001f3d/cpilot-macos-aarch64.tar.gz",
+      "sha256": "494abac2ffda2d51f8745fa30d0b17974b8339a7785807bf60ee26c4dee41955",
+      "size": 110026211
     },
     "macos-x86_64": {
-      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.13-242fbb0/cpilot-macos-x86_64.tar.gz",
-      "sha256": "a8e8fb66fcfc690c1c1ac627e07f4df9db0e1038af59a9e5b368568a76e9dd20",
-      "size": 110834045
+      "url": "https://github.com/bigmoostache/context-pilot/releases/download/v0.2.14-d001f3d/cpilot-macos-x86_64.tar.gz",
+      "sha256": "0ca8535143a4f1f774ad972ab6bdbf8605f7238ea550758d1c7247452048cadd",
+      "size": 110839056
     }
   }
 }
