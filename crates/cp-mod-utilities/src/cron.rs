@@ -1,9 +1,14 @@
 //! 5-field POSIX cron expressions (`minute hour day-of-month month day-of-week`).
 //!
-//! Supports `*`, numbers, ranges `a-b`, steps `*/n` and `a-b/n`, and comma
-//! lists. Day-of-week is 0–7 (0 and 7 are Sunday). As in POSIX cron, when both
-//! day fields are restricted a day matches if EITHER does. Evaluated in the
-//! host's local time (see [`crate::time::local_utc_offset_secs`]).
+//! Supports `*`, numbers, names (`JAN`–`DEC`, `SUN`–`SAT`, any case), ranges
+//! `a-b`, steps `*/n` and `a-b/n`, comma lists, and the `@yearly`,
+//! `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight` and `@hourly`
+//! shortcuts. Day-of-week is 0–7 (0 and 7 are Sunday). As in Vixie cron, when
+//! both day fields are restricted a day matches if EITHER does, and a field
+//! starting with `*` (including `*/n`) counts as unrestricted for that rule.
+
+use crate::calendar::{self, DAY_SECS};
+use crate::tz::{self, Zone};
 
 /// A parsed cron expression: one bit per allowed value of each field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,85 +23,150 @@ pub struct Cron {
     months: u64,
     /// Days of week 0–6 (Sunday = 0).
     weekdays: u64,
-    /// Day-of-month field was `*` (POSIX OR rule only applies when both are restricted).
+    /// Day-of-month field started with `*` (OR rule only applies when both are restricted).
     any_day: bool,
-    /// Day-of-week field was `*`.
+    /// Day-of-week field started with `*`.
     any_weekday: bool,
 }
 
-/// Seconds in a day.
-const DAY_SECS: i64 = 86_400;
-
 /// How far ahead [`Cron::next_after`] searches (≈ 5 years, covers Feb 29).
 const SEARCH_DAYS: i64 = 366 * 5;
+
+/// Month names; index 0 is month 1.
+const MONTH_NAMES: [&str; 12] = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+/// Weekday names; index 0 is Sunday.
+const WEEKDAY_NAMES: [&str; 7] = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+/// One field's grammar: allowed range, accepted names, label for errors.
+struct Field {
+    /// Smallest allowed value.
+    min: u32,
+    /// Largest allowed value.
+    max: u32,
+    /// Names; `names[i]` stands for `min + i`.
+    names: &'static [&'static str],
+    /// Field label used in error messages.
+    label: &'static str,
+}
 
 /// Bitmask of `value` (0–63).
 fn bit(value: u32) -> u64 {
     1u64.checked_shl(value).unwrap_or(0)
 }
 
-/// Parse one comma-separated field into a bitmask over `min..=max`.
-fn parse_field(field: &str, (min, max): (u32, u32), name: &str) -> Result<u64, String> {
-    let mut mask = 0u64;
-    for part in field.split(',') {
-        let (range, step) = match part.split_once('/') {
-            Some((r, s)) => {
-                let step: u32 = s.parse().map_err(|_e| format!("bad step `{s}` in {name}"))?;
-                if step == 0 {
-                    return Err(format!("step 0 in {name}"));
-                }
-                (r, step)
-            }
-            None => (part, 1),
-        };
-        let (lo, hi) = if range == "*" {
-            (min, max)
-        } else if let Some((a, b)) = range.split_once('-') {
-            let lo: u32 = a.parse().map_err(|_e| format!("bad value `{a}` in {name}"))?;
-            let hi: u32 = b.parse().map_err(|_e| format!("bad value `{b}` in {name}"))?;
-            (lo, hi)
-        } else {
-            let v: u32 = range.parse().map_err(|_e| format!("bad value `{range}` in {name}"))?;
-            // `5/15` means 5, 20, 35, 50: a lone start with a step runs to max.
-            (v, if step > 1 { max } else { v })
-        };
-        if lo > hi {
-            return Err(format!("{name} `{range}` is a reversed range (write {hi}-{lo})"));
+impl Field {
+    /// A number or (case-insensitive) name.
+    fn value(&self, token: &str) -> Result<u32, String> {
+        if let Ok(number) = token.parse::<u32>() {
+            return Ok(number);
         }
-        if lo < min || hi > max {
-            return Err(format!("{name} `{range}` out of range {min}-{max}"));
-        }
-        let mut v = lo;
-        while v <= hi {
-            mask |= bit(v);
-            v = v.saturating_add(step);
-        }
+        self.names
+            .iter()
+            .position(|name| name.eq_ignore_ascii_case(token))
+            .and_then(|idx| u32::try_from(idx).ok())
+            .map(|idx| self.min.saturating_add(idx))
+            .ok_or_else(|| format!("bad value `{token}` in {}", self.label))
     }
-    Ok(mask)
+
+    /// Parse one comma-separated field into a bitmask over `min..=max`.
+    fn parse(&self, field: &str) -> Result<u64, String> {
+        let mut mask = 0u64;
+        for part in field.split(',') {
+            let (range, step) = match part.split_once('/') {
+                Some((head, raw_step)) => {
+                    let step: u32 =
+                        raw_step.parse().map_err(|_e| format!("bad step `{raw_step}` in {}", self.label))?;
+                    if step == 0 {
+                        return Err(format!("step 0 in {}", self.label));
+                    }
+                    (head, step)
+                }
+                None => (part, 1),
+            };
+            let (lo, hi) = if range == "*" {
+                (self.min, self.max)
+            } else if let Some((first, last)) = range.split_once('-') {
+                (self.value(first)?, self.value(last)?)
+            } else {
+                let start = self.value(range)?;
+                // `5/15` means 5, 20, 35, 50: a lone start with a step runs to max.
+                (start, if step > 1 { self.max } else { start })
+            };
+            if lo > hi {
+                return Err(format!("{} `{range}` is a reversed range (write {hi}-{lo})", self.label));
+            }
+            if lo < self.min || hi > self.max {
+                return Err(format!("{} `{range}` out of range {}-{}", self.label, self.min, self.max));
+            }
+            let mut value = lo;
+            while value <= hi {
+                mask |= bit(value);
+                value = value.saturating_add(step);
+            }
+        }
+        Ok(mask)
+    }
+}
+
+/// UTC epoch ms of wall-clock epoch ms `wall_ms` in `zone`.
+fn wall_ms_to_utc_ms(zone: &Zone, wall_ms: u64) -> Option<u64> {
+    let utc = zone.local_to_utc(i64::try_from(wall_ms.checked_div(1000)?).ok()?);
+    u64::try_from(utc).ok()?.checked_mul(1000)
+}
+
+/// Expansion of an `@` shortcut, `None` if unknown.
+fn expand_macro(name: &str) -> Option<&'static str> {
+    match name.to_ascii_lowercase().as_str() {
+        "@yearly" | "@annually" => Some("0 0 1 1 *"),
+        "@monthly" => Some("0 0 1 * *"),
+        "@weekly" => Some("0 0 * * 0"),
+        "@daily" | "@midnight" => Some("0 0 * * *"),
+        "@hourly" => Some("0 * * * *"),
+        _ => None,
+    }
 }
 
 impl Cron {
-    /// Parse a 5-field expression, e.g. `0 * * * *` (hourly) or `30 8 * * 1-5`.
+    /// Parse a 5-field expression, e.g. `0 * * * *` (hourly), `30 8 * * MON-FRI`
+    /// or `@daily`.
     ///
     /// # Errors
     ///
-    /// Wrong field count, unparsable values, out-of-range values or a zero step.
+    /// Wrong field count, unknown shortcut, unparsable values, out-of-range
+    /// values or a zero step.
     pub fn parse(expr: &str) -> Result<Self, String> {
-        let fields: Vec<&str> = expr.split_whitespace().collect();
+        let trimmed = expr.trim();
+        let body = if trimmed.starts_with('@') {
+            expand_macro(trimmed).ok_or_else(|| {
+                format!("unknown cron shortcut `{trimmed}` (use @yearly, @monthly, @weekly, @daily or @hourly)")
+            })?
+        } else {
+            trimmed
+        };
+        let fields: Vec<&str> = body.split_whitespace().collect();
         let &[minute, hour, day, month, weekday] = fields.as_slice() else {
             return Err(format!(
                 "cron `{expr}` must have 5 fields: minute hour day-of-month month day-of-week (e.g. `0 9 * * 1-5`)"
             ));
         };
         // Left to right, so an error names the first bad field.
-        let minutes = parse_field(minute, (0, 59), "minute")?;
-        let hours = parse_field(hour, (0, 23), "hour")?;
-        let days = parse_field(day, (1, 31), "day-of-month")?;
-        let months = parse_field(month, (1, 12), "month")?;
-        let raw_weekdays = parse_field(weekday, (0, 7), "day-of-week")?;
+        let minutes = Field { min: 0, max: 59, names: &[], label: "minute" }.parse(minute)?;
+        let hours = Field { min: 0, max: 23, names: &[], label: "hour" }.parse(hour)?;
+        let days = Field { min: 1, max: 31, names: &[], label: "day-of-month" }.parse(day)?;
+        let months = Field { min: 1, max: 12, names: &MONTH_NAMES, label: "month" }.parse(month)?;
+        let raw_weekdays = Field { min: 0, max: 7, names: &WEEKDAY_NAMES, label: "day-of-week" }.parse(weekday)?;
         // 7 is Sunday too: fold it onto 0.
         let weekdays = (raw_weekdays & !bit(7)) | if raw_weekdays & bit(7) == 0 { 0 } else { bit(0) };
-        Ok(Self { minutes, hours, days, months, weekdays, any_day: day == "*", any_weekday: weekday == "*" })
+        Ok(Self {
+            minutes,
+            hours,
+            days,
+            months,
+            weekdays,
+            any_day: day.starts_with('*'),
+            any_weekday: weekday.starts_with('*'),
+        })
     }
 
     /// Whether the calendar day (`day` of month, `month`, `weekday` 0=Sunday) matches.
@@ -107,7 +177,7 @@ impl Cron {
         let by_day = self.days & bit(day) != 0;
         let by_weekday = self.weekdays & bit(weekday) != 0;
         match (self.any_day, self.any_weekday) {
-            (true, true) => true,
+            (true, true) => by_day && by_weekday,
             (true, false) => by_weekday,
             (false, true) => by_day,
             (false, false) => by_day || by_weekday,
@@ -120,9 +190,10 @@ impl Cron {
         (shifted != 0).then(|| from.saturating_add(shifted.trailing_zeros()))
     }
 
-    /// Next firing time strictly after `after_ms` (epoch ms), for a host at
-    /// `offset_secs` from UTC. `None` if nothing matches within ~5 years
-    /// (e.g. `0 0 31 2 *`).
+    /// Next firing time strictly after `after_ms` (epoch ms), for a host at a
+    /// FIXED `offset_secs` from UTC. `None` if nothing matches within ~5 years
+    /// (e.g. `0 0 31 2 *`). For the host's DST-aware zone use
+    /// [`Cron::next_after_local`].
     #[must_use]
     pub fn next_after(&self, after_ms: u64, offset_secs: i32) -> Option<u64> {
         let after_secs = i64::try_from(after_ms.checked_div(1000)?).ok()?;
@@ -132,9 +203,8 @@ impl Cron {
         let first_day = start.div_euclid(DAY_SECS);
         let mut from_minute = u32::try_from(start.rem_euclid(DAY_SECS).checked_div(60)?).ok()?;
         for day_index in first_day..first_day.saturating_add(SEARCH_DAYS) {
-            let (_, month, day) = civil_from_days(day_index);
-            // 1970-01-01 was a Thursday (4).
-            let weekday = u32::try_from(day_index.saturating_add(4).rem_euclid(7)).ok()?;
+            let (_, month, day) = calendar::civil_from_days(day_index);
+            let weekday = u32::try_from(calendar::weekday(day_index)).ok()?;
             if self.day_matches(day, month, weekday)
                 && let Some(minute_of_day) = self.first_minute_from(from_minute)
             {
@@ -148,43 +218,52 @@ impl Cron {
         None
     }
 
-    /// First allowed minute-of-day (0–1439) at or after `from`, same day.
-    fn first_minute_from(&self, from: u32) -> Option<u32> {
-        let (mut hour, mut minute) = (from.checked_div(60)?, from.checked_rem(60)?);
-        while let Some(h) = Self::first_at_or_after(self.hours, hour) {
-            if h > 23 {
-                return None;
+    /// Next firing time strictly after `after_ms` in the host time zone,
+    /// using the offset in force at each candidate (DST-aware).
+    #[must_use]
+    pub fn next_after_local(&self, after_ms: u64) -> Option<u64> {
+        self.next_after_in(&tz::host_zone(), after_ms)
+    }
+
+    /// [`Cron::next_after_local`] for an explicit zone.
+    ///
+    /// The search runs on the wall clock, so each wall time fires at most once:
+    /// a time inside the spring-forward gap fires right after the gap (shifted
+    /// by it), and the repeated fall-back hour does not fire a second time.
+    fn next_after_in(&self, zone: &Zone, after_ms: u64) -> Option<u64> {
+        let after_secs = i64::try_from(after_ms.checked_div(1000)?).ok()?;
+        let wall_secs = after_secs.checked_add(i64::from(zone.offset_at(after_secs)))?;
+        let mut wall_ms = u64::try_from(wall_secs).ok()?.checked_mul(1000)?;
+        // A fall-back hour can map the next wall time to an instant already
+        // passed; a couple of extra steps always clear it.
+        for _ in 0u8..3u8 {
+            let next_wall = self.next_after(wall_ms, 0)?;
+            let utc_ms = wall_ms_to_utc_ms(zone, next_wall)?;
+            if utc_ms > after_ms {
+                return Some(utc_ms);
             }
-            if h > hour {
-                minute = 0;
-            }
-            if let Some(m) = Self::first_at_or_after(self.minutes, minute).filter(|m| *m < 60) {
-                return Some(h.saturating_mul(60).saturating_add(m));
-            }
-            (hour, minute) = (h.saturating_add(1), 0);
+            wall_ms = next_wall;
         }
         None
     }
-}
 
-/// `(year, month 1–12, day 1–31)` of a day count since 1970-01-01
-/// (Howard Hinnant's `civil_from_days`).
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let z = days.saturating_add(719_468);
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = doe
-        .saturating_sub(doe.div_euclid(1460))
-        .saturating_add(doe.div_euclid(36_524))
-        .saturating_sub(doe.div_euclid(146_096))
-        .div_euclid(365);
-    let doy = doe
-        .saturating_sub(yoe.saturating_mul(365).saturating_add(yoe.div_euclid(4)).saturating_sub(yoe.div_euclid(100)));
-    let mp = doy.saturating_mul(5).saturating_add(2).div_euclid(153);
-    let day = doy.saturating_sub(mp.saturating_mul(153).saturating_add(2).div_euclid(5)).saturating_add(1);
-    let month = if mp < 10 { mp.saturating_add(3) } else { mp.saturating_sub(9) };
-    let year = yoe.saturating_add(era.saturating_mul(400)).saturating_add(i64::from(month <= 2));
-    (year, u32::try_from(month).unwrap_or(1), u32::try_from(day).unwrap_or(1))
+    /// First allowed minute-of-day (0–1439) at or after `from`, same day.
+    fn first_minute_from(&self, from: u32) -> Option<u32> {
+        let (mut hour, mut minute) = (from.checked_div(60)?, from.checked_rem(60)?);
+        while let Some(found_hour) = Self::first_at_or_after(self.hours, hour) {
+            if found_hour > 23 {
+                return None;
+            }
+            if found_hour > hour {
+                minute = 0;
+            }
+            if let Some(found_minute) = Self::first_at_or_after(self.minutes, minute).filter(|found| *found < 60) {
+                return Some(found_hour.saturating_mul(60).saturating_add(found_minute));
+            }
+            (hour, minute) = (found_hour.saturating_add(1), 0);
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -193,15 +272,23 @@ mod tests {
 
     /// 2026-10-13T17:52:00Z (a Tuesday).
     const T0: u64 = 1_791_913_920_000;
+    /// 2026-03-29T01:00:00Z: Paris springs forward (02:00 CET -> 03:00 CEST).
+    const PARIS_SPRING_MS: u64 = 1_774_746_000_000;
+    /// 2026-10-25T01:00:00Z: Paris falls back (03:00 CEST -> 02:00 CET).
+    const PARIS_FALL_MS: u64 = 1_792_890_000_000;
+    /// One hour in ms.
+    const HOUR: u64 = 3_600_000;
 
     fn next(expr: &str, after: u64) -> Option<u64> {
         Cron::parse(expr).ok()?.next_after(after, 0)
     }
 
-    #[test]
-    fn civil_dates() {
-        assert_eq!(civil_from_days(0), (1970, 1, 1));
-        assert_eq!(civil_from_days(20_739), (2026, 10, 13));
+    fn paris() -> Zone {
+        Zone::from_posix("CET-1CEST,M3.5.0,M10.5.0/3").unwrap_or_default()
+    }
+
+    fn next_paris(expr: &str, after: u64) -> Option<u64> {
+        Cron::parse(expr).ok()?.next_after_in(&paris(), after)
     }
 
     #[test]
@@ -227,8 +314,7 @@ mod tests {
     #[test]
     fn posix_day_or_rule_and_errors() {
         // Day 15 OR Monday: Monday 19th comes after the 15th (Thursday).
-        let c = next("0 0 15 * 1", T0);
-        assert_eq!(c, next("0 0 15 * *", T0));
+        assert_eq!(next("0 0 15 * 1", T0), next("0 0 15 * *", T0));
         assert!(next("0 0 31 2 *", T0).is_none());
         assert_eq!(Cron::parse("0 9 * *").ok(), None);
         assert_eq!(Cron::parse("60 * * * *").ok(), None);
@@ -236,12 +322,66 @@ mod tests {
     }
 
     #[test]
+    fn star_step_day_field_is_unrestricted_for_the_or_rule() {
+        // `*/1` day + Monday = Mondays only (Vixie), not every day.
+        assert_eq!(next("0 9 */1 * 1", T0), next("0 9 * * 1", T0));
+        // `*/2` day + `*` weekday = odd days only.
+        let odd = Cron::parse("0 0 */2 * *").ok();
+        assert_eq!(odd.map(|cron| cron.day_matches(14, 10, 3)), Some(false));
+        assert_eq!(odd.map(|cron| cron.day_matches(15, 10, 4)), Some(true));
+    }
+
+    #[test]
+    fn names_and_shortcuts() {
+        let same = [
+            ("30 8 * * MON-FRI", "30 8 * * 1-5"),
+            ("0 0 1 jan,Jul *", "0 0 1 1,7 *"),
+            ("0 0 * * sun", "0 0 * * 0"),
+            ("@daily", "0 0 * * *"),
+            ("@MIDNIGHT", "0 0 * * *"),
+            ("@hourly", "0 * * * *"),
+            ("@weekly", "0 0 * * 0"),
+            ("@monthly", "0 0 1 * *"),
+            ("@annually", "0 0 1 1 *"),
+        ];
+        for (named, numeric) in same {
+            assert_eq!(Cron::parse(named).ok(), Cron::parse(numeric).ok(), "{named}");
+        }
+        for bad in ["@reboot", "0 0 * * FOO"] {
+            assert_eq!(Cron::parse(bad).ok(), None, "{bad}");
+        }
+    }
+
+    #[test]
     fn error_messages_name_the_right_problem() {
-        // Reversed range: not "out of range".
         let reversed = Cron::parse("5-1 * * * *").unwrap_err();
         assert!(reversed.contains("reversed range"), "{reversed}");
-        // A garbage expression blames the FIRST bad field (minute), not the last.
         let garbage = Cron::parse("foo bar baz qux quux").unwrap_err();
         assert!(garbage.contains("minute"), "{garbage}");
+    }
+
+    #[test]
+    fn local_schedule_tracks_dst() {
+        // 09:00 Paris the day before spring-forward is 08:00Z; the day after, 07:00Z.
+        let before = next_paris("0 9 * * *", PARIS_SPRING_MS - 20 * HOUR);
+        assert_eq!(before, Some(PARIS_SPRING_MS + 7 * HOUR - 24 * HOUR));
+        let after = next_paris("0 9 * * *", PARIS_SPRING_MS);
+        assert_eq!(after, Some(PARIS_SPRING_MS + 6 * HOUR));
+        // After fall-back, 09:00 CET = 08:00Z.
+        assert_eq!(next_paris("0 9 * * *", PARIS_FALL_MS), Some(PARIS_FALL_MS + 7 * HOUR));
+    }
+
+    #[test]
+    fn local_schedule_gap_and_overlap() {
+        // 02:30 does not exist on spring-forward day: fires once at 03:30 CEST (01:30Z).
+        let gap = next_paris("30 2 * * *", PARIS_SPRING_MS - 2 * HOUR);
+        assert_eq!(gap, Some(PARIS_SPRING_MS + 1_800_000));
+        // Hourly across fall-back: strictly increasing, never repeats an instant.
+        let mut at = PARIS_FALL_MS - 3 * HOUR;
+        for _ in 0u8..6u8 {
+            let fired = next_paris("0 * * * *", at);
+            assert!(fired.is_some_and(|ms| ms > at), "{fired:?} after {at}");
+            at = fired.unwrap_or(u64::MAX);
+        }
     }
 }
