@@ -22,7 +22,7 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
 ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 
 # Serialize concurrent invocations with a portable mkdir spin-lock. The
 # TS-codegen step regenerates the hey-api client into a SINGLE shared output dir
@@ -59,13 +59,15 @@ until mkdir "$LOCK_DIR" 2>/dev/null; do
 done
 trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
 
-fail=0
+# shellcheck source=lib-failures.sh
+. "$ROOT/.github/checks/lib-failures.sh"
+ledger_init check-api-contract
 
 echo "=== OpenAPI spec + route exhaustiveness ==="
-cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1 || fail=1
+cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1 || ledger_fail openapi
 
 echo "=== TS client codegen + drift ==="
-bash "$ROOT/.github/checks/check-typescript-contract.sh" || fail=1
+bash "$ROOT/.github/checks/check-typescript-contract.sh" || ledger_fail ts-drift
 
 echo "=== manual fetch() audit (api layer must use the generated SDK) ==="
 # The api layer must call the generated SDK. The only acceptable raw fetch is a
@@ -89,10 +91,7 @@ MANUAL_FETCH=$(find "$ROOT/web/src/lib/api" -type f -name '*.ts' -not -path '*/g
 if [ -n "$MANUAL_FETCH" ]; then
   echo "::error::Manual fetch() calls found in API layer — use the generated SDK (or mark // ok:manual):"
   echo "$MANUAL_FETCH"
-  fail=1
+  ledger_fail manual-fetch
 fi
 
-if [ "$fail" -eq 0 ]; then
-  echo "check-api-contract OK ($MODE): openapi · ts-drift · manual-fetch ✓"
-fi
-exit "$fail"
+ledger_finish "openapi · ts-drift · manual-fetch ✓"

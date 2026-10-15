@@ -31,14 +31,16 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
 ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
-fail=0
+cd "$ROOT" || exit 1
+# shellcheck source=lib-failures.sh
+. "$ROOT/.github/checks/lib-failures.sh"
+ledger_init check-rust-lints
 
 echo "=== cargo fmt --check ==="
-cargo fmt -- --check 2>&1 || fail=1
+cargo fmt -- --check 2>&1 || ledger_fail fmt
 
 echo "=== cargo clippy --workspace --all-targets -D warnings ==="
-cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
+cargo clippy --workspace --all-targets -- -D warnings 2>&1 || ledger_fail clippy
 
 # cargo check runs in --ci only. In --callback it is redundant + too slow: the
 # rust-tests callback already does a full-workspace `cargo build` (debug) which
@@ -47,16 +49,13 @@ cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
 # zero extra coverage. CI keeps it (the rust job's cache is warm; explicit gate).
 if [ "$MODE" = "--ci" ]; then
   echo "=== cargo check --workspace -D warnings ==="
-  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || fail=1
+  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || ledger_fail check
 fi
 
 echo "=== lint-exception registry ==="
-bash "$ROOT/.github/checks/check-lint-exceptions.sh" || fail=1
+bash "$ROOT/.github/checks/check-lint-exceptions.sh" || ledger_fail lint-exceptions
 
 echo "=== vault-bypass (full scan) ==="
-bash "$ROOT/.github/checks/check-vault-bypass.sh" || fail=1
+bash "$ROOT/.github/checks/check-vault-bypass.sh" || ledger_fail vault-bypass
 
-if [ "$fail" -eq 0 ]; then
-  echo "check-rust-lints OK ($MODE): fmt · clippy · check · exceptions · vault ✓"
-fi
-exit "$fail"
+ledger_finish "fmt · clippy · check · exceptions · vault ✓"
