@@ -42,7 +42,7 @@
 //! every record on a synced segment.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Seek as _, SeekFrom, Write as _};
+use std::io::{self, Seek as _, SeekFrom, Write as _};
 use std::path::{Path, PathBuf};
 
 use cp_wire::framing;
@@ -90,6 +90,45 @@ pub struct OplogWriter {
     /// appended. Seeded on open by replaying the durable log; its heads and
     /// seen-set are written verbatim into each segment's leading checkpoint.
     state: Recovered,
+
+    /// Set by the first failed write or sync. A failed `write_all` can leave a
+    /// partial frame mid-segment, and a failed `fdatasync` can leave pages the
+    /// kernel already dropped while a later sync reports success. Appending
+    /// past either would acknowledge records that the next open truncates, so
+    /// a poisoned writer refuses all further work until it is reopened (reopen
+    /// truncates the torn tail and resumes from what is truly durable).
+    poisoned: bool,
+
+    /// Exclusive advisory lock on `dir/LOCK`, held for the writer's lifetime:
+    /// two writers on one oplog would interleave frames.
+    _lock: File,
+
+    /// Test-only fault injection: the next frame write stops halfway and fails.
+    #[cfg(test)]
+    fail_next_write: bool,
+}
+
+/// Name of the lock file guarding single-writer access to an oplog directory.
+const LOCK_FILE: &str = "LOCK";
+
+/// Take the exclusive writer lock on `dir`, failing fast if another writer
+/// (another process, or another handle in this one) already holds it.
+fn lock_dir(dir: &Path) -> OplogResult<File> {
+    let file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(dir.join(LOCK_FILE))?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(fs::TryLockError::WouldBlock) => Err(io::Error::new(
+            io::ErrorKind::WouldBlock,
+            format!("oplog {} is already open by another writer", dir.display()),
+        )
+        .into()),
+        Err(fs::TryLockError::Error(e)) => Err(e.into()),
+    }
+}
+
+/// The error every call on a poisoned writer returns.
+fn poisoned_error() -> io::Error {
+    io::Error::other("oplog writer poisoned by an earlier I/O failure; reopen to recover")
 }
 
 impl OplogWriter {
@@ -120,6 +159,7 @@ impl OplogWriter {
     {
         let dir = path.as_ref().to_path_buf();
         fs::create_dir_all(&dir)?;
+        let lock = lock_dir(&dir)?;
 
         let indices = segment::indices(&dir)?;
         // Running heads + the highest durable rev come from replaying the log.
@@ -137,7 +177,7 @@ impl OplogWriter {
                 file.sync_data()?;
             }
             let _pos = file.seek(SeekFrom::Start(scan.valid_len))?;
-            Ok(Self {
+            let mut writer = Self {
                 dir,
                 file,
                 index,
@@ -146,7 +186,18 @@ impl OplogWriter {
                 next_rev,
                 segment_limit,
                 state: recovered,
-            })
+                poisoned: false,
+                _lock: lock,
+                #[cfg(test)]
+                fail_next_write: false,
+            };
+            // A crash between creating a rolled segment and making its leading
+            // checkpoint durable leaves it empty. Re-stamp it so the bounded-replay
+            // invariant (every rolled segment opens with a checkpoint) holds.
+            if index > 0 && scan.entries.is_empty() {
+                let _cp_rev = writer.checkpoint()?;
+            }
+            Ok(writer)
         } else {
             // Fresh oplog: create segment 0 (no leading checkpoint — there is
             // no prior state to snapshot) and durably link it into the dir.
@@ -160,6 +211,10 @@ impl OplogWriter {
                 next_rev,
                 segment_limit,
                 state: recovered,
+                poisoned: false,
+                _lock: lock,
+                #[cfg(test)]
+                fail_next_write: false,
             })
         }
     }
@@ -213,16 +268,20 @@ impl OplogWriter {
     /// Returns [`OplogError::Frame`] if the entry cannot be framed, or
     /// [`OplogError::Io`] if the write or a segment roll fails.
     pub fn append_buffered(&mut self, kind: OpEntryKind) -> OplogResult<u64> {
-        // Probe the framed size to decide whether this record would overflow
-        // the segment. (The probe re-encodes; `rev`/timestamp do not affect the
-        // decision, so a zeroed placeholder is fine.)
-        let probe = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, 0, kind.clone());
-        let frame_len = u64::try_from(framing::encode_entry(&probe)?.len()).unwrap_or(u64::MAX);
+        self.ensure_healthy()?;
+        let entry = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, now_ms(), kind);
+        let frame = framing::encode_entry(&entry)?;
+        let frame_len = u64::try_from(frame.len()).unwrap_or(u64::MAX);
 
         if self.segment_has_record && self.segment_bytes.wrapping_add(frame_len) > self.segment_limit {
+            // The roll's checkpoint takes this rev; re-frame under the next one.
+            // Rolls happen once per segment, so the common path encodes once.
             self.roll()?;
+            let reframed = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, entry.timestamp_ms, entry.kind);
+            let reframed_bytes = framing::encode_entry(&reframed)?;
+            return self.write_frame(&reframed, &reframed_bytes, true);
         }
-        self.write_record(kind, true)
+        self.write_frame(&entry, &frame, true)
     }
 
     /// `fdatasync` the current segment, making every buffered append durable.
@@ -233,10 +292,26 @@ impl OplogWriter {
     ///
     /// # Errors
     ///
-    /// Returns [`OplogError::Io`] if the `fdatasync` fails.
-    pub fn sync(&self) -> OplogResult<()> {
-        self.file.sync_data()?;
+    /// Returns [`OplogError::Io`] if the `fdatasync` fails (which poisons the
+    /// writer) or the writer is already poisoned.
+    pub fn sync(&mut self) -> OplogResult<()> {
+        self.ensure_healthy()?;
+        if let Err(e) = self.file.sync_data() {
+            self.poisoned = true;
+            return Err(e.into());
+        }
         Ok(())
+    }
+
+    /// Whether an earlier I/O failure has poisoned this writer.
+    #[must_use]
+    pub const fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
+
+    /// Refuse work once poisoned (see the `poisoned` field).
+    fn ensure_healthy(&self) -> OplogResult<()> {
+        if self.poisoned { Err(poisoned_error().into()) } else { Ok(()) }
     }
 
     /// Force a checkpoint (a full [`Heads`] snapshot) into the current segment.
@@ -262,19 +337,27 @@ impl OplogWriter {
     /// buffered-but-unsynced records on it become durable at the roll boundary
     /// — a group-commit batch that spans a roll never leaves records on an
     /// unsynced, abandoned segment. The new segment's leading checkpoint is
-    /// written buffered; the caller's trailing `sync` (or the next group commit)
-    /// makes it durable.
+    /// synced **before** returning: compaction treats a checkpoint-bearing
+    /// segment as the replay base and deletes everything older, so that
+    /// checkpoint must be durable before any compaction can observe it (one
+    /// extra `fdatasync` per segment, i.e. per 64 MiB).
     fn roll(&mut self) -> OplogResult<()> {
         self.sync()?;
         let next_index = self.index.wrapping_add(1);
-        let file = Self::create_segment(&self.dir, next_index)?;
+        let file = match Self::create_segment(&self.dir, next_index) {
+            Ok(file) => file,
+            Err(e) => {
+                self.poisoned = true;
+                return Err(e);
+            }
+        };
         self.file = file;
         self.index = next_index;
         self.segment_bytes = 0;
         self.segment_has_record = false;
         let snapshot = self.snapshot();
         let _cp_rev = self.write_record(OpEntryKind::Checkpoint { snapshot }, false)?;
-        Ok(())
+        self.sync()
     }
 
     /// Low-level buffered append: frame, write, advance `rev`, fold state. Does
@@ -283,19 +366,41 @@ impl OplogWriter {
     /// a checkpoint), which gates future rolls. This is the single place a `rev`
     /// is assigned.
     fn write_record(&mut self, kind: OpEntryKind, is_record: bool) -> OplogResult<u64> {
-        let rev = self.next_rev;
-        let entry = OpEntry::new(WRITER_SCHEMA_VERSION, rev, now_ms(), kind);
+        self.ensure_healthy()?;
+        let entry = OpEntry::new(WRITER_SCHEMA_VERSION, self.next_rev, now_ms(), kind);
         let frame = framing::encode_entry(&entry)?;
+        self.write_frame(&entry, &frame, is_record)
+    }
 
-        self.file.write_all(&frame)?;
+    /// Write an already-framed `entry` (whose `rev` must be `next_rev`) and
+    /// advance the writer. A failed write poisons the writer: the segment may
+    /// now hold a partial frame, and nothing may be appended after it.
+    fn write_frame(&mut self, entry: &OpEntry, frame: &[u8], is_record: bool) -> OplogResult<u64> {
+        let rev = entry.rev;
+        if let Err(e) = self.write_bytes(frame) {
+            self.poisoned = true;
+            return Err(e.into());
+        }
 
         self.segment_bytes = self.segment_bytes.wrapping_add(u64::try_from(frame.len()).unwrap_or(u64::MAX));
         self.next_rev = self.next_rev.wrapping_add(1);
         if is_record {
             self.segment_has_record = true;
         }
-        fold_entry(&mut self.state, &entry);
+        fold_entry(&mut self.state, entry);
         Ok(rev)
+    }
+
+    /// The raw segment write (with test-only fault injection: write half the
+    /// frame, then fail — a torn partial write).
+    fn write_bytes(&mut self, frame: &[u8]) -> io::Result<()> {
+        #[cfg(test)]
+        if std::mem::take(&mut self.fail_next_write) {
+            let half = frame.get(..frame.len().checked_shr(1).unwrap_or(0)).unwrap_or_default();
+            self.file.write_all(half)?;
+            return Err(io::Error::other("injected write failure"));
+        }
+        self.file.write_all(frame)
     }
 
     /// The `rev` the next append will assign.
@@ -339,129 +444,4 @@ fn now_ms() -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use cp_wire::types::Phase;
-    use tempfile::tempdir;
-
-    fn phase_kind() -> OpEntryKind {
-        OpEntryKind::PhaseTransition { phase: Phase::Streaming }
-    }
-
-    #[test]
-    fn append_assigns_monotonic_revs() {
-        let dir = tempdir().expect("tempdir");
-        let mut writer = OplogWriter::open(dir.path()).expect("open");
-        let revs: Vec<u64> = std::iter::repeat_with(|| writer.append(phase_kind()).expect("append")).take(10).collect();
-        assert_eq!(revs, (0u64..10).collect::<Vec<_>>(), "revs strictly increase from 0");
-    }
-
-    #[test]
-    fn revs_resume_across_reopen_without_reuse() {
-        let dir = tempdir().expect("tempdir");
-        {
-            let mut writer = OplogWriter::open(dir.path()).expect("open");
-            for _unused in 0u32..5 {
-                let _rev = writer.append(phase_kind()).expect("append");
-            }
-            assert_eq!(writer.next_rev(), 5);
-        }
-        // Reopen: next rev must continue at 5, never reusing 0..4.
-        let mut reopened = OplogWriter::open(dir.path()).expect("reopen");
-        assert_eq!(reopened.next_rev(), 5, "rev resumes past the highest durable rev");
-        let rev = reopened.append(phase_kind()).expect("append");
-        assert_eq!(rev, 5);
-    }
-
-    #[test]
-    fn appended_records_read_back_in_order() {
-        let dir = tempdir().expect("tempdir");
-        let mut writer = OplogWriter::open(dir.path()).expect("open");
-        for _unused in 0u32..4 {
-            let _rev = writer.append(phase_kind()).expect("append");
-        }
-        let path = segment::path(dir.path(), 0);
-        let scan = segment::read(&path).expect("read");
-        assert_eq!(scan.entries.len(), 4);
-        assert!(!scan.torn_tail);
-        let revs: Vec<u64> = scan.entries.iter().map(|e| e.rev).collect();
-        assert_eq!(revs, vec![0, 1, 2, 3]);
-    }
-
-    #[test]
-    fn small_segment_limit_forces_roll_and_continues_revs() {
-        let dir = tempdir().expect("tempdir");
-        // A tiny limit forces a new segment after roughly each record. Each
-        // roll injects a leading checkpoint, so revs advance by more than the
-        // user-record count — assert monotonicity + a roll, not an exact total.
-        let mut writer = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("open");
-        let mut last = 0;
-        for _unused in 0u32..6 {
-            last = writer.append(phase_kind()).expect("append");
-        }
-        assert!(writer.current_segment() > 0, "tiny limit must have rolled segments");
-        let after_first_session = writer.next_rev();
-        assert!(after_first_session > last, "next_rev is past the last appended rev");
-
-        // Reopen across multiple segments: rev resumes exactly where it stopped.
-        let reopened = OplogWriter::open_with_segment_limit(dir.path(), 16).expect("reopen");
-        assert_eq!(
-            reopened.next_rev(),
-            after_first_session,
-            "rev resumes across multi-segment scan, checkpoints included",
-        );
-    }
-
-    #[test]
-    fn torn_tail_is_truncated_on_open() {
-        let dir = tempdir().expect("tempdir");
-        {
-            let mut writer = OplogWriter::open(dir.path()).expect("open");
-            let _rev = writer.append(phase_kind()).expect("append");
-            let _rev2 = writer.append(phase_kind()).expect("append");
-        }
-        // Corrupt the segment by appending garbage bytes (a torn write).
-        let path = segment::path(dir.path(), 0);
-        {
-            let mut f = OpenOptions::new().append(true).open(&path).expect("reopen for corrupt");
-            f.write_all(&[0xFF, 0xFF, 0xFF, 0xFF, 0x01]).expect("write garbage");
-            f.sync_data().expect("sync");
-        }
-        // Reopen: the garbage tail is dropped, rev resumes at 2.
-        let mut writer = OplogWriter::open(dir.path()).expect("reopen");
-        assert_eq!(writer.next_rev(), 2, "garbage tail must not advance rev");
-        let rev = writer.append(phase_kind()).expect("append after recovery");
-        assert_eq!(rev, 2);
-
-        let scan = segment::read(&path).expect("read");
-        assert_eq!(scan.entries.len(), 3, "two survivors + one fresh append");
-        assert!(!scan.torn_tail, "tail is clean after recovery");
-    }
-
-    #[test]
-    fn explicit_checkpoint_carries_running_heads() {
-        let dir = tempdir().expect("tempdir");
-        let mut writer = OplogWriter::open(dir.path()).expect("open");
-        let _r = writer
-            .append(OpEntryKind::MessageCreated {
-                agent_id: "T1".to_owned(),
-                message_id: "m1".to_owned(),
-                head: cp_wire::types::ContentHash::new([0x77; 32]),
-                inline_body: None,
-            })
-            .expect("append");
-        let _cp = writer.checkpoint().expect("checkpoint");
-
-        // The newest segment now ends with a checkpoint whose heads match the
-        // running heads.
-        let scan = segment::read(&segment::path(dir.path(), 0)).expect("read");
-        // Own the last entry so the checkpoint pattern binds `snapshot` by value —
-        // matching a `&OpEntryKind` via ergonomics trips pattern_type_mismatch, and
-        // its mandated `ref` fix trips ref_patterns (the two are mutually exclusive).
-        let last_kind = scan.entries.into_iter().next_back().expect("entries").kind;
-        let OpEntryKind::Checkpoint { snapshot } = last_kind else {
-            panic!("expected trailing checkpoint");
-        };
-        assert_eq!(&snapshot.heads, writer.heads());
-    }
-}
+mod tests;
