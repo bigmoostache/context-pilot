@@ -68,7 +68,6 @@ pub(crate) fn digest(path: &Path) -> Option<FileDigest> {
         file_hash: hex.get(..8).unwrap_or(&hex).to_owned(),
         desc_key: description_key(&path.to_string_lossy(), &content),
     };
-    let _prev =
-        CACHE.lock().unwrap_or_else(PoisonError::into_inner).insert(path.to_path_buf(), (stamp, fresh.clone()));
+    let _prev = CACHE.lock().unwrap_or_else(PoisonError::into_inner).insert(path.to_path_buf(), (stamp, fresh.clone()));
     Some(fresh)
 }
