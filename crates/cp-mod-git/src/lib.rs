@@ -24,7 +24,6 @@ use worker::GitSnapshot;
 
 use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
-use std::process::Command;
 
 /// Parse a `git diff --numstat` line into (additions, deletions, path).
 /// Binary files (`-`/`-` counts) yield 0/0.
@@ -41,13 +40,10 @@ fn parse_numstat_line(line: &str) -> Option<(i32, i32, String)> {
 /// Collect tracked (working-tree) changes via `git diff --numstat <base>`.
 fn collect_tracked_changes(dir: &std::path::Path, diff_args: &[&str]) -> Vec<GitFileChange> {
     let mut changes = Vec::new();
-    let Ok(output) = Command::new("git").args(diff_args).current_dir(dir).output() else {
+    let Some(stdout) = worker::git_stdout(dir, diff_args) else {
         return changes;
     };
-    if !output.status.success() {
-        return changes;
-    }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
+    for line in stdout.lines() {
         if let Some((additions, deletions, path)) = parse_numstat_line(line) {
             let change_type = if dir.join(&path).exists() { GitChangeType::Modified } else { GitChangeType::Deleted };
             changes.push(GitFileChange { path, additions, deletions, change_type });
@@ -58,19 +54,15 @@ fn collect_tracked_changes(dir: &std::path::Path, diff_args: &[&str]) -> Vec<Git
 
 /// Append untracked files (`git ls-files --others`) with their line counts.
 fn append_untracked_files(dir: &std::path::Path, changes: &mut Vec<GitFileChange>) {
-    let Ok(output) = Command::new("git").args(["ls-files", "--others", "--exclude-standard"]).current_dir(dir).output()
-    else {
+    let Some(stdout) = worker::git_stdout(dir, &["ls-files", "--others", "--exclude-standard"]) else {
         return;
     };
-    if !output.status.success() {
-        return;
-    }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
+    for line in stdout.lines() {
         let path = line.trim().to_owned();
         if path.is_empty() {
             continue;
         }
-        let line_count = std::fs::read_to_string(dir.join(&path)).map_or(0i32, |c| c.lines().count().to_i32());
+        let line_count = worker::count_lines_capped(&dir.join(&path)).to_i32();
         changes.push(GitFileChange {
             path,
             additions: line_count,
@@ -92,20 +84,14 @@ fn append_untracked_files(dir: &std::path::Path, changes: &mut Vec<GitFileChange
 pub fn compute_git_snapshot(dir: &std::path::Path, diff_base: Option<&str>) -> GitSnapshot {
     // `branch --show-current` fails (non-zero) outside a repo — use it as the
     // repo probe and the branch read in one call.
-    let probe = Command::new("git").args(["branch", "--show-current"]).current_dir(dir).output().ok();
-    let Some(branch_out) = probe.filter(|o| o.status.success()) else {
+    let Some(branch_out) = worker::git_stdout(dir, &["branch", "--show-current"]) else {
         return GitSnapshot { dir: dir.to_path_buf(), ..GitSnapshot::default() };
     };
 
-    let branch_name = String::from_utf8_lossy(&branch_out.stdout).trim().to_owned();
+    let branch_name = branch_out.trim().to_owned();
     let branch = if branch_name.is_empty() {
         // Detached HEAD: fall back to the short commit hash.
-        Command::new("git")
-            .args(["rev-parse", "--short", "HEAD"])
-            .current_dir(dir)
-            .output()
-            .ok()
-            .map(|h| format!("detached:{}", String::from_utf8_lossy(&h.stdout).trim()))
+        worker::git_stdout(dir, &["rev-parse", "--short", "HEAD"]).map(|h| format!("detached:{}", h.trim()))
     } else {
         Some(branch_name)
     };
@@ -309,6 +295,8 @@ impl Module for GitModule {
             WatchSpec::DirRecursive(".git/refs/heads".to_owned()),
             WatchSpec::DirRecursive(".git/refs/tags".to_owned()),
             WatchSpec::DirRecursive(".git/refs/remotes".to_owned()),
+            // Linked worktrees keep their own HEAD/index under `.git/worktrees/<name>/`.
+            WatchSpec::DirRecursive(".git/worktrees".to_owned()),
         ]
     }
 
