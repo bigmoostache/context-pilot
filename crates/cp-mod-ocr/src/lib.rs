@@ -4,10 +4,17 @@
 //! structured JSON (text boxes with bounding boxes). Runs async
 //! via the watcher system; returns immediately and notifies on completion.
 
-/// Datalab HTTP API client (submit, poll, cache).
+/// Result disk cache and atomic file writes.
+mod cache;
+/// Datalab HTTP API client (submit, poll, retries, job budget).
 pub mod client;
+/// Mocked-HTTP regression tests.
+#[cfg(test)]
+mod tests;
 /// Tool dispatch and parameter validation.
 pub mod tools;
+/// Watcher delivering a job's outcome to the calling agent.
+mod watcher;
 
 use cp_base::modules::Module;
 use cp_base::panels::Panel;

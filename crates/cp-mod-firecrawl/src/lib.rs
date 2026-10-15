@@ -9,8 +9,12 @@
 pub mod api;
 /// Recursive site crawling — `firecrawl_crawl` tool.
 pub(crate) mod crawl;
+/// Retrying, deadline-aware HTTP transport shared by every endpoint.
+pub(crate) mod http;
 /// Dynamic panel rendering for scraped content.
 pub mod panel;
+#[cfg(test)]
+mod tests;
 /// Tool dispatch: `firecrawl_scrape`, `firecrawl_search`, `firecrawl_map`.
 pub mod tools;
 /// Firecrawl API response/request serde types.

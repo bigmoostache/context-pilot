@@ -1,12 +1,13 @@
 //! YAML-backed persistent storage for tree descriptions.
 //!
 //! Descriptions are stored in `.context-pilot/shared/tree-descriptions.yaml`,
-//! keyed by a 16-char hex SHA-256 of `(path + file_content)`.  The BTreeMap
+//! keyed by 16 hex chars of FNV-1a over `(path + file_content)`.  The BTreeMap
 //! key order is deterministic, making diffs merge-friendly across git branches.
 //!
 //! Delegates all YAML I/O (load, save, backup, recovery) to
 //! [`cp_base::config::yaml_sync::YamlSync`].  This module adds tree-specific
-//! logic: content-hash keys, file-existence checks, stale-description refresh.
+//! logic: content-hash keys, file-existence checks, stale-description refresh,
+//! and pruning of superseded entries.
 //!
 //! ## Write path
 //!
@@ -19,6 +20,14 @@
 //! are missing from the in-memory state are populated back, provided the
 //! file still exists on disk **and** its content hash matches the YAML key
 //! (i.e. the description is fresh).
+//!
+//! ## Pruning
+//!
+//! Every content change adds a key and nothing removed the old one, so the
+//! file grew without bound (~5 entries per path). On load, [`prune_yaml`]
+//! keeps per path the entry matching the current content plus the
+//! [`KEEP_PER_PATH`] most recent others (enough to restore a description
+//! after a branch switch), and drops the rest.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -28,7 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use cp_base::config::yaml_sync::{SyncEntry, YamlSync};
 
-use crate::tools::compute_file_hash;
+use crate::filehash::{description_key as compute_description_key, digest};
 use crate::types::TreeFileDescription;
 
 // ---------------------------------------------------------------------------
@@ -74,22 +83,6 @@ impl SyncEntry for YamlEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Key computation
-// ---------------------------------------------------------------------------
-
-/// Compute a description key: first 16 hex chars of FNV-1a(path ∥ content).
-///
-/// The combined hash means the same file at a different path (copy/rename)
-/// or the same path with different content each get their own YAML entry.
-fn compute_description_key(path: &str, content: &[u8]) -> String {
-    let mut data = Vec::with_capacity(path.len().saturating_add(content.len()));
-    data.extend_from_slice(path.as_bytes());
-    data.extend_from_slice(content);
-    let hex = cp_mod_utilities::hash::compute(&data);
-    hex.get(..16).unwrap_or(&hex).to_owned()
-}
-
-// ---------------------------------------------------------------------------
 // Public API — surgical updates
 // ---------------------------------------------------------------------------
 
@@ -131,30 +124,23 @@ pub(crate) fn remove_yaml_entries(paths: &[String]) {
 /// a new `TreeFileDescription` is appended to the in-memory vec.
 pub(crate) fn populate_from_yaml(descriptions: &mut Vec<TreeFileDescription>) {
     let map = sync().load::<YamlEntry>();
-    if map.is_empty() {
-        return;
-    }
+    populate_with(&map, descriptions);
+}
 
-    let existing: std::collections::HashSet<String> = descriptions.iter().map(|d| d.path.clone()).collect();
-
-    for (key, entry) in &map {
+/// [`populate_from_yaml`] over an already-loaded map (pure apart from file reads).
+pub(crate) fn populate_with(map: &BTreeMap<String, YamlEntry>, descriptions: &mut Vec<TreeFileDescription>) {
+    let mut existing: std::collections::HashSet<String> = descriptions.iter().map(|d| d.path.clone()).collect();
+    for (key, entry) in map {
         if existing.contains(&entry.path) {
             continue;
         }
-        let file_path = Path::new(&entry.path);
-        if !file_path.exists() {
-            continue;
-        }
-        let Ok(content) = std::fs::read(file_path) else { continue };
-        let current_key = compute_description_key(&entry.path, &content);
-        if current_key != *key {
-            continue; // File content changed — description is stale, skip
-        }
-        let file_hash = compute_file_hash(file_path).unwrap_or_default();
+        // Missing file, or content changed since this entry was written: skip.
+        let Some(current) = digest(Path::new(&entry.path)).filter(|d| d.desc_key == *key) else { continue };
+        let _new = existing.insert(entry.path.clone());
         descriptions.push(TreeFileDescription {
             path: entry.path.clone(),
             description: entry.description.clone(),
-            file_hash,
+            file_hash: current.file_hash,
         });
     }
 }
@@ -169,35 +155,85 @@ pub(crate) fn populate_from_yaml(descriptions: &mut Vec<TreeFileDescription>) {
 /// Runs on the cache worker thread over the shared snapshot (read-only) and
 /// returns one [`DescPatch`] per swap; callers apply them via [`apply_patches`].
 pub(crate) fn refresh_stale_from_yaml(descriptions: &[TreeFileDescription]) -> Vec<DescPatch> {
-    let map = load_cached();
+    refresh_with(&load_cached(), descriptions)
+}
+
+/// [`refresh_stale_from_yaml`] over an already-loaded map. One memoized
+/// [`digest`] per file: an unchanged file costs a `stat`, not a read.
+pub(crate) fn refresh_with(map: &BTreeMap<String, YamlEntry>, descriptions: &[TreeFileDescription]) -> Vec<DescPatch> {
     if map.is_empty() {
         return Vec::new();
     }
-
     let mut patches = Vec::new();
     for desc in descriptions {
-        let file_path = Path::new(&desc.path);
-        let Some(current_hash) = compute_file_hash(file_path) else { continue };
-
-        // Skip if description is still fresh
-        if !desc.file_hash.is_empty() && desc.file_hash == current_hash {
+        let Some(current) = digest(Path::new(&desc.path)) else { continue };
+        if !desc.file_hash.is_empty() && desc.file_hash == current.file_hash {
             continue;
         }
-
-        // File content changed — check YAML for a matching entry
-        let Ok(content) = std::fs::read(file_path) else { continue };
-        let current_key = compute_description_key(&desc.path, &content);
-
-        if let Some(entry) = map.get(&current_key) {
+        if let Some(entry) = map.get(&current.desc_key) {
             patches.push(DescPatch {
                 path: desc.path.clone(),
                 old_hash: desc.file_hash.clone(),
                 description: entry.description.clone(),
-                file_hash: current_hash,
+                file_hash: current.file_hash,
             });
         }
     }
     patches
+}
+
+/// Non-protected entries kept per path by [`prune_yaml`]: enough history to
+/// restore a description after switching between a few branches.
+pub(crate) const KEEP_PER_PATH: usize = 3;
+
+/// Drop superseded YAML entries (one load, at most one write).
+///
+/// Protected, never dropped: the entry keyed by each path's current content,
+/// and any entry whose `(path, description)` is live in `descriptions`.
+pub(crate) fn prune_yaml(descriptions: &[TreeFileDescription]) {
+    let map = sync().load::<YamlEntry>();
+    let live: std::collections::HashSet<(&str, &str)> =
+        descriptions.iter().map(|d| (d.path.as_str(), d.description.as_str())).collect();
+    let mut protected = std::collections::HashSet::new();
+    let mut seen = std::collections::HashSet::new();
+    for (key, entry) in &map {
+        if live.contains(&(entry.path.as_str(), entry.description.as_str())) {
+            let _new = protected.insert(key.clone());
+        }
+        if seen.insert(entry.path.as_str())
+            && let Some(current) = digest(Path::new(&entry.path))
+        {
+            let _new = protected.insert(current.desc_key);
+        }
+    }
+    let drop = prune_plan(&map, &protected, KEEP_PER_PATH);
+    if !drop.is_empty() {
+        let _removed = sync().remove_where::<YamlEntry, _>(|key, _entry| drop.contains(key));
+    }
+}
+
+/// Prunable entries of one path: `(key, last_edited_ms)`.
+type Candidates<'map> = Vec<(&'map String, u64)>;
+
+/// Keys to drop: per path, everything but `protected` keys and the `keep`
+/// newest others (by `last_edited_ms`, then key for determinism).
+pub(crate) fn prune_plan(
+    map: &BTreeMap<String, YamlEntry>,
+    protected: &std::collections::HashSet<String>,
+    keep: usize,
+) -> std::collections::HashSet<String> {
+    let mut by_path: BTreeMap<&str, Candidates<'_>> = BTreeMap::new();
+    for (key, entry) in map {
+        if !protected.contains(key) {
+            by_path.entry(entry.path.as_str()).or_default().push((key, entry.last_edited_ms));
+        }
+    }
+    let mut drop = std::collections::HashSet::new();
+    for mut candidates in by_path.into_values() {
+        candidates.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+        drop.extend(candidates.into_iter().skip(keep).map(|(key, _ms)| key.clone()));
+    }
+    drop
 }
 
 /// One stale-description swap computed off-thread by [`refresh_stale_from_yaml`].

@@ -1,8 +1,8 @@
-//! Threads module — parallel discussion and work topics.
+//! Agents module — one conversation and runtime per agent.
 //!
-//! Provides structured async back-and-forth between the user and the AI
-//! across multiple concurrent agents. Each agent has a turn-based status
-//! (`MY_TURN` / `THEIR_TURN`) and its own message history.
+//! Holds the agent roster (a parent/child forest, see [`types::tree`]). An
+//! agent's messages live in its human group and its `MY_TURN` / `THEIR_TURN`
+//! status is derived from group turn state (see [`types::turn`]).
 //!
 //! One tool: `Send` (post a message into a group). `Read(group_id)` lives
 //! in cp-coordination.
@@ -41,7 +41,7 @@ static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
 
 use self::panel::AgentsPanel;
 
-/// Threads module: parallel discussion and work topics with turn-based focus.
+/// Agents module: roster, per-agent human groups and derived turn status.
 #[derive(Debug, Clone, Copy)]
 pub struct AgentsModule;
 

@@ -94,7 +94,7 @@ pub struct Boot {
     _lock: Flock<File>,
 
     /// The agent's durable oplog plus its group-commit agent.
-    oplog: OplogService,
+    oplog: std::sync::Arc<OplogService>,
 
     /// The bound stream socket the publisher/intake will accept on.
     listener: UnixListener,
@@ -265,7 +265,7 @@ impl Boot {
         // `Lifecycle::Stopping` emitted on `Drop`.
         oplog.submit_durable(OpEntryKind::Lifecycle { state: LifecycleState::Running });
 
-        Ok(Self { _lock: lock, oplog, listener, entry, socket_path, _heartbeat: heartbeat })
+        Ok(Self { _lock: lock, oplog: std::sync::Arc::new(oplog), listener, entry, socket_path, _heartbeat: heartbeat })
     }
 
     /// The agent's stable registry id (FNV-1a of its canonical folder path).
@@ -288,8 +288,14 @@ impl Boot {
 
     /// The agent's durable oplog service.
     #[must_use]
-    pub const fn oplog(&self) -> &OplogService {
+    pub fn oplog(&self) -> &OplogService {
         &self.oplog
+    }
+
+    /// A shared handle on the oplog, for the intake thread.
+    #[must_use]
+    pub fn oplog_shared(&self) -> std::sync::Arc<OplogService> {
+        std::sync::Arc::clone(&self.oplog)
     }
 
     /// The bound stream socket listener.

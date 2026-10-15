@@ -96,27 +96,41 @@ fn send_v2_request(
     model: &str,
     api_request: &serde_json::Value,
 ) -> Result<reqwest::blocking::Response, LlmError> {
-    client
-        .post(ENDPOINT)
-        .header("accept", "text/event-stream")
-        .header("authorization", format!("Bearer {access_token}"))
-        .header("anthropic-version", API_VERSION)
-        .header("anthropic-beta", beta_header_for(model))
-        .header("anthropic-dangerous-direct-browser-access", "true")
-        .header("content-type", "application/json")
-        .header("user-agent", "claude-cli/2.1.282 (external, sdk-cli)")
-        .header("x-app", "cli")
-        .header("x-stainless-arch", "arm64")
-        .header("x-stainless-lang", "js")
-        .header("x-stainless-os", "MacOS")
-        .header("x-stainless-package-version", "0.112.1")
-        .header("x-stainless-retry-count", "0")
-        .header("x-stainless-runtime", "node")
-        .header("x-stainless-runtime-version", "v26.3.0")
-        .header("x-stainless-timeout", "600")
-        .json(api_request)
-        .send()
-        .map_err(LlmError::from)
+    let builder = v2_headers(model, access_token)
+        .into_iter()
+        .fold(client.post(ENDPOINT), |req, (name, value)| req.header(name, value));
+    builder.json(api_request).send().map_err(LlmError::from)
+}
+
+/// Fixed part of the CLI v2.1.282 signature, in wire order after
+/// `anthropic-beta`. Single source for both the live request and the refusal
+/// dump, so the two can no longer drift apart.
+const CLI_SIGNATURE: [(&str, &str); 12] = [
+    ("anthropic-dangerous-direct-browser-access", "true"),
+    ("content-type", "application/json"),
+    ("user-agent", "claude-cli/2.1.282 (external, sdk-cli)"),
+    ("x-app", "cli"),
+    ("x-stainless-arch", "arm64"),
+    ("x-stainless-lang", "js"),
+    ("x-stainless-os", "MacOS"),
+    ("x-stainless-package-version", "0.112.1"),
+    ("x-stainless-retry-count", "0"),
+    ("x-stainless-runtime", "node"),
+    ("x-stainless-runtime-version", "v26.3.0"),
+    ("x-stainless-timeout", "600"),
+];
+
+/// Full ordered V2 header list for `model`, with `bearer` as the token
+/// (`"<redacted>"` when recording a dump).
+fn v2_headers(model: &str, bearer: &str) -> Vec<(&'static str, String)> {
+    let mut headers = vec![
+        ("accept", "text/event-stream".to_owned()),
+        ("authorization", format!("Bearer {bearer}")),
+        ("anthropic-version", API_VERSION.to_owned()),
+        ("anthropic-beta", beta_header_for(model)),
+    ];
+    headers.extend(CLI_SIGNATURE.iter().map(|&(name, value)| (name, value.to_owned())));
+    headers
 }
 
 /// Persist the exact request that produced a `refusal` `stop_reason`, so it can
@@ -135,24 +149,10 @@ fn dump_refusal_request(worker_id: &str, model: &str, api_request: &serde_json::
         "project_dir": project_dir.display().to_string(),
         "model": model,
         "request_url": ENDPOINT,
-        "request_headers": {
-            "accept": "text/event-stream",
-            "authorization": "Bearer <redacted>",
-            "anthropic-version": API_VERSION,
-            "anthropic-beta": beta_header_for(model),
-            "anthropic-dangerous-direct-browser-access": "true",
-            "content-type": "application/json",
-            "user-agent": "claude-cli/2.1.282 (external, sdk-cli)",
-            "x-app": "cli",
-            "x-stainless-arch": "arm64",
-            "x-stainless-lang": "js",
-            "x-stainless-os": "MacOS",
-            "x-stainless-package-version": "0.112.1",
-            "x-stainless-retry-count": "0",
-            "x-stainless-runtime": "node",
-            "x-stainless-runtime-version": "v26.3.0",
-            "x-stainless-timeout": "600",
-        },
+        "request_headers": v2_headers(model, "<redacted>")
+            .into_iter()
+            .map(|(name, value)| (name.to_owned(), serde_json::Value::String(value)))
+            .collect::<serde_json::Map<_, _>>(),
         "request_body": api_request,
     });
     let dir = cp_env::env().core.home.join(".context-pilot").join("refusals");
@@ -329,5 +329,59 @@ impl LlmClient for ClaudeCodeV2Client {
 
     fn check_api(&self, model: &str) -> ApiCheckResult {
         self.do_check_api(model)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{API_VERSION, v2_headers};
+
+    /// Pins the exact wire signature (names, values, order). Live OAuth auth
+    /// depends on it: a change here must be a deliberate CLI re-capture.
+    #[test]
+    fn v2_header_signature_is_pinned() {
+        let headers = v2_headers("claude-opus-5-5", "tok");
+        let names: Vec<&str> = headers.iter().map(|&(n, _)| n).collect();
+        assert_eq!(
+            names,
+            [
+                "accept",
+                "authorization",
+                "anthropic-version",
+                "anthropic-beta",
+                "anthropic-dangerous-direct-browser-access",
+                "content-type",
+                "user-agent",
+                "x-app",
+                "x-stainless-arch",
+                "x-stainless-lang",
+                "x-stainless-os",
+                "x-stainless-package-version",
+                "x-stainless-retry-count",
+                "x-stainless-runtime",
+                "x-stainless-runtime-version",
+                "x-stainless-timeout",
+            ]
+        );
+        let get = |name: &str| headers.iter().find(|&&(n, _)| n == name).map(|pair| pair.1.as_str());
+        assert_eq!(get("authorization"), Some("Bearer tok"));
+        assert_eq!(get("anthropic-version"), Some(API_VERSION));
+        assert_eq!(get("user-agent"), Some("claude-cli/2.1.282 (external, sdk-cli)"));
+        assert_eq!(get("x-stainless-package-version"), Some("0.112.1"));
+        assert_eq!(get("x-stainless-runtime-version"), Some("v26.3.0"));
+    }
+
+    /// The refusal dump records the same headers as the live request, token aside.
+    #[test]
+    fn dump_headers_match_live_headers_except_token() {
+        let live = v2_headers("claude-haiku-4-5", "secret");
+        let dump = v2_headers("claude-haiku-4-5", "<redacted>");
+        for (l, d) in live.iter().zip(&dump) {
+            if l.0 == "authorization" {
+                assert_eq!(d.1, "Bearer <redacted>");
+            } else {
+                assert_eq!(l, d);
+            }
+        }
     }
 }

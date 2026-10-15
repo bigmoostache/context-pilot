@@ -156,34 +156,64 @@ fn delete(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
     }
     let mut doomed = Vec::new();
     subtree_post_order(agents, id, &mut doomed, agents.len());
-    if doomed.len() > 1 {
-        confirm(agents, id, args.key)?;
+    let exec = FleetExecMirror::get(state);
+    let busy: Vec<&str> = doomed.iter().map(String::as_str).filter(|d| is_busy(exec.exec_state_of(d))).collect();
+    if doomed.len() > 1 || !busy.is_empty() {
+        confirm(agents, (caller, id), &busy, args.key)?;
     }
     let gone = doomed.join(", ");
     // Groups they own and coordination groups they sat in go too (files
     // included); they leave every other group.
     let removed =
         social::departed::purge(&mut GroupsState::get_mut(state).groups, &|m: &str| !doomed.iter().any(|d| d == m));
-    for gid in &removed {
-        cp_groups::persist::remove_group_file(gid);
-    }
+    remove_group_files_off_loop(&removed);
     ManagementState::get_mut(state).doomed.extend(doomed);
     Ok(format!("Deleted {gone} with the groups they owned or coordinated in: {}.", removed.join(", ")))
 }
 
-/// Spend a valid `key`, or refuse with the subtree listing and a fresh key.
-fn confirm(agents: &[Agent], id: &str, key: Option<&str>) -> Result<(), String> {
+/// Whether an agent in state `s` is mid-turn (stream, tools or blocking wait).
+const fn is_busy(s: AgentExecState) -> bool {
+    s.is_active()
+}
+
+/// Delete the files of `removed` groups on a detached thread, so the tool
+/// never blocks the main loop on disk I/O. Inline only if the spawn fails.
+fn remove_group_files_off_loop(removed: &[String]) {
+    if removed.is_empty() {
+        return;
+    }
+    let bg = removed.to_vec();
+    let spawned = std::thread::Builder::new().name("group-file-rm".into()).spawn(move || {
+        for gid in &bg {
+            cp_groups::persist::remove_group_file(gid);
+        }
+    });
+    if spawned.is_err() {
+        for gid in removed {
+            cp_groups::persist::remove_group_file(gid);
+        }
+    }
+}
+
+/// Spend a `key` issued for this `(caller, id)` delete, or refuse with the
+/// subtree listing, the busy agents and a fresh key bound to this delete.
+fn confirm(agents: &[Agent], (caller, id): (&str, &str), busy: &[&str], key: Option<&str>) -> Result<(), String> {
     let now = cp_base::panels::now_ms();
-    if key.is_some_and(|k| keys::consume(k, now)) {
+    if key.is_some_and(|k| keys::consume(k, caller, id, now)) {
         return Ok(());
     }
     let mut listing = String::new();
     write_subtree(agents, id, 0, &mut listing);
-    let invalid = if key.is_some() { "Invalid or expired key. " } else { "" };
+    let invalid = if key.is_some() { "Invalid or expired key for this delete. " } else { "" };
+    let busy_line = if busy.is_empty() {
+        String::new()
+    } else {
+        format!("Busy right now (streaming, waiting on the LLM or in a tool call): {}.\n", busy.join(", "))
+    };
     Err(format!(
-        "{invalid}You tried to delete a sub-agent that still has sub-agents of its own:\n{listing}\
-         If you are absolutely sure, call again with key=\"{}\" (valid 5 minutes, for any agent).",
-        keys::issue(now)
+        "{invalid}Deleting {id} needs confirmation. It would delete:\n{listing}{busy_line}\
+         If you are absolutely sure, call again with key=\"{}\" (valid 5 minutes, for this delete only).",
+        keys::issue(caller, id, now)
     ))
 }
 
@@ -214,8 +244,6 @@ const fn exec_label(s: AgentExecState) -> &'static str {
         AgentExecState::Idle => "idle",
         AgentExecState::Runnable => "runnable",
         AgentExecState::Streaming => "streaming",
-        AgentExecState::AwaitingLlm => "awaiting_llm",
-        AgentExecState::AwaitingTool => "awaiting_tool",
         AgentExecState::Errored => "errored",
     }
 }

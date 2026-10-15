@@ -7,7 +7,6 @@ use cp_base::tools::{ToolResult, ToolUse};
 use crate::api::{FirecrawlClient, MapParams, ScrapeParams, SearchParams};
 use cp_base::cast::Safe as _;
 use std::fmt::Write as _;
-use std::time::Duration;
 
 /// Dispatch firecrawl tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -55,16 +54,6 @@ const ASYNC_TIMEOUT_SCRAPE_SECS: u64 = 60;
 /// Async timeout for Firecrawl map calls (seconds).
 /// Map is faster — just sitemap/URL discovery.
 const ASYNC_TIMEOUT_MAP_SECS: u64 = 30;
-
-/// Async timeout for Firecrawl crawl jobs (seconds).
-/// Crawls are long-running — up to 5 minutes.
-pub(crate) const ASYNC_TIMEOUT_CRAWL_SECS: u64 = 310;
-
-/// Polling interval between crawl status checks.
-pub(crate) const CRAWL_POLL_INTERVAL: Duration = Duration::from_secs(5);
-
-/// Maximum number of poll iterations before giving up internally.
-pub(crate) const CRAWL_MAX_POLLS: u32 = 60;
 
 /// Append the `## Metadata` section (title / description / URL) when present.
 fn push_scrape_metadata(content: &mut String, data: &crate::types::ScrapeData) {

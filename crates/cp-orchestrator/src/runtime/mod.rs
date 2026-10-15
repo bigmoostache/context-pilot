@@ -25,17 +25,30 @@
 //! rather than the scan interval (a step toward the inotify-primary signal
 //! of design doc I12 / §8.1). The loop itself lives in [`driver`].
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 mod driver;
+pub(crate) mod guard;
 mod seed;
 mod update_scheduler;
 
 use crate::services::auth::backup::BackupScheduler;
 use crate::transport::Backend;
+
+/// Run the driver forever. A panicking tick must not kill discovery for the
+/// daemon's lifetime: recover the lock and restart with fresh driver state.
+fn supervise_driver(backend: &Arc<Mutex<Backend>>, agents_dir: &Path, interval: Duration, auth_db: Option<&Path>) -> ! {
+    loop {
+        let backup = auth_db.map(Path::to_path_buf).map(BackupScheduler::new);
+        guard::run_guarded("driver", backend, || {
+            driver::driver_loop(backend, agents_dir.to_path_buf(), interval, backup)
+        });
+        thread::sleep(interval);
+    }
+}
 
 /// Runtime configuration — a view over the validated environment.
 #[derive(Debug)]
@@ -160,9 +173,9 @@ impl Runtime {
         let backend = Arc::clone(&self.backend);
         let agents_dir = self.config.agents_dir.clone();
         let interval = self.config.scan_interval;
-        let backup_scheduler = self.config.auth_enabled.then(|| BackupScheduler::new(self.config.auth_db_path.clone()));
+        let auth_db = self.config.auth_enabled.then(|| self.config.auth_db_path.clone());
 
-        thread::spawn(move || driver::driver_loop(&backend, agents_dir, interval, backup_scheduler))
+        thread::spawn(move || supervise_driver(&backend, &agents_dir, interval, auth_db.as_deref()))
     }
 
     /// Spawn the auto-update scheduler (O4.2): poll the channel on boot and

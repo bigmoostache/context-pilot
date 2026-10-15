@@ -6,25 +6,45 @@
 //! conversion is done (or fails).
 
 use std::path::PathBuf;
-use std::sync::Mutex;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
 
-use cp_base::panels::now_ms;
 use cp_base::state::runtime::State;
-use cp_base::state::watchers::carriers::WatcherResult;
-use cp_base::state::watchers::{Watcher, WatcherRegistry};
+use cp_base::state::watchers::WatcherRegistry;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::client::{DatalabClient, OcrMode, api_key_from_env, is_ocr_extension};
+use crate::cache::atomic_write;
+use crate::client::{DatalabClient, OcrMode, WATCHER_TIMEOUT, api_key_from_env, is_ocr_extension};
+use crate::watcher::OcrWatcher;
 
-/// Async timeout for OCR API calls (seconds).
-///
-/// Datalab can take several minutes for large documents. The client
-/// has its own 300 s poll timeout; this covers submit + poll + margin.
-const ASYNC_TIMEOUT_SECS: u64 = 360;
+/// Maximum OCR jobs running at once; further calls are refused.
+pub(crate) const MAX_CONCURRENT_JOBS: usize = 4;
 
-/// Monotonic counter for generating unique OCR watcher IDs.
-static OCR_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// Jobs currently running (held by [`JobSlot`]).
+static RUNNING_JOBS: AtomicUsize = AtomicUsize::new(0);
+
+/// One reserved slot of [`MAX_CONCURRENT_JOBS`], released on drop (also when
+/// the worker panics).
+#[derive(Debug)]
+pub(crate) struct JobSlot;
+
+impl JobSlot {
+    /// Reserve a slot, or `None` when all are taken.
+    pub(crate) fn acquire() -> Option<Self> {
+        RUNNING_JOBS
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
+                (n < MAX_CONCURRENT_JOBS).then_some(n.saturating_add(1))
+            })
+            .ok()
+            .map(|_prev| Self)
+    }
+}
+
+impl Drop for JobSlot {
+    fn drop(&mut self) {
+        let _prev = RUNNING_JOBS.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 /// Dispatch OCR tool calls.
 pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -33,13 +53,13 @@ pub(crate) fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> 
 
 /// Validated inputs for one OCR job, produced by [`validate_ocr_inputs`].
 struct OcrJob {
-    /// Datalab API key from the environment.
+    /// Datalab API key from the vault.
     api_key: String,
-    /// Absolute path of the source document.
+    /// Source document, resolved against the agent's workdir.
     path: PathBuf,
     /// Output format (markdown or text-boxes).
     mode: OcrMode,
-    /// Destination path for the converted text.
+    /// Destination, resolved against the agent's workdir.
     output_path: PathBuf,
     /// Source path as given (for messages).
     path_display: String,
@@ -48,52 +68,44 @@ struct OcrJob {
 }
 
 /// Validate every `ocr` parameter synchronously (API key, path existence +
-/// extension, mode, output + parent dir). Returns the ready-to-run [`OcrJob`]
-/// or the error `ToolResult` to bubble straight back.
-fn validate_ocr_inputs(tool: &ToolUse) -> Result<OcrJob, Box<ToolResult>> {
-    let Some(api_key) = api_key_from_env() else {
-        return Err(Box::new(err(tool, "DATALAB_API_KEY not set in environment.".to_owned())));
-    };
-
-    let Some(path_str) = tool.input.get("path").and_then(|v| v.as_str()) else {
-        return Err(Box::new(err(tool, "Missing required parameter 'path'.".to_owned())));
-    };
-    let path = PathBuf::from(path_str);
-    if !path.exists() {
-        return Err(Box::new(err(tool, format!("File not found: '{path_str}'"))));
+/// extension, mode, output + parent dir). Relative paths resolve against the
+/// executing agent's workdir (its worktree, else the project root).
+fn validate_ocr_inputs(tool: &ToolUse, state: &State) -> Result<OcrJob, String> {
+    if let Some(e) = state.workdir_error() {
+        return Err(e);
     }
+    let api_key = api_key_from_env().ok_or_else(|| {
+        "Datalab API key not found: set DATALAB_API_KEY in the environment or ~/.context-pilot/.env, \
+         or store 'datalab' in the credential vault."
+            .to_owned()
+    })?;
 
+    let path_str = tool.input.get("path").and_then(|v| v.as_str()).ok_or("Missing required parameter 'path'.")?;
+    let path = state.resolve_path(path_str);
+    if !path.is_file() {
+        return Err(format!("File not found: '{path_str}'"));
+    }
     let ext = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
     if !is_ocr_extension(ext) {
-        return Err(Box::new(err(
-            tool,
-            format!("Unsupported file type '.{ext}'. Supported: pdf, png, jpg, jpeg, tiff, webp, bmp, heic, gif."),
-        )));
+        return Err(format!(
+            "Unsupported file type '.{ext}'. Supported: pdf, png, jpg, jpeg, tiff, webp, bmp, heic, gif."
+        ));
     }
 
-    let Some(mode_str) = tool.input.get("mode").and_then(|v| v.as_str()) else {
-        return Err(Box::new(err(
-            tool,
-            "Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.".to_owned(),
-        )));
-    };
-    let mode = match OcrMode::from_str(mode_str) {
-        Ok(m) => m,
-        Err(e) => return Err(Box::new(err(tool, e))),
-    };
+    let mode_str = tool
+        .input
+        .get("mode")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing required parameter 'mode'. Use 'markdown' or 'text_boxes'.")?;
+    let mode = OcrMode::from_str(mode_str)?;
 
-    let Some(output_str) = tool.input.get("output").and_then(|v| v.as_str()) else {
-        return Err(Box::new(err(tool, "Missing required parameter 'output'.".to_owned())));
-    };
-    let output_path = PathBuf::from(output_str);
-
-    // Ensure parent directory exists.
+    let output_str = tool.input.get("output").and_then(|v| v.as_str()).ok_or("Missing required parameter 'output'.")?;
+    let output_path = state.resolve_path(output_str);
     if let Some(parent) = output_path.parent()
-        && !parent.as_os_str().is_empty()
         && !parent.exists()
-        && let Err(e) = std::fs::create_dir_all(parent)
     {
-        return Err(Box::new(err(tool, format!("Cannot create output directory '{}': {e}", parent.display()))));
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Cannot create output directory '{}': {e}", parent.display()))?;
     }
 
     Ok(OcrJob {
@@ -106,70 +118,64 @@ fn validate_ocr_inputs(tool: &ToolUse) -> Result<OcrJob, Box<ToolResult>> {
     })
 }
 
-/// Execute the `ocr` tool.
-///
-/// Validates parameters synchronously, spawns a background thread for the
-/// Datalab API call, and returns immediately. A spine notification fires
-/// when the conversion completes (or fails), waking the AI if idle.
+/// Run one job on the worker thread and phrase its outcome.
+fn run_job(client: &DatalabClient, job: &OcrJob) -> String {
+    match client.convert(&job.path, job.mode) {
+        Ok(result) => {
+            let out = &job.output_display;
+            if let Err(e) = atomic_write(&job.output_path, result.text.as_bytes()) {
+                return format!("\u{274c} OCR succeeded but failed to write output to '{out}': {e}");
+            }
+            let cached_note = if result.cached { " (from cache)" } else { "" };
+            let chars = result.text.chars().count();
+            format!("\u{2705} OCR complete{cached_note}! {chars} chars written to '{out}'.")
+        }
+        Err(e) => format!("\u{274c} OCR failed for '{}': {e}", job.path_display),
+    }
+}
+
+/// Execute the `ocr` tool: validate synchronously, spawn the worker, register
+/// a non-blocking watcher bound to the calling agent, return immediately.
 fn execute_ocr(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("ocr_exec");
-    let job = match validate_ocr_inputs(tool) {
+    let job = match validate_ocr_inputs(tool, state) {
         Ok(j) => j,
-        Err(e) => return *e,
+        Err(e) => return err(tool, e),
     };
-    let OcrJob { api_key, path, mode, output_path, path_display, output_display } = job;
+    let Some(slot) = JobSlot::acquire() else {
+        return err(
+            tool,
+            format!("{MAX_CONCURRENT_JOBS} OCR jobs already running. Wait for a completion notification and retry."),
+        );
+    };
+    let content = format!(
+        "OCR job submitted for '{}' \u{2192} '{}'. A notification will arrive when the conversion finishes. \
+         If you go idle, the notification will wake you up.",
+        job.path_display, job.output_display
+    );
+    let path_display = job.path_display.clone();
 
-    // --- Spawn background thread + non-blocking watcher ---
     let (tx, rx) = mpsc::channel();
-
-    // Clone for the closure — originals are used in the tool result after spawn.
-    let path_for_closure = path_display.clone();
-    let output_for_closure = output_display.clone();
-
     let handle = std::thread::Builder::new().name("ocr-worker".into()).spawn(move || {
-        let client = match DatalabClient::new(&api_key) {
-            Ok(c) => c,
-            Err(e) => {
-                let _r = tx.send(format!("❌ OCR failed: cannot create client: {e}"));
-                return;
-            }
+        let _slot = slot;
+        let message = match DatalabClient::new(&job.api_key) {
+            Ok(client) => run_job(&client, &job),
+            Err(e) => format!("\u{274c} OCR failed: cannot create client: {e}"),
         };
-
-        match client.convert(&path, mode) {
-            Ok(result) => {
-                if let Err(e) = std::fs::write(&output_path, &result.text) {
-                    let _r =
-                        tx.send(format!("❌ OCR succeeded but failed to write output to '{output_for_closure}': {e}"));
-                    return;
-                }
-                let cached_note = if result.cached { " (from cache)" } else { "" };
-                let char_count = result.text.len();
-                let _r = tx.send(format!(
-                    "✅ OCR complete{cached_note}! {char_count} chars written to '{output_for_closure}'.",
-                ));
-            }
-            Err(e) => {
-                let _r = tx.send(format!("❌ OCR failed for '{path_for_closure}': {e}"));
-            }
-        }
+        let _r = tx.send(message);
     });
-
-    if let Err(e) = handle.as_ref() {
+    if let Err(e) = handle {
         return err(tool, format!("Failed to spawn OCR worker thread: {e}"));
     }
 
-    // Register non-blocking watcher — fires as a spine notification
-    let counter = OCR_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let watcher = OcrWatcher::new(counter, &path_display, rx, ASYNC_TIMEOUT_SECS);
+    let owner = state.executing_agent_id().map(str::to_owned);
+    let timeout_ms = u64::try_from(WATCHER_TIMEOUT.as_millis()).unwrap_or(u64::MAX);
+    let watcher = OcrWatcher::new(&path_display, rx, owner, timeout_ms);
     WatcherRegistry::get_mut(state).register(Box::new(watcher));
 
     ToolResult {
         tool_use_id: tool.id.clone(),
-        content: format!(
-            "OCR job submitted for '{path_display}' → '{output_display}'. \
-             A notification will arrive when the conversion finishes. \
-             If you go idle, the notification will wake you up.",
-        ),
+        content,
         display: None,
         tldr: None,
         is_error: false,
@@ -188,130 +194,5 @@ fn err(tool: &ToolUse, content: String) -> ToolResult {
         is_error: true,
         preserves_tempo: false,
         tool_name: tool.name.clone(),
-    }
-}
-
-// ============================================================
-// OcrWatcher — non-blocking watcher for background OCR jobs
-// ============================================================
-
-/// A non-blocking watcher that polls an [`mpsc::Receiver<String>`] for an
-/// OCR completion message from the background worker thread.
-///
-/// When the message arrives (or the thread dies / times out), the watcher
-/// fires a **spine notification** instead of replacing a blocking sentinel.
-/// This lets the AI continue working while OCR runs in the background.
-struct OcrWatcher {
-    /// Unique watcher ID.
-    watcher_id: String,
-    /// Human-readable description for the Spine panel.
-    desc: String,
-    /// Receiver end of the channel from the worker thread.
-    rx: Mutex<Receiver<String>>,
-    /// Timestamp when this watcher was registered.
-    registered_at_ms: u64,
-    /// Absolute deadline in ms since epoch.
-    deadline_ms: u64,
-}
-
-impl OcrWatcher {
-    /// Create a new OCR watcher.
-    fn new(counter: usize, path_display: &str, rx: Receiver<String>, timeout_secs: u64) -> Self {
-        let now = now_ms();
-        Self {
-            watcher_id: format!("ocr_{counter}"),
-            desc: format!("⏳ OCR: {path_display}"),
-            rx: Mutex::new(rx),
-            registered_at_ms: now,
-            deadline_ms: now.saturating_add(timeout_secs.saturating_mul(1000)),
-        }
-    }
-}
-
-impl std::fmt::Debug for OcrWatcher {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OcrWatcher")
-            .field("watcher_id", &self.watcher_id)
-            .field("desc", &self.desc)
-            .field("registered_at_ms", &self.registered_at_ms)
-            .field("deadline_ms", &self.deadline_ms)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Watcher for OcrWatcher {
-    fn id(&self) -> &str {
-        &self.watcher_id
-    }
-
-    fn description(&self) -> &str {
-        &self.desc
-    }
-
-    fn is_blocking(&self) -> bool {
-        false // Non-blocking — fires as a spine notification
-    }
-
-    fn tool_use_id(&self) -> Option<&str> {
-        None // No sentinel to replace
-    }
-
-    fn check(&self, _state: &State) -> Option<WatcherResult> {
-        let Ok(rx) = self.rx.lock() else {
-            return Some(WatcherResult::new("\u{274c} OCR watcher failed (lock poisoned)"));
-        };
-        match rx.try_recv() {
-            Ok(message) => Some(WatcherResult::new(message)),
-            Err(TryRecvError::Disconnected) => Some(WatcherResult::new("\u{274c} OCR worker thread died unexpectedly")),
-            Err(TryRecvError::Empty) => None,
-        }
-    }
-
-    fn check_timeout(&self) -> Option<WatcherResult> {
-        (now_ms() >= self.deadline_ms).then(|| {
-            let elapsed_secs =
-                cp_base::panels::time_arith::ms_to_secs(self.deadline_ms.saturating_sub(self.registered_at_ms));
-            WatcherResult::new(format!("❌ OCR timed out after {elapsed_secs}s"))
-        })
-    }
-
-    fn registered_ms(&self) -> u64 {
-        self.registered_at_ms
-    }
-
-    fn source_tag(&self) -> &'static str {
-        "ocr"
-    }
-
-    fn suicide(&self, _state: &State) -> bool {
-        false
-    }
-
-    fn is_easy_bash(&self) -> bool {
-        false
-    }
-
-    fn is_persistent(&self) -> bool {
-        false
-    }
-
-    fn fire_at_ms(&self) -> Option<u64> {
-        None
-    }
-
-    fn message(&self) -> Option<&str> {
-        None
-    }
-
-    fn agent_id(&self) -> Option<&str> {
-        None
-    }
-
-    fn interval_ms(&self) -> u64 {
-        0
-    }
-
-    fn recurrence_label(&self) -> Option<&str> {
-        None
     }
 }

@@ -20,14 +20,12 @@ fn invalidate_tree_cache(state: &mut State) {
     cp_base::panels::mark_panels_dirty(state, Kind::TREE);
 }
 
-/// Compute a short hash (8-char truncated FNV-1a) for a file's contents.
+/// Short content hash (8-char truncated FNV-1a) of a file, for `[!]` stale markers.
 ///
-/// Used to detect stale tree descriptions via `[!]` markers.
+/// Memoized on `(mtime, len)` by [`crate::filehash::digest`].
 #[must_use]
 pub fn compute_file_hash(path: &Path) -> Option<String> {
-    let content = fs::read(path).ok()?;
-    let hex = cp_mod_utilities::hash::compute(&content);
-    Some(hex.get(..8).unwrap_or(&hex).to_owned())
+    crate::filehash::digest(path).map(|d| d.file_hash)
 }
 
 /// Outcome of toggling one folder path.

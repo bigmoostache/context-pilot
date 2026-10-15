@@ -16,9 +16,9 @@ use cp_wire::types::payload::query::{Kind, Outcome, Query};
 /// The resolved Meilisearch coordinates a query needs: `(port, master_key,
 /// project_hash)`.
 ///
-/// Resolved **before** the bridge borrows its state (see the borrow note in
-/// [`accept_commands`](super::bridge)) so the responder closure is
-/// self-contained and never touches `State` mid-connection.
+/// Copied out of `State` into the responder closure the bridge intake thread
+/// calls, which cannot borrow `State` (see `sync_query_responder` in
+/// [`super::bridge`]).
 pub(super) type SearchCreds = (u16, String, String);
 
 /// Answer one read-path [`Query`] against this agent's own Meilisearch indexes.

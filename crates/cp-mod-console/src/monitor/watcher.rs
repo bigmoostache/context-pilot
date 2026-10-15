@@ -195,6 +195,7 @@ impl LiveMonitor {
         let now = now_ms();
         let (bytes, cursor) = handle.buffer.read_since(rt.cursor);
         rt.cursor = cursor;
+        lock(&self.record).cursor = cursor;
         rt.engine.ingest(&bytes, self.filter(), now);
         let exit_final = status.is_terminal() && {
             let since = *rt.exited_at_ms.get_or_insert(now);

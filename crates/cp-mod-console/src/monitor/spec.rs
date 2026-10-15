@@ -1,10 +1,10 @@
 //! Monitor parameters: parsing, validation, and the shared record shown in the Monitor panel.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// What a monitor is attached to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
     /// An existing console panel (`id`).
@@ -16,7 +16,7 @@ pub enum Source {
 }
 
 /// What makes a monitor fire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     /// The process exits.
@@ -28,7 +28,7 @@ pub enum Mode {
 }
 
 /// Whether a monitor survives its first event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Frequency {
     /// Ends after the first event.
@@ -38,7 +38,7 @@ pub enum Frequency {
 }
 
 /// Validated `Monitor` call, before any console is resolved or spawned.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Request {
     /// Attachment kind.
     #[serde(rename = "type")]
@@ -175,7 +175,7 @@ pub const fn type_name(source: Source) -> &'static str {
 }
 
 /// Lifecycle of a monitor, as shown in the Monitor panel.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "state")]
 pub enum Status {
     /// Watching.
@@ -190,7 +190,7 @@ pub enum Status {
 }
 
 /// One monitor as tracked by `ConsoleState` and rendered by the Monitor panel.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     /// Monitor id (`M<n>`).
     pub monitor_id: String,
@@ -206,6 +206,13 @@ pub struct Record {
     pub events: u32,
     /// Current lifecycle state.
     pub status: Status,
+    /// Ring-buffer offset the watcher has consumed; persisted so a reload
+    /// resumes there (hidden from the panel).
+    #[serde(skip)]
+    pub cursor: u64,
+    /// Agent notified; persisted with the record (hidden from the panel).
+    #[serde(skip)]
+    pub agent: Option<String>,
 }
 
 impl Record {

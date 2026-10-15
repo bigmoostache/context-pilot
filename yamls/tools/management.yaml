@@ -12,9 +12,10 @@ tools:
                 state, groups, messages, open panels, context tokens.
         update  id, name?, description?  -> direct children only.
         delete  id, key?  -> any of your descendants, with its whole subtree
-                and their coordination groups. If it has sub-agents the call
-                fails with the subtree and a confirmation key; repeat with that
-                key (valid 5 minutes) to confirm.
+                and their coordination groups. If it has sub-agents, or any of
+                them is busy (streaming or in a tool call), the call fails with
+                the subtree and a confirmation key; repeat with that key (valid
+                5 minutes, this delete only) to confirm.
       You own the sub-agents you create: follow up on them, answer them, and
       delete them as soon as you are done with them. Never leave one behind.
     parameters:

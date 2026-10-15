@@ -242,11 +242,78 @@ fn prune_unsatisfied(active: &mut HashSet<String>, deps: &[(String, Vec<&'static
 mod tests {
     use super::prune_unsatisfied;
 
+    /// Every embedded tool YAML, by file stem. Kept in sync with the
+    /// `yamls/tools/` directory by [`tool_yaml_list_matches_directory`].
+    const TOOL_YAMLS: &[(&str, &str)] = &[
+        ("agents", include_str!("../../yamls/tools/agents.yaml")),
+        ("brave", include_str!("../../yamls/tools/brave.yaml")),
+        ("callback", include_str!("../../yamls/tools/callback.yaml")),
+        ("console", include_str!("../../yamls/tools/console.yaml")),
+        ("coordination", include_str!("../../yamls/tools/coordination.yaml")),
+        ("core", include_str!("../../yamls/tools/core.yaml")),
+        ("entities", include_str!("../../yamls/tools/entities.yaml")),
+        ("files", include_str!("../../yamls/tools/files.yaml")),
+        ("firecrawl", include_str!("../../yamls/tools/firecrawl.yaml")),
+        ("git", include_str!("../../yamls/tools/git.yaml")),
+        ("github", include_str!("../../yamls/tools/github.yaml")),
+        ("logs", include_str!("../../yamls/tools/logs.yaml")),
+        ("management", include_str!("../../yamls/tools/management.yaml")),
+        ("memory", include_str!("../../yamls/tools/memory.yaml")),
+        ("ocr", include_str!("../../yamls/tools/ocr.yaml")),
+        ("prompt", include_str!("../../yamls/tools/prompt.yaml")),
+        ("queue", include_str!("../../yamls/tools/queue.yaml")),
+        ("reverie", include_str!("../../yamls/tools/reverie.yaml")),
+        ("scratchpad", include_str!("../../yamls/tools/scratchpad.yaml")),
+        ("search", include_str!("../../yamls/tools/search.yaml")),
+        ("spine", include_str!("../../yamls/tools/spine.yaml")),
+        ("tree", include_str!("../../yamls/tools/tree.yaml")),
+    ];
+
+    /// Tools dispatched by name without a module `ToolDefinition`.
+    /// `reverie_report` is routed by `dispatch_reverie_tool`.
+    const DISPATCH_ONLY: &[&str] = &["reverie_report"];
+
     #[test]
     fn missing_dependency_cascades_without_panic() {
         let mut active: std::collections::HashSet<String> = ["b", "c", "d"].iter().map(|s| (*s).to_owned()).collect();
         let deps = vec![("b".to_owned(), vec!["a"]), ("c".to_owned(), vec!["b"]), ("d".to_owned(), vec![])];
         prune_unsatisfied(&mut active, &deps);
         assert_eq!(active.into_iter().collect::<Vec<_>>(), vec!["d".to_owned()]);
+    }
+
+    /// Every tool id described in YAML is a registered tool, and no id is
+    /// described twice. Catches dead text that the parse test cannot see
+    /// (a YAML for a deleted tool still parses fine). The reverse direction
+    /// (registered tool without text) already panics in `from_yaml`.
+    #[test]
+    fn yaml_tool_ids_are_registered() {
+        let mut registered: std::collections::HashSet<String> =
+            super::all_modules().iter().flat_map(|m| m.tool_definitions()).map(|d| d.id).collect();
+        let _new = registered.insert(crate::app::reverie::tools::optimize_context_tool_definition().id);
+        registered.extend(DISPATCH_ONLY.iter().map(|s| (*s).to_owned()));
+
+        let mut seen: std::collections::HashMap<String, &str> = std::collections::HashMap::new();
+        for &(file, content) in TOOL_YAMLS {
+            for id in cp_base::tools::ToolTexts::parse(content).tools.into_keys() {
+                assert!(registered.contains(&id), "yamls/tools/{file}.yaml describes unregistered tool '{id}'");
+                let prev = seen.insert(id.clone(), file);
+                assert!(prev.is_none(), "tool '{id}' described in both {prev:?} and {file}.yaml");
+            }
+        }
+    }
+
+    /// `TOOL_YAMLS` lists exactly the files in `yamls/tools/`.
+    #[test]
+    fn tool_yaml_list_matches_directory() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("yamls/tools");
+        let mut on_disk: Vec<String> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".yaml")).map(str::to_owned))
+            .collect();
+        on_disk.sort();
+        let listed: Vec<String> = TOOL_YAMLS.iter().map(|&(f, _)| f.to_owned()).collect();
+        assert_eq!(on_disk, listed);
     }
 }

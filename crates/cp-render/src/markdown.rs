@@ -83,10 +83,12 @@ pub fn to_blocks(content: &str) -> Vec<Block> {
 pub fn parse_line(line: &str) -> Vec<Span> {
     let trimmed = line.trim_start();
 
-    // Headers: # ## ### etc.
-    if trimmed.starts_with('#') {
-        let level = trimmed.chars().take_while(|&c| c == '#').count();
-        let content = trimmed.get(level..).unwrap_or("").trim_start();
+    // Headers: # ## ### etc. — the `#` run must be followed by a space or end
+    // the line, so `#tag` and `#123` stay plain text.
+    let level = trimmed.chars().take_while(|&c| c == '#').count();
+    let after = trimmed.get(level..).unwrap_or("");
+    if level > 0 && (after.is_empty() || after.starts_with(' ')) {
+        let content = after.trim_start();
 
         let semantic = match level {
             1..=3 => Semantic::Accent,
@@ -198,7 +200,13 @@ fn take_link(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> LinkParse 
 }
 
 /// Handle a `` ` `` inline-code marker: flush pending text, then push the code span.
+///
+/// A backtick with no closing one later on the line stays literal text.
 fn handle_code(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, spans: &mut Vec<Span>, current: &mut String) {
+    if !chars.clone().any(|c| c == '`') {
+        current.push('`');
+        return;
+    }
     flush_text(spans, current);
     let code = take_code(chars);
     if !code.is_empty() {
@@ -207,6 +215,10 @@ fn handle_code(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, spans: &mut
 }
 
 /// Handle a `*`/`_` marker: a doubled marker opens bold, a lone one is literal.
+///
+/// A doubled marker without a closing pair later on the line stays literal,
+/// as does `__` right after a letter or digit (`foo__bar__`), which
+/// standard markdown does not treat as an opener.
 fn handle_marker(
     marker: char,
     chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
@@ -218,11 +230,27 @@ fn handle_marker(
         return;
     }
     let _r = chars.next(); // consume the second marker
+    let intraword = marker == '_' && current.chars().next_back().is_some_and(char::is_alphanumeric);
+    if intraword || !has_closing_pair(chars.clone(), marker) {
+        current.push(marker);
+        current.push(marker);
+        return;
+    }
     flush_text(spans, current);
     let bold = take_bold(chars, marker);
     if !bold.is_empty() {
         spans.push(Span::new(bold).bold());
     }
+}
+
+/// Whether the rest of the line holds a doubled `marker` that closes bold.
+fn has_closing_pair(mut rest: std::iter::Peekable<std::str::Chars<'_>>, marker: char) -> bool {
+    while let Some(c) = rest.next() {
+        if c == marker && rest.peek() == Some(&marker) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Handle a `[` link opener: push an accent span for a valid `[text](url)`,

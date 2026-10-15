@@ -77,7 +77,7 @@ pub(crate) fn introspect(conn: &Connection, db_path: &Path) -> SchemaCache {
 }
 
 /// List user table names (excludes `sqlite_%`, `_meta`).
-fn user_table_names(conn: &Connection) -> Vec<String> {
+pub(crate) fn user_table_names(conn: &Connection) -> Vec<String> {
     let Ok(mut stmt) = conn.prepare(
         "SELECT name FROM sqlite_master
          WHERE type = 'table'

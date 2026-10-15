@@ -264,7 +264,6 @@ mod tests {
             ("reverie", include_str!("../../../yamls/tools/reverie.yaml")),
             ("scratchpad", include_str!("../../../yamls/tools/scratchpad.yaml")),
             ("spine", include_str!("../../../yamls/tools/spine.yaml")),
-            ("todo", include_str!("../../../yamls/tools/todo.yaml")),
             ("tree", include_str!("../../../yamls/tools/tree.yaml")),
         ];
         for &(name, content) in &yamls {

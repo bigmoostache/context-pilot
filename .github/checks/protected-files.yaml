@@ -46,6 +46,10 @@
   whole_file: true
 - path: .github/checks/check-api-contract.sh
   whole_file: true
+# The failure ledger the family scripts above source: it decides their exit
+# code, so editing it could turn every family green. Locked with them.
+- path: .github/checks/lib-failures.sh
+  whole_file: true
 
 # --- Guard tools the family scripts delegate to (standalone value: --update/
 #     --show modes or dual-mode logic) ---

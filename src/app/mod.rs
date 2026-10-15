@@ -24,8 +24,28 @@ use crate::state::cache::CacheUpdate;
 use crate::state::persistence::PersistenceWriter;
 use crate::ui::help::CommandPalette;
 
-/// Deferred `StreamDone` data: (`input_tokens`, `output_tokens`, `cache_hit`, `cache_miss`, `stop_reason`, `bp_hashes`, `bp_panel_ids`, `alive_count`, `alive_positions_permille`).
-pub(crate) type PendingDone = (usize, usize, usize, usize, Option<String>, Vec<String>, Vec<String>, usize, Vec<u16>);
+/// Deferred `StreamEvent::Done` payload, held until the typewriter and pending
+/// tools drain so the turn finalizes only once everything is on screen.
+pub(crate) struct PendingDone {
+    /// Uncached input tokens billed for the call.
+    pub input_tokens: usize,
+    /// Output tokens generated.
+    pub output_tokens: usize,
+    /// Input tokens served from the prompt cache.
+    pub cache_hit_tokens: usize,
+    /// Input tokens written to the prompt cache.
+    pub cache_miss_tokens: usize,
+    /// Provider stop reason (`end_turn`, `tool_use`, …), if reported.
+    pub stop_reason: Option<String>,
+    /// Content hashes of the cache breakpoints placed this call.
+    pub bp_hashes: Vec<String>,
+    /// Panel ids those breakpoints were placed on (parallel to `bp_hashes`).
+    pub bp_panel_ids: Vec<String>,
+    /// Number of breakpoints still alive (cache-hit) on this call.
+    pub alive_count: usize,
+    /// Positions of the alive breakpoints, in per-mille of the prompt.
+    pub alive_positions_permille: Vec<u16>,
+}
 
 /// Per-thread main-stream state — holds the receiver channel for a running
 /// agent stream (the thread-centric analogue of [`ReverieStream`]).

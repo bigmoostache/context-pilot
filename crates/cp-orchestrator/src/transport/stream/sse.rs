@@ -272,17 +272,17 @@ pub fn channel() -> (Sink, Body) {
 /// disconnects (a write error), at which point dropping `body` signals the
 /// producer thread to stop.
 pub fn stream_to_client(request: Request, mut body: Body) {
-    let mut writer = request.into_writer();
-    let preamble = concat!(
+    let mut preamble = String::from(concat!(
         "HTTP/1.1 200 OK\r\n",
         "Content-Type: text/event-stream\r\n",
         "Cache-Control: no-cache\r\n",
         "Connection: keep-alive\r\n",
-        "Access-Control-Allow-Origin: *\r\n",
-        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n",
-        "Access-Control-Allow-Headers: Content-Type, Last-Event-ID\r\n",
-        "\r\n",
-    );
+    ));
+    for header in crate::transport::cors_headers(&request) {
+        preamble.extend([header.field.as_str().as_str(), ": ", header.value.as_str(), "\r\n"]);
+    }
+    preamble.push_str("\r\n");
+    let mut writer = request.into_writer();
     if writer.write_all(preamble.as_bytes()).and_then(|()| writer.flush()).is_err() {
         return;
     }

@@ -18,5 +18,9 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci | --callback
 
-echo "check-ts-tests ($MODE): no frontend test suite wired yet (see TODO(playwright)). Skipping."
+# Exit 0 is deliberate (no ephemeral stack to run against), but a silent green
+# hides that the web UI has no automated tests. ::warning:: puts a yellow
+# annotation on every run's summary so the gap stays visible until wired.
+echo "::warning title=TS tests not wired::check-ts-tests is a STUB: no frontend test suite runs, this green proves nothing (see TODO(playwright))."
+echo "check-ts-tests ($MODE): STUB, no frontend test suite wired yet (see TODO(playwright)). Skipping."
 exit 0

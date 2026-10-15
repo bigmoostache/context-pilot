@@ -17,13 +17,24 @@
 ///
 /// Enums whose matched fields are all `Copy` (or fieldless) need no `ref` and
 /// should use a plain `match *place` instead — this macro is only for the
-/// irreducible non-`Copy` case.
+/// irreducible non-`Copy` case. A `macro_rules!` cannot inspect its arms, so
+/// that rule is enforced by review, not by the compiler.
 ///
-/// ```ignore
-/// cp_macros::deref_match!(self, {
-///     Self::Named(ref s) => write!(f, "{s}"),
-///     Self::Count(n)     => write!(f, "{n}"),
-/// })
+/// ```
+/// enum Shape {
+///     Named(String),
+///     Count(u32),
+/// }
+///
+/// fn describe(shape: &Shape) -> String {
+///     cp_macros::deref_match!(shape, {
+///         Shape::Named(ref s) => s.clone(),
+///         Shape::Count(n) => n.to_string(),
+///     })
+/// }
+///
+/// assert_eq!(describe(&Shape::Named("a".to_owned())), "a");
+/// assert_eq!(describe(&Shape::Count(3)), "3");
 /// ```
 #[macro_export]
 macro_rules! deref_match {
@@ -35,3 +46,6 @@ macro_rules! deref_match {
         match *$place { $($arm)* }
     }};
 }
+
+#[cfg(test)]
+mod tests;

@@ -48,6 +48,8 @@ use std::thread;
 
 use tiny_http::{Header, Method, Request, Response, Server};
 
+use crate::runtime::guard::{Admission, run_guarded};
+
 pub(crate) use rest::backend::{Backend, Paths};
 
 /// Maximum request body size accepted on a POST route (32 MiB) — bounds memory
@@ -86,10 +88,36 @@ pub fn serve(addr: &str, state: &Arc<Mutex<Backend>>) -> Result<(), String> {
 /// transport face now (design §13.4 removed the separate maintenance plane), so
 /// this dispatches every request through the one product [`handle`] pipeline.
 pub fn serve_bound(server: &Server, state: &Arc<Mutex<Backend>>) {
+    let gate = Arc::new(Admission::new(MAX_IN_FLIGHT));
     for request in server.incoming_requests() {
+        let Some(permit) = gate.try_enter() else {
+            respond_overloaded(request);
+            continue;
+        };
         let handler_state = Arc::clone(state);
-        let _handle = thread::spawn(move || handle(request, &handler_state));
+        // A panicking handler drops `request` during unwind (tiny_http answers
+        // 500), releases its permit, and leaves the backend lock usable.
+        let spawned = thread::Builder::new().spawn(move || {
+            let _permit = permit;
+            run_guarded("request", &handler_state, || handle(request, &handler_state));
+        });
+        if let Err(e) = spawned {
+            crate::oerr!("transport: cannot spawn request thread: {e}");
+        }
     }
+}
+
+/// Most request threads alive at once. SSE streams hold their thread for the
+/// connection's lifetime, so this also caps concurrent streams.
+const MAX_IN_FLIGHT: usize = 256;
+
+/// Shed load: `503` with a short `Retry-After` when [`MAX_IN_FLIGHT`] is hit.
+fn respond_overloaded(request: Request) {
+    let mut response = Response::from_string("{\"error\":\"server busy\"}").with_status_code(503i32);
+    if let Ok(h) = Header::from_bytes(&b"Retry-After"[..], &b"1"[..]) {
+        response = response.with_header(h);
+    }
+    let _sent = request.respond(response);
 }
 
 /// Route one request: dispatch to a REST handler or the SSE stream.
@@ -199,7 +227,7 @@ fn bearer_token(request: &Request) -> Option<String> {
 /// Answer a CORS preflight with `204 No Content` and the permissive CORS headers.
 fn respond_preflight(request: Request) {
     let mut response = Response::from_string("").with_status_code(204i32);
-    for header in cors_headers() {
+    for header in cors_headers(&request) {
         response = response.with_header(header);
     }
     let _sent = request.respond(response);
@@ -262,11 +290,21 @@ impl<'ctx> RouteCtx<'ctx> {
     }
 }
 
-/// CORS response headers permitting the Vite dev server (or any origin) to
-/// call the backend. Tighten to a specific origin in production if needed.
-fn cors_headers() -> Vec<Header> {
+/// CORS response headers for `request`.
+///
+/// The browser UI is served same-origin (static SPA here, or proxied by
+/// Caddy / vite), so CORS only matters for the local dev server calling
+/// `localhost:7878` directly. `Allow-Origin` therefore echoes the caller's
+/// `Origin` only when [`allowed_origin`] accepts it; any other site gets no
+/// grant (the old `*` let every web page read API responses).
+pub(crate) fn cors_headers(request: &Request) -> Vec<Header> {
+    let header = |name: &'static str| request.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.as_str());
+    let Some(origin) = header("Origin").and_then(|o| allowed_origin(o, header("Host"))) else {
+        return Vec::new();
+    };
     [
-        Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]),
+        Header::from_bytes(&b"Access-Control-Allow-Origin"[..], origin.as_bytes()),
+        Header::from_bytes(&b"Vary"[..], &b"Origin"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, PUT, PATCH, DELETE, OPTIONS"[..]),
         Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type, Last-Event-ID, Authorization"[..]),
         // Expose Content-Disposition so cross-origin fetch() (web dev server →
@@ -279,6 +317,22 @@ fn cors_headers() -> Vec<Header> {
     .into_iter()
     .filter_map(Result::ok)
     .collect()
+}
+
+/// The `Origin` to grant, or `None` to refuse: same host as the request's
+/// `Host` header, or a loopback origin (the dev server on another port).
+fn allowed_origin<'origin>(origin: &'origin str, host: Option<&str>) -> Option<&'origin str> {
+    let authority = origin.strip_prefix("http://").or_else(|| origin.strip_prefix("https://"))?;
+    if authority.contains(['/', '@']) {
+        return None;
+    }
+    let name = if authority.starts_with('[') {
+        authority.split_inclusive(']').next().unwrap_or(authority)
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    };
+    let loopback = matches!(name, "localhost" | "127.0.0.1" | "[::1]");
+    (loopback || host.is_some_and(|h| h.eq_ignore_ascii_case(authority))).then_some(origin)
 }
 
 /// Respond with a JSON [`HttpReply`](rest::HttpReply), including CORS headers.
@@ -296,7 +350,7 @@ fn respond_json(request: Request, reply: &rest::HttpReply) {
     if gzipped && let Ok(header) = Header::from_bytes(&b"Content-Encoding"[..], &b"gzip"[..]) {
         response = response.with_header(header);
     }
-    for header in cors_headers() {
+    for header in cors_headers(&request) {
         response = response.with_header(header);
     }
     let _sent = request.respond(response);
@@ -342,5 +396,25 @@ mod tests {
             ("/api/stream".to_owned(), "agent=a1&ticket=x".to_owned())
         );
         assert_eq!(split_url("/api/fleets"), ("/api/fleets".to_owned(), String::new()));
+    }
+
+    /// Same-origin and loopback dev origins are granted.
+    #[test]
+    fn allowed_origin_grants_same_or_loopback() {
+        assert_eq!(allowed_origin("http://localhost:5174", None), Some("http://localhost:5174"));
+        assert!(allowed_origin("http://127.0.0.1:5174", None).is_some());
+        assert!(allowed_origin("http://[::1]:5174", None).is_some());
+        assert!(allowed_origin("https://box.ts.net", Some("box.ts.net")).is_some());
+    }
+
+    /// Foreign sites and look-alike authorities are refused.
+    #[test]
+    fn allowed_origin_refuses_foreign() {
+        let box_host = Some("box.ts.net");
+        assert!(allowed_origin("https://evil.example", box_host).is_none());
+        assert!(allowed_origin("http://localhost.evil.example", None).is_none());
+        assert!(allowed_origin("http://evil@localhost", None).is_none());
+        assert!(allowed_origin("null", None).is_none());
+        assert!(allowed_origin("https://box.ts.net:8443", box_host).is_none());
     }
 }

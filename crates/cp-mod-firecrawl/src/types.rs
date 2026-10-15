@@ -123,6 +123,8 @@ pub struct CrawlStatusResponse {
     pub credits_used: Option<u32>,
     /// Crawled page data (populated when `status == "completed"`).
     pub data: Option<Vec<CrawlPageData>>,
+    /// URL of the next result page when the payload was split (v2 pagination).
+    pub next: Option<String>,
     /// Error message on failure.
     pub error: Option<String>,
 }

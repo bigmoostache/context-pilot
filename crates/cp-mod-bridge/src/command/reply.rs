@@ -37,7 +37,7 @@ pub type Responder<'src> = &'src dyn Fn(&Query) -> Outcome;
 ///
 /// [`Intake::process`]: super::Intake
 pub(super) fn answer(frame: &QueryFrame, cap_token: &str, responder: Responder<'_>) -> Response {
-    if frame.auth.is_empty() || frame.auth != cap_token {
+    if !super::auth::bearer_matches(&frame.auth, cap_token) {
         return Response::new(frame.query.id.clone(), Outcome::Error { reason: "bad bearer token".to_owned() });
     }
     Response::new(frame.query.id.clone(), responder(&frame.query))

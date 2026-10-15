@@ -1,10 +1,10 @@
 //! Intermediate rendering representation for Context Pilot.
 //!
 //! This crate defines the IR types that sit between the data layer and the
-//! terminal renderer. Panels emit `Vec<Block>`, and the centralized
-//! `build_frame()` assembles a full [`Frame`] snapshot each tick. A
-//! platform-specific adapter then converts the `Frame` into drawable
-//! primitives (ratatui for TUI, HTML for web, etc.).
+//! terminal renderer. Panels emit `Vec<Block>`; the frame builder in the
+//! `tui` crate (`src/ui/ir`) builds the sidebar, status bar and overlays each
+//! tick, and the conversation or active panel only when it is painted. The
+//! ratatui adapter there is the only consumer today.
 //!
 //! # Design principles
 //!
@@ -13,7 +13,8 @@
 //! - **Structured data** — tables, trees, and progress bars are first-class
 //!   [`Block`] variants, not pre-formatted text.
 //! - **Serializable** — every type derives [`Serialize`](serde::Serialize)
-//!   so the frame can be shipped over the wire to a web frontend.
+//!   so a non-terminal frontend could consume the IR. Nothing serializes it
+//!   yet: the web UI reads REST/`cp-wire`, not this IR.
 //!
 //! # `exhaustive_structs`
 //!
@@ -37,6 +38,8 @@ pub mod conversation;
 pub mod frame;
 /// Markdown-to-IR conversion utilities.
 pub mod markdown;
+#[cfg(test)]
+mod markdown_tests;
 /// Search index overlay IR types (Ctrl+I).
 pub mod overlay_ir;
 
@@ -362,46 +365,15 @@ impl Block {
         Self::Line(vec![Span::styled(text, semantic)])
     }
 
-    /// Shorthand: section header from plain text.
-    #[must_use]
-    pub fn header(text: String) -> Self {
-        Self::Header(vec![Span::styled(text, Semantic::Header)])
-    }
-
     /// Shorthand: line from multiple spans.
     #[must_use]
     pub const fn line(spans: Vec<Span>) -> Self {
         Self::Line(spans)
     }
 
-    /// Shorthand: simple table with string headers.
-    #[must_use]
-    pub fn table(headers: Vec<(&str, Align)>, rows: Vec<Vec<Cell>>) -> Self {
-        let columns = headers.into_iter().map(|(h, a)| Column { header: h.to_owned(), align: a }).collect();
-        Self::Table { columns, rows }
-    }
-
     /// Shorthand: empty line (vertical spacing).
     #[must_use]
     pub const fn empty() -> Self {
         Self::Empty
-    }
-
-    /// Shorthand: horizontal separator.
-    #[must_use]
-    pub const fn separator() -> Self {
-        Self::Separator
-    }
-
-    /// Shorthand: key-value list.
-    #[must_use]
-    pub const fn kv(pairs: Vec<KeyValuePair>) -> Self {
-        Self::KeyValue(pairs)
-    }
-
-    /// Shorthand: single key-value pair as a block.
-    #[must_use]
-    pub fn kv_row(key: Vec<Span>, value: Vec<Span>) -> Self {
-        Self::KeyValue(vec![(key, value)])
     }
 }
