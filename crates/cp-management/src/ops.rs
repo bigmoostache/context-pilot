@@ -171,9 +171,10 @@ fn delete(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, St
     Ok(format!("Deleted {gone} with the groups they owned or coordinated in: {}.", removed.join(", ")))
 }
 
-/// Whether an agent in state `s` is mid-work (stream, LLM wait, tool call).
+/// Whether an agent in state `s` is mid-turn; `Streaming` covers the stream,
+/// the LLM wait and in-flight tool calls.
 const fn is_busy(s: AgentExecState) -> bool {
-    matches!(s, AgentExecState::Streaming | AgentExecState::AwaitingLlm | AgentExecState::AwaitingTool)
+    matches!(s, AgentExecState::Streaming)
 }
 
 /// Delete the files of `removed` groups on a detached thread, so the tool
