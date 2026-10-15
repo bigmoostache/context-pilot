@@ -156,7 +156,7 @@ fn pre_start_daemons(progress: &mut impl FnMut(&str)) {
     progress("pre-starting daemons");
 
     let meili_handle = std::thread::spawn(cp_mod_search::pre_start_daemon);
-    let console_handle = std::thread::spawn(cp_mod_console::manager::find_or_create_server);
+    let console_handle = std::thread::spawn(cp_mod_console::manager::client::find_or_create_server);
 
     // Join both — each agent has internal timeouts so this won't
     // block indefinitely.  Log results without aborting.
