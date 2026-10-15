@@ -322,7 +322,9 @@ fn read_heartbeat(entry: &Entry) -> Option<Heartbeat> {
 }
 
 /// Parse every `<id>.json` record in `dir`, skipping unreadable/unparseable
-/// files and the transient `*.tmp` writes. A missing directory yields an empty
+/// files, the transient `*.tmp` writes, and agents whose protocol major falls
+/// outside the N-1 window ([`cp_wire::accepts`]) — the orchestrator never
+/// talks to a peer it cannot decode. A missing directory yields an empty
 /// list (no agents yet), not an error.
 fn read_records(dir: &Path) -> io::Result<Vec<Entry>> {
     let read_dir = match fs::read_dir(dir) {
@@ -342,6 +344,7 @@ fn read_records(dir: &Path) -> io::Result<Vec<Entry>> {
         }
         if let Ok(bytes) = fs::read(&path)
             && let Ok(record) = serde_json::from_slice::<Entry>(&bytes)
+            && cp_wire::accepts(record.protocol_version)
         {
             records.push(record);
         }

@@ -328,14 +328,19 @@ pub struct Fired {
 /// Advance time-driven substates once.
 ///
 /// Due `ComingBack`s become `SimpleTurn`s (returned as [`Fired`]); each
-/// `Recurrent` then re-arms its `ComingBack` at the next cron match after
-/// `now_ms` (`offset_secs` = local UTC offset) unless one is still pending;
-/// finally each `Dispatch` goes to its first candidate that `is_idle` and is
-/// not already runnable anywhere. Dispatch runs last so every other relaunch
-/// decision of the tick is already visible.
-pub fn tick<Idle>(groups: &mut [Group], (now_ms, offset_secs): (u64, i32), is_idle: &Idle) -> Vec<Fired>
+/// `Recurrent` then re-arms its `ComingBack` at `next_fire(cron, now_ms)`
+/// unless one is still pending; finally each `Dispatch` goes to its first
+/// candidate that `is_idle` and is not already runnable anywhere. Dispatch
+/// runs last so every other relaunch decision of the tick is already visible.
+///
+/// `next_fire` resolves the zone: production passes
+/// [`Cron::next_after_local`], which applies the UTC offset in force at the
+/// *firing* instant. A single "now" offset would misfire by the DST shift
+/// whenever a change falls between now and the next match.
+pub fn tick<Idle, Next>(groups: &mut [Group], (now_ms, next_fire): (u64, &Next), is_idle: &Idle) -> Vec<Fired>
 where
     Idle: Fn(&str) -> bool,
+    Next: Fn(&Cron, u64) -> Option<u64>,
 {
     let mut fired = Vec::new();
     for g in groups.iter_mut() {
@@ -359,7 +364,7 @@ where
             };
             push_unique(g, next);
         }
-        arm_recurrents(g, now_ms, offset_secs);
+        arm_recurrents(g, now_ms, next_fire);
     }
     resolve_dispatch(groups, is_idle);
     fired
@@ -367,7 +372,10 @@ where
 
 /// Arm the next `ComingBack` of every `Recurrent` in `group` that has none
 /// pending. A cron that no longer parses or never fires stays unarmed.
-fn arm_recurrents(group: &mut Group, now_ms: u64, offset_secs: i32) {
+fn arm_recurrents<Next>(group: &mut Group, now_ms: u64, next_fire: &Next)
+where
+    Next: Fn(&Cron, u64) -> Option<u64>,
+{
     let armed = |id: &str, social: &[Substate]| {
         social.iter().any(|s| matches!(s, Substate::ComingBack { from: Some(f), .. } if f == id))
     };
@@ -385,7 +393,7 @@ fn arm_recurrents(group: &mut Group, now_ms: u64, offset_secs: i32) {
             if armed(id, &group.social) {
                 return None;
             }
-            let at_ms = Cron::parse(cron).ok()?.next_after(now_ms, offset_secs)?;
+            let at_ms = next_fire(&Cron::parse(cron).ok()?, now_ms)?;
             Some(Substate::ComingBack {
                 agent_id: agent_id.clone(),
                 at_ms,
