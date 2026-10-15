@@ -34,17 +34,18 @@ pub(super) fn padded(spans: Vec<Span<'static>>) -> Line<'static> {
     Line::from(all)
 }
 
-/// Render the sidebar region from its IR snapshot.
-pub(crate) fn render_sidebar_from_ir(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
+/// Render the sidebar region from its IR snapshot. `owner` is the agent the
+/// sidebar belongs to (keys the token-bar animation).
+pub(crate) fn render_sidebar_from_ir(frame: &mut Frame<'_>, sidebar: &Sidebar, owner: Option<&str>, area: Rect) {
     if matches!(sidebar.mode, SidebarMode::Normal) {
-        render_normal(frame, sidebar, area);
+        render_normal(frame, sidebar, owner, area);
     }
 }
 
 // ── Normal (full) sidebar ────────────────────────────────────────────
 
 /// Render the full sidebar with context list, token bar, PR card, stats, and help hints.
-fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
+fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, owner: Option<&str>, area: Rect) {
     let _guard = crate::profile!("ir::sidebar_normal");
     let base_style = Style::default().bg(theme::bg_base());
     let cw = content_width(area.width);
@@ -59,7 +60,7 @@ fn render_normal(frame: &mut Frame<'_>, sidebar: &Sidebar, area: Rect) {
 
     // Token bar in rounded border box (above entries)
     if let Some(tb) = sidebar.token_bar.as_ref() {
-        render_token_bar_box(&mut lines, tb, cw);
+        render_token_bar_box(&mut lines, tb, owner, cw);
     }
 
     // Separate fixed (id is empty for conversation, or is_fixed) from dynamic entries
@@ -201,12 +202,12 @@ fn token_count_color(tokens: u32) -> ratatui::style::Color {
 /// Line 1: ⚓ Context Pilot
 /// Line 2: used / threshold / budget (styled)
 /// Line 3: gauge bar
-fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, cw: usize) {
+fn render_token_bar_box(lines: &mut Vec<Line<'static>>, token_bar: &TokenBar, owner: Option<&str>, cw: usize) {
     let border_style = Style::default().fg(theme::border_muted());
     let inner_width = cw.saturating_sub(2); // space between │ and │
 
     // Get animated values (smooth fill + pulse)
-    let anim = super::bar_animation::tick(token_bar);
+    let anim = super::bar_animation::tick(owner, token_bar);
 
     let current = format_number(anim.used_tokens.to_usize());
     let threshold = format_number(token_bar.threshold.to_usize());

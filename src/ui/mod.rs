@@ -177,7 +177,8 @@ fn render_body(frame: &mut Frame<'_>, state: &mut State, area: Rect, ir_frame: &
     {
         let _g = crate::profile!("sidebar_draw");
         if let Some(sidebar) = ir_frame.sidebar.as_ref() {
-            ir::render_sidebar::render_sidebar_from_ir(frame, sidebar, sidebar_area);
+            let owner = cp_mod_agents::types::FocusState::get(state).focused_agent_id.clone();
+            ir::render_sidebar::render_sidebar_from_ir(frame, sidebar, owner.as_deref(), sidebar_area);
         }
     }
     render_main_content(frame, state, content_area);
