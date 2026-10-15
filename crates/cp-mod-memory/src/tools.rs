@@ -1,4 +1,4 @@
-use cp_base::state::context::{Kind, estimate_tokens};
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
@@ -13,10 +13,22 @@ fn tier_of(id: &str) -> Option<Tier> {
     Tier::from_str_slug(slug)
 }
 
+/// Size of `contents` in `tier`'s unit. Tokens are estimated over
+/// **characters** (not bytes), so accented text and emoji are not penalised
+/// and the measure matches the migration's char-based truncation.
+fn measure(contents: &str, tier: Tier) -> usize {
+    let chars = contents.chars().count();
+    if tier.is_char_bound() {
+        chars
+    } else {
+        cp_base::cast::float_math::ceil_ratio(chars, cp_base::config::constants::CHARS_PER_TOKEN)
+    }
+}
+
 /// Validate a proposed `contents` against `tier`'s enforced bound. Returns the
 /// measured size on success, or an error quoting the **advertised** bound.
 fn validate_contents(contents: &str, tier: Tier) -> Result<(), String> {
-    let size = if tier.is_char_bound() { contents.chars().count() } else { estimate_tokens(contents) };
+    let size = measure(contents, tier);
     if size > tier.enforced_bound() {
         Err(format!(
             "contents too long: ~{size} {unit} (max {adv}). Keep it dense and synthetic; use a larger tier only if truly incompressible.",
@@ -26,6 +38,17 @@ fn validate_contents(contents: &str, tier: Tier) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+/// Read the optional `importance` field. An unknown value is an error rather
+/// than silently ignored.
+fn parse_importance(edit: &serde_json::Value) -> Result<Option<MemoryImportance>, String> {
+    let Some(raw) = edit.get("importance").and_then(|v| v.as_str()) else {
+        return Ok(None);
+    };
+    raw.parse::<MemoryImportance>()
+        .map(Some)
+        .map_err(|()| format!("invalid importance '{raw}' (expected low, medium, high or critical)"))
 }
 
 /// Outcome of applying one edit entry.
@@ -55,8 +78,10 @@ fn apply_one_edit(edit: &serde_json::Value, state: &mut State) -> EditOutcome {
     // edit (e.g. importance only) preserves the rest.
     let title_in = edit.get("title").and_then(|v| v.as_str());
     let contents_in = edit.get("contents").and_then(|v| v.as_str());
-    let importance_in =
-        edit.get("importance").and_then(|v| v.as_str()).and_then(|s| s.parse::<MemoryImportance>().ok());
+    let importance_in = match parse_importance(edit) {
+        Ok(imp) => imp,
+        Err(e) => return EditOutcome::Error(format!("{id}: {e}")),
+    };
 
     // Validate title / contents BEFORE mutating (all-or-nothing per entry).
     if let Some(t) = title_in
@@ -93,15 +118,11 @@ fn apply_one_edit(edit: &serde_json::Value, state: &mut State) -> EditOutcome {
     let nothing_left = slot.title.trim().is_empty() && slot.contents.trim().is_empty();
     slot.occupied = !(contents_cleared || nothing_left);
     if !slot.occupied {
-        slot.title.clear();
-        slot.contents.clear();
-        slot.importance = MemoryImportance::Medium;
+        storage::clear_slot(slot);
     }
 
-    let occupied = slot.occupied;
-    let preview = slot.title.clone();
-    storage::upsert_slot(slot);
-    if occupied { EditOutcome::Set(format!("{id}: {preview}")) } else { EditOutcome::Freed(id.to_owned()) }
+    let slot_id = slot.id.clone();
+    if slot.occupied { EditOutcome::Set(format!("{slot_id}: {}", slot.title)) } else { EditOutcome::Freed(slot_id) }
 }
 
 /// Append the tidy-up nudge when total occupancy is at/above 90 % (FR6).
@@ -151,16 +172,30 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut freed: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
 
+    let mut touched: Vec<String> = Vec::new();
+
     for edit in edits {
         match apply_one_edit(edit, state) {
-            EditOutcome::Set(line) => set.push(line),
-            EditOutcome::Freed(id) => freed.push(id),
+            EditOutcome::Set(line) => {
+                if let Some((id, _)) = line.split_once(':') {
+                    touched.push(id.to_owned());
+                }
+                set.push(line);
+            }
+            EditOutcome::Freed(id) => {
+                touched.push(id.clone());
+                freed.push(id);
+            }
             EditOutcome::Error(e) => errors.push(e),
         }
     }
 
-    let changed = !set.is_empty() || !freed.is_empty();
+    let changed = !touched.is_empty();
     if changed {
+        // One batched write for the whole call (≤ 2 file rewrites, not 2 per edit).
+        let ms = MemoryState::get(state);
+        let slots: Vec<_> = touched.iter().filter_map(|id| ms.slot(id)).collect();
+        storage::persist_slots(&slots);
         state.touch_panel(Kind::MEMORY);
     }
 
@@ -174,4 +209,51 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let mut result = ToolResult::new(tool.id.clone(), output, !changed);
     result.preserves_tempo = true;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Slot ids parse to their tier; malformed ids do not.
+    #[test]
+    fn tier_of_parses_ids() {
+        assert_eq!(tier_of("M-long-2"), Some(Tier::Long));
+        assert_eq!(tier_of("short-2"), None);
+        assert_eq!(tier_of("M-giant-1"), None);
+    }
+
+    /// Regression: tokens are estimated over chars, so accented text fits the
+    /// same budget as ASCII of equal length.
+    #[test]
+    fn measure_is_char_based() {
+        let ascii = "e".repeat(330);
+        let accented = "\u{e9}".repeat(330);
+        assert_eq!(measure(&ascii, Tier::Short), measure(&accented, Tier::Short));
+        assert_eq!(measure(&accented, Tier::Safe), 330);
+    }
+
+    /// Contents over the enforced bound are rejected; within it, accepted.
+    #[test]
+    fn validate_contents_bounds() {
+        validate_contents("ok", Tier::Tiny).unwrap();
+        let long = "w".repeat(Tier::Safe.enforced_bound().saturating_add(1));
+        let _too_long = validate_contents(&long, Tier::Safe).unwrap_err();
+    }
+
+    /// Regression: an unknown importance is an error, not silently ignored.
+    #[test]
+    fn importance_parsing() {
+        let ok = serde_json::json!({ "importance": "high" });
+        assert_eq!(parse_importance(&ok), Ok(Some(MemoryImportance::High)));
+        assert_eq!(parse_importance(&serde_json::json!({})), Ok(None));
+        let _bad = parse_importance(&serde_json::json!({ "importance": "urgent" })).unwrap_err();
+    }
+
+    /// The tidy nudge fires only at or above 90 % occupancy.
+    #[test]
+    fn tidy_nudge_threshold() {
+        assert!(tidy_nudge(197).is_none());
+        assert!(tidy_nudge(198).is_some());
+    }
 }

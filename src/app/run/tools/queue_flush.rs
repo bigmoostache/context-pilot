@@ -25,9 +25,10 @@ pub(crate) struct FlushedTool {
 pub(crate) fn execute_queue_flush(
     tool: &cp_base::tools::ToolUse,
     state: &mut State,
+    owner: Option<&str>,
 ) -> (crate::infra::tools::ToolResult, Vec<FlushedTool>) {
     let qs = QueueState::get_mut(state);
-    if qs.queued_calls.is_empty() {
+    if qs.count_owned(owner) == 0 {
         return (
             crate::infra::tools::ToolResult::new(
                 tool.id.clone(),
@@ -37,10 +38,12 @@ pub(crate) fn execute_queue_flush(
             Vec::new(),
         );
     }
-    let calls = qs.flush();
-    qs.active = false;
+    let calls = qs.flush(owner);
+    // Only the main agent owns the `active` toggle; a reverie flush leaves it alone.
+    if owner.is_none() {
+        qs.active = false;
+    }
 
-    let summary = format!("Executed {} queued action(s).", calls.len());
     let mut flushed = Vec::with_capacity(calls.len());
 
     for call in &calls {
@@ -48,15 +51,45 @@ pub(crate) fn execute_queue_flush(
         // The original id was already used in the "Queued as #N" tool_result at intercept time.
         let fresh_id = format!("flush_{}_{}", call.index, call.tool_use_id);
         let queued_tool = cp_base::tools::ToolUse::new(fresh_id, call.tool_name.clone(), call.input.clone());
-        let result = execute_tool(&queued_tool, state);
+        let result = run_flushed_call(&queued_tool, state);
         flushed.push(FlushedTool { tool: queued_tool, result, queue_index: call.index });
     }
+    let summary = flush_summary(&flushed);
 
     // The summary wrapper preserves tempo — only the individual flushed
     // tool results should drive the tempo decision (transparent queue).
     let mut wrapper = crate::infra::tools::ToolResult::new(tool.id.clone(), summary, false);
     wrapper.preserves_tempo = true;
     (wrapper, flushed)
+}
+
+/// Run one flushed call, re-running pre-flight first: earlier calls in the same
+/// flush may have changed what the queue-time check validated (e.g. an `Edit`'s
+/// `old_string`). Errors skip execution; warnings are appended to the result.
+fn run_flushed_call(tool: &cp_base::tools::ToolUse, state: &mut State) -> crate::infra::tools::ToolResult {
+    let active = state.active_modules.clone();
+    let pf = crate::modules::pre_flight::pre_flight_tool(tool, state, &active);
+    if pf.has_errors() {
+        return crate::infra::tools::ToolResult::new(tool.id.clone(), pf.format_errors(), true);
+    }
+    let mut result = execute_tool(tool, state);
+    if pf.has_warnings() {
+        result.content.push('\n');
+        result.content.push_str(&pf.format_errors());
+    }
+    result
+}
+
+/// Flush summary. Calls run one by one with no rollback, so failures are
+/// listed by queue index rather than hidden behind a bare count.
+fn flush_summary(flushed: &[FlushedTool]) -> String {
+    let failed: Vec<String> =
+        flushed.iter().filter(|f| f.result.is_error).map(|f| format!("#{}", f.queue_index)).collect();
+    if failed.is_empty() {
+        format!("Executed {} queued action(s) in order.", flushed.len())
+    } else {
+        format!("Executed {} queued action(s) in order; failed (no rollback): {}.", flushed.len(), failed.join(", "))
+    }
 }
 
 /// Create and persist a compact `tool_call` message for a queue-flushed `ToolUse`.

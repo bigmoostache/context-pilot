@@ -636,10 +636,8 @@ name = "cp-mod-github"
 version = "0.2.13"
 dependencies = [
  "cp-base",
- "cp-mod-utilities",
  "cp-render",
  "crossterm",
- "regex",
  "serde_json",
 ]
 

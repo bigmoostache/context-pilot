@@ -3,11 +3,10 @@
 //! Extracted from `main.rs` to keep it under the 500-line limit.
 
 use std::collections::BTreeMap;
-use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, PoisonError};
 
-use crate::{SHUTDOWN_REQUESTED, Session, Sessions, is_pid_alive};
+use crate::{SHUTDOWN_REQUESTED, Session, Sessions, session};
 
 /// Delete `*.log` files in `dir` whose mtime is older than `max_age`.
 /// Best-effort: unreadable entries are skipped. A live session keeps writing
@@ -45,12 +44,13 @@ pub(crate) fn raise_fd_limit() {
     }
 }
 
-/// Register SIGINT and SIGHUP handlers via `signal-hook`.
+/// Register SIGTERM, SIGINT and SIGHUP handlers via `signal-hook`.
 ///
 /// Each handler atomically sets [`SHUTDOWN_REQUESTED`] — the main accept loop
-/// polls it and breaks cleanly.
+/// polls it and breaks cleanly. SIGTERM matters most: it is what `kill <pid>`
+/// sends, and the default action would skip child and socket cleanup.
 pub(crate) fn install_signal_handlers() {
-    for sig in [signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP] {
+    for sig in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGINT, signal_hook::consts::SIGHUP] {
         drop(signal_hook::flag::register(sig, Arc::clone(&SHUTDOWN_REQUESTED)));
     }
 }
@@ -97,9 +97,8 @@ pub(crate) fn reaper_loop(sessions: &Sessions) {
 /// bookkeeping for sessions removed elsewhere.
 fn reap_tick(map: &mut BTreeMap<String, Session>, exit_times: &mut BTreeMap<String, u64>, now_secs: u64) {
     // Discover newly-exited sessions.
-    for (key, session) in map.iter_mut() {
-        session.poll_status();
-        if session.is_terminal() {
+    for (key, entry) in map.iter() {
+        if entry.is_terminal() {
             let _prev = exit_times.entry(key.clone()).or_insert(now_secs);
         }
     }
@@ -124,32 +123,35 @@ fn reap_tick(map: &mut BTreeMap<String, Session>, exit_times: &mut BTreeMap<Stri
 }
 
 // Here be the last port of call — once ye enter, no process leaves alive.
-/// Kill all sessions — used during shutdown.
+/// Kill every session's process group — used during shutdown.
+///
+/// Empties the map under the lock, then signals outside it.
 pub(crate) fn kill_all_sessions(sessions: &Sessions) {
-    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-    for session in map.values_mut() {
-        if !session.is_terminal() {
-            terminate(session.pid, 50);
-        }
-        drop(session.stdin.take());
+    let drained = std::mem::take(&mut *sessions.lock().unwrap_or_else(PoisonError::into_inner));
+    for (_, mut gone) in drained {
+        drop(gone.stdin.take());
+        session::terminate(gone.pid, 50);
     }
-    map.clear();
 }
 
-/// SIGTERM `pid`, then SIGKILL it if still alive after `grace_ms`.
-///
-/// Polls liveness every 5 ms instead of sleeping the full grace period, so a
-/// process that exits promptly (the common case) returns in a few ms. The
-/// caller (and the agent blocked on the socket reply) no longer pays a fixed
-/// delay. Worst case is unchanged: `grace_ms` then SIGKILL.
-pub(crate) fn terminate(pid: u32, grace_ms: u64) {
-    drop(Command::new("kill").args([&pid.to_string()]).output());
-    let deadline = std::time::Instant::now().checked_add(std::time::Duration::from_millis(grace_ms));
-    while is_pid_alive(pid) {
-        if deadline.is_none_or(|d| std::time::Instant::now() >= d) {
-            drop(Command::new("kill").args(["-9", &pid.to_string()]).output());
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// A session whose waiter has (or has not) recorded an exit.
+    fn fake(exit: Option<i32>) -> Session {
+        Session { pid: 0, stdin: None, exit: Arc::new(Mutex::new(exit)) }
+    }
+
+    #[test]
+    fn reaper_keeps_running_and_fresh_exits_drops_old_ones() {
+        let mut map = BTreeMap::from([("run".to_owned(), fake(None)), ("done".to_owned(), fake(Some(0i32)))]);
+        let mut seen = BTreeMap::new();
+        reap_tick(&mut map, &mut seen, 100);
+        assert_eq!(map.len(), 2, "a fresh exit stays for the grace period");
+        reap_tick(&mut map, &mut seen, 100 + REAPER_GRACE_SECS);
+        assert!(map.contains_key("run"), "running sessions are never reaped");
+        assert!(!map.contains_key("done"), "exits past the grace period are reaped");
     }
 }

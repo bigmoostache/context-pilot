@@ -19,7 +19,7 @@ impl Panel for QueuePanel {
             S::muted("  This queue is shared between the main consciousness and background".into()).italic(),
         ]));
         blocks.push(Block::Line(vec![
-            S::muted("  reverie sub-agents. Items may appear here from either source.".into()).italic(),
+            S::muted("  reverie sub-agents. Reverie items are tagged; each side flushes only its own.".into()).italic(),
         ]));
         blocks.push(Block::empty());
 
@@ -38,20 +38,10 @@ impl Panel for QueuePanel {
         blocks.push(Block::empty());
 
         for call in &qs.queued_calls {
-            let params = serde_json::to_string(&call.input).unwrap_or_default();
-            let short = if params.len() > 80 {
-                let mut end = 77;
-                while !params.is_char_boundary(end) {
-                    end = end.saturating_sub(1);
-                }
-                format!("{}...", params.get(..end).unwrap_or(""))
-            } else {
-                params
-            };
             blocks.push(Block::Line(vec![
                 S::muted(format!("  {}. ", call.index)),
                 S::accent(call.tool_name.clone()).bold(),
-                S::muted(format!("({short})")),
+                S::muted(format!("({}){}", truncate_params(&call.input, 80), owner_tag(call))),
             ]));
         }
 
@@ -89,7 +79,7 @@ impl Panel for QueuePanel {
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::QUEUE)
-            .map_or(("P11", 0), |c| (c.id.as_str(), c.last_refresh_ms));
+            .map_or(("", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Queue", content, last_refresh_ms)]
     }
 
@@ -138,19 +128,51 @@ impl QueuePanel {
             let status = if qs.active { "Active" } else { "Paused" };
             let _r1 = write!(text, "Queue {} — {} action(s) queued:\n\n", status, qs.queued_calls.len());
             for call in &qs.queued_calls {
-                let params = serde_json::to_string(&call.input).unwrap_or_default();
-                let short = if params.len() > 120 {
-                    let mut end = 117;
-                    while !params.is_char_boundary(end) {
-                        end = end.saturating_sub(1);
-                    }
-                    format!("{}...", params.get(..end).unwrap_or(""))
-                } else {
-                    params
-                };
-                let _r2 = writeln!(text, "{}. {}({})", call.index, call.tool_name, short);
+                let _r2 = writeln!(
+                    text,
+                    "{}. {}({}){}",
+                    call.index,
+                    call.tool_name,
+                    truncate_params(&call.input, 120),
+                    owner_tag(call)
+                );
             }
         }
         text
+    }
+}
+
+/// Compact JSON of a call's params, cut to `max` bytes (char-boundary safe, `...` suffix).
+fn truncate_params(input: &serde_json::Value, max: usize) -> String {
+    let params = serde_json::to_string(input).unwrap_or_default();
+    if params.len() <= max {
+        return params;
+    }
+    let mut end = max.saturating_sub(3);
+    while !params.is_char_boundary(end) {
+        end = end.saturating_sub(1);
+    }
+    format!("{}...", params.get(..end).unwrap_or(""))
+}
+
+/// ` [reverie:<id>]` for reverie-owned calls, empty for the main agent's.
+fn owner_tag(call: &crate::types::QueuedToolCall) -> String {
+    call.owner.as_ref().map_or_else(String::new, |o| format!(" [reverie:{o}]"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_params;
+
+    #[test]
+    fn truncate_keeps_short_params() {
+        assert_eq!(truncate_params(&serde_json::json!({"a": 1i32}), 80), r#"{"a":1}"#);
+    }
+
+    #[test]
+    fn truncate_cuts_on_char_boundary() {
+        let out = truncate_params(&serde_json::json!({"k": "\u{e9}".repeat(100)}), 20);
+        assert!(out.ends_with("..."));
+        assert!(out.len() <= 20);
     }
 }
