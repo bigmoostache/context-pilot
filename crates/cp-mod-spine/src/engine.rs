@@ -40,6 +40,18 @@ fn in_backoff(state: &State) -> bool {
     now_ms().saturating_sub(last_err_ms) < backoff_secs.saturating_mul(1000)
 }
 
+/// Whether `content` (trimmed) is a message the spine itself pushed. The
+/// auto-continuation prefix is read from the injection template (text before
+/// `{count}`), so editing `injections.yaml` cannot silently disable the check.
+fn is_synthetic(content: &str) -> bool {
+    let spine = &INJECTIONS.spine;
+    let prefix = spine.auto_continuation.split("{count}").next().unwrap_or_default().trim();
+    (!prefix.is_empty() && content.starts_with(prefix))
+        || content == spine.continue_msg.trim()
+        || content == spine.reload_complete.trim()
+        || content == spine.user_message_during_stream.trim()
+}
+
 /// True when the last non-tool-result user message was a synthetic
 /// auto-continuation the assistant hasn't answered yet (double-synthetic guard).
 fn last_synthetic_unanswered(state: &State) -> bool {
@@ -55,10 +67,7 @@ fn last_synthetic_unanswered(state: &State) -> bool {
         return false;
     };
     let content = msg.content.trim();
-    let is_synthetic = content.starts_with("/* Auto-continuation:")
-        || content == INJECTIONS.spine.continue_msg.trim()
-        || content == INJECTIONS.spine.reload_complete.trim();
-    if !is_synthetic {
+    if !is_synthetic(content) {
         return false;
     }
     // Assistant responded anywhere after the synthetic message (not just last).
@@ -138,9 +147,6 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     SpineState::mark_all_unprocessed_as_processed(state);
     let count = &mut SpineState::get_mut(state).config.auto_continuation_count;
     *count = count.saturating_add(1);
-    if SpineState::get(state).config.autonomous_start_ms.is_none() {
-        SpineState::get_mut(state).config.autonomous_start_ms = Some(now_ms());
-    }
     state.touch_panel(Kind::SPINE);
 
     SpineDecision::Continue(action)
@@ -239,5 +245,87 @@ pub fn apply_continuation(state: &mut State, action: ContinuationAction) -> bool
             state.begin_streaming();
             true
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{NotificationStatus, gc_notifications};
+
+    fn spine_state() -> State {
+        let mut state = State::default();
+        state.set_ext(SpineState::new());
+        state
+    }
+
+    fn notify(state: &mut State, source: &str) {
+        drop(SpineState::create_notification(state, NotificationType::Custom, source.to_owned(), "x".to_owned()));
+    }
+
+    /// Simulate the assistant answering a fired continuation, then the stream ending OK.
+    fn answer_and_succeed(state: &mut State) {
+        let _ai = state.push_empty_assistant();
+        if let Some(last) = state.agent_mut().messages.last_mut() {
+            last.content = "done".to_owned();
+        }
+        SpineState::on_stream_success(state);
+    }
+
+    #[test]
+    fn guard_caps_a_loop_whose_turns_all_succeed() {
+        let mut state = spine_state();
+        SpineState::get_mut(&mut state).config.max_auto_retries = Some(2);
+        for round in 0u8..2 {
+            notify(&mut state, &format!("ping{round}"));
+            assert!(matches!(check_spine(&mut state), SpineDecision::Continue(_)));
+            answer_and_succeed(&mut state);
+        }
+        notify(&mut state, "ping2");
+        assert!(matches!(check_spine(&mut state), SpineDecision::Blocked(_)));
+        assert!(!SpineState::has_unprocessed_notifications(&state));
+    }
+
+    #[test]
+    fn stream_success_keeps_count_but_clears_backoff() {
+        let mut state = spine_state();
+        let cfg = &mut SpineState::get_mut(&mut state).config;
+        cfg.auto_continuation_count = 3;
+        cfg.consecutive_continuation_errors = 2;
+        cfg.last_continuation_error_ms = Some(1);
+        SpineState::on_stream_success(&mut state);
+        let after = SpineState::get(&state).config;
+        assert_eq!(after.auto_continuation_count, 3);
+        assert_eq!(after.consecutive_continuation_errors, 0);
+        assert!(after.last_continuation_error_ms.is_none());
+    }
+
+    #[test]
+    fn unanswered_synthetic_blocks_a_second_one() {
+        let mut state = spine_state();
+        notify(&mut state, "a");
+        let SpineDecision::Continue(action) = check_spine(&mut state) else { panic!("expected Continue") };
+        assert!(apply_continuation(&mut state, action));
+        state.agent_mut().stream.phase.transition(cp_base::state::flags::StreamPhase::Idle);
+        notify(&mut state, "b");
+        assert!(matches!(check_spine(&mut state), SpineDecision::Idle));
+    }
+
+    #[test]
+    fn gc_drops_processed_then_blocked_never_unprocessed() {
+        let mk = |id: &str, status| {
+            let mut n = Notification::new(id.to_owned(), NotificationType::Custom, id.to_owned(), String::new());
+            n.status = status;
+            n
+        };
+        let mut list = vec![
+            mk("N1", NotificationStatus::Blocked),
+            mk("N2", NotificationStatus::Unprocessed),
+            mk("N3", NotificationStatus::Processed),
+            mk("N4", NotificationStatus::Blocked),
+        ];
+        gc_notifications(&mut list, 2);
+        let ids: Vec<&str> = list.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids, vec!["N2", "N4"]);
     }
 }
