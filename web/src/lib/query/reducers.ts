@@ -137,10 +137,13 @@ function foldMessageDeleted(prev: AgentDetail[], k: Kind): AgentDetail[] | null 
  * (same flags) returns the SAME refs via map, which structural sharing collapses.
  */
 function foldAgentFocus(prev: AgentDetail[], k: Kind): AgentDetail[] {
-  return prev.map((t) => {
+  const next = prev.map((t) => {
     const focused = t.id === k.agent_id
     return t.focused === focused ? t : { ...t, focused }
   })
+  // `map` always allocates: return `prev` itself when no row changed so the
+  // bridge skips `setQueryData` (and the re-render) on a no-op focus delta.
+  return next.every((t, i) => t === prev[i]) ? prev : next
 }
 
 /**

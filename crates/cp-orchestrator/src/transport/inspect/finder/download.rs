@@ -17,7 +17,8 @@ const MAX_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 /// `GET /api/fleet/{id}/fs/download?path=` — file or folder download.
 ///
 /// **Files** are returned as raw bytes with `Content-Disposition: attachment`,
-/// capped at [`MAX_DOWNLOAD_BYTES`].
+/// capped at [`MAX_DOWNLOAD_BYTES`]. Like [`fs_raw`], they may live in the
+/// realm or under `/tmp` (see `previewable_path`).
 ///
 /// **Folders** are zipped into a temporary archive (`/tmp`), returned as
 /// `{dirname}.zip`, capped at [`MAX_ZIP_BYTES`], then cleaned up. Uses the
@@ -36,13 +37,14 @@ pub(crate) fn fs_download(state: &Mutex<Backend>, fleet_id: &str, query: &str) -
         Some(p) if !p.is_empty() => p,
         _ => return Err(HttpReply::error(400, "missing path parameter")),
     };
-    let Some(target) = confined_path(&folder, &relative) else {
+    // Folders zip only inside the realm; files may also come from the
+    // read-only preview roots (`/tmp`), where agents leave cited reports.
+    if let Some(dir) = confined_path(&folder, &relative).filter(|p| p.is_dir()) {
+        return zip_and_download(&dir);
+    }
+    let Some(target) = previewable_path(&folder, &relative) else {
         return Err(HttpReply::error(403, "path outside agent realm"));
     };
-
-    if target.is_dir() {
-        return zip_and_download(&target);
-    }
 
     if !target.is_file() {
         return Err(HttpReply::error(404, "not a file or directory"));
