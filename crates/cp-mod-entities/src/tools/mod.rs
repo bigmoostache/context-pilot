@@ -169,32 +169,24 @@ fn route_ok(state: &mut State, ctx: &RouteCtx<'_>) -> Result<(String, bool, bool
     }
 }
 
-/// Post-execution classification: what the statement did and how it ran.
-struct PostExec {
-    /// Statement kind (Select skips sync).
-    kind: SqlKind,
-    /// Dry run — no persistent effect, skip sync.
-    dry_run: bool,
-    /// Execution errored — skip sync.
-    is_error: bool,
-}
-
-/// Meilisearch sync after a successful mutation (skipped on dry-run / read-only).
-fn sync_affected(state: &mut State, sql: &str, ctx: &PostExec, stmts: &[&str]) {
-    if ctx.is_error || ctx.dry_run || ctx.kind == SqlKind::Select {
-        return;
-    }
-    let affected = crate::sync::extract_affected_tables(stmts);
-    let upper = sql.to_uppercase();
-    let is_drop = upper.contains("DROP TABLE") || upper.contains("DROP TABLE IF EXISTS");
+/// Meilisearch sync after a successful mutation.
+///
+/// `before` is the table list snapshotted before execution; `None` means no
+/// sync (dry run, read-only, or failed call). The effect is read back from
+/// `sqlite_master`.
+fn sync_affected(state: &mut State, conn: &Connection, before: Option<&[String]>, stmts: &[&str]) {
+    let Some(before_tables) = before else { return };
+    let effect = crate::sync::affected::detect(conn, before_tables, stmts);
     let es_sync = crate::types::EntitiesState::get_mut(state);
-    for table in &affected {
-        if is_drop {
-            es_sync.dropped_tables.push(table.clone());
-            let _removed = es_sync.dirty_tables.remove(table);
-        } else {
-            let _inserted = es_sync.dirty_tables.insert(table.clone());
+    for table in effect.dropped {
+        let _removed = es_sync.dirty_tables.remove(&table);
+        if !es_sync.dropped_tables.contains(&table) {
+            es_sync.dropped_tables.push(table);
         }
+    }
+    for table in effect.dirty {
+        es_sync.dropped_tables.retain(|t| *t != table);
+        let _inserted = es_sync.dirty_tables.insert(table);
     }
     crate::sync::flush_sync(state);
 }
@@ -336,6 +328,8 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     let plan = ExecPlan { kind, dry_run, dump_path: &dump_path, migrations_dir: &migrations_dir };
+    // Table list before a real write, diffed afterwards for drops/creates.
+    let before = (!dry_run && kind != SqlKind::Select).then(|| db::user_table_names(&conn));
     let result_content = run_statement(&conn, sql, &plan, state);
 
     // ── Route results ───────────────────────────────────────────────────
@@ -363,7 +357,7 @@ pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     };
 
     // ── Post-execution bookkeeping ──────────────────────────────────────
-    sync_affected(state, sql, &PostExec { kind, dry_run, is_error }, &stmts);
+    sync_affected(state, &conn, before.as_deref().filter(|_| !is_error), &stmts);
     refresh_schema_cache(state, &conn, &db_path, dry_run);
 
     ToolResult {
