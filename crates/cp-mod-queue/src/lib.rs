@@ -1,10 +1,11 @@
-//! Queue module — batch tool calls and execute them atomically.
+//! Queue module — batch tool calls and execute them in order on flush.
 //!
 //! Three tools: `Queue_pause`, `Queue_execute` (flush),
 //! `Queue_undo` (remove by index; auto-deactivates when all items removed).
 //! The queue intercepts tool calls in the pipeline, stores them, and replays
-//! on flush. Reverie sub-agents get their own activation flag sharing the same
-//! queue storage.
+//! them one by one on flush (no rollback). Reverie sub-agents get their own
+//! activation flag; each queued call records its owner so a reverie only
+//! flushes or clears its own calls.
 
 /// Queue sidebar panel rendering.
 mod panel;
@@ -30,7 +31,7 @@ use cp_base::cast::Safe as _;
 static TOOL_TEXTS: std::sync::LazyLock<ToolTexts> =
     std::sync::LazyLock::new(|| ToolTexts::parse(include_str!("../../../yamls/tools/queue.yaml")));
 
-/// Queue module: batch tool calls and flush them atomically.
+/// Queue module: batch tool calls and flush them in order.
 #[derive(Debug, Clone, Copy)]
 pub struct QueueModule;
 
@@ -57,7 +58,7 @@ impl Module for QueueModule {
         "Queue"
     }
     fn description(&self) -> &'static str {
-        "Batch tool execution queue for atomic operations"
+        "Batch tool execution queue: one cache break per batch"
     }
 
     fn init_state(&self, state: &mut State) {
@@ -153,13 +154,8 @@ impl Module for QueueModule {
                 }
                 Some(pf)
             }
-            "Queue_execute" => {
-                let mut pf = Verdict::new();
-                if qs.queued_calls.is_empty() {
-                    pf.warnings.push("Queue is empty \u{2014} nothing to execute".to_owned());
-                }
-                Some(pf)
-            }
+            // Queue_execute never reaches module pre-flight: the pipeline routes it
+            // to the flush directly, which reports an empty queue itself.
             "Queue_undo" => {
                 let mut pf = Verdict::new();
                 if let Some(indices) = tool.input.get("indices").and_then(|v| v.as_array()) {
@@ -200,7 +196,7 @@ impl Module for QueueModule {
     }
 
     fn tool_category_descriptions(&self) -> Vec<(&'static str, &'static str)> {
-        vec![("Queue", "Batch tool execution queue \u{2014} queue actions and flush them atomically")]
+        vec![("Queue", "Batch tool execution queue \u{2014} queue actions and flush them in order")]
     }
 
     fn dependencies(&self) -> &[&'static str] {
