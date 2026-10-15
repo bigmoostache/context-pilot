@@ -43,10 +43,16 @@ pub struct FiredCoucou {
 }
 
 /// Cron equivalent of a legacy `hourly`/`daily`/`weekly` recurrence, anchored
-/// on the local time of `fire_at_ms`.
+/// on the local time of `fire_at_ms` (with the UTC offset in effect at that
+/// instant, so a DST change between then and now doesn't shift the hour).
 fn legacy_cron(label: &str, fire_at_ms: u64) -> Option<String> {
     let secs = i64::try_from(fire_at_ms.checked_div(1000)?).ok()?;
-    let local = secs.saturating_add(i64::from(time::local_utc_offset_secs()));
+    cron_from_local(label, secs, time::utc_offset_at_secs(secs))
+}
+
+/// Cron for `label` anchored on `secs` shifted by `offset_secs` (east of UTC).
+fn cron_from_local(label: &str, secs: i64, offset_secs: i32) -> Option<String> {
+    let local = secs.saturating_add(i64::from(offset_secs));
     let minute = local.rem_euclid(3600).div_euclid(60);
     let hour = local.rem_euclid(86_400).div_euclid(3600);
     // 1970-01-01 was a Thursday (4).
@@ -186,6 +192,18 @@ mod tests {
         let first = reg.pending.first();
         assert_eq!(first.map(|c| c.interval_ms), Some(0));
         assert!(first.and_then(|c| c.cron.as_deref()).is_some_and(|e| e.ends_with(" * * *")));
+    }
+
+    #[test]
+    fn legacy_cron_uses_offset_of_the_original_instant() {
+        // Thu 1970-01-01 23:05 UTC.
+        let secs = 23 * 3600 + 5 * 60;
+        assert_eq!(cron_from_local("daily", secs, 0).as_deref(), Some("5 23 * * *"));
+        // Winter (+1h) vs summer (+2h) offsets land on different local days/hours.
+        assert_eq!(cron_from_local("weekly", secs, 3600).as_deref(), Some("5 0 * * 5"));
+        assert_eq!(cron_from_local("weekly", secs, 7200).as_deref(), Some("5 1 * * 5"));
+        assert_eq!(cron_from_local("hourly", secs, -1800).as_deref(), Some("35 * * * *"));
+        assert!(cron_from_local("monthly", secs, 0).is_none());
     }
 
     #[test]
