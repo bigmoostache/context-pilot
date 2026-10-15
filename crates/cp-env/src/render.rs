@@ -52,7 +52,7 @@ fn header(out: &mut String) {
     out.push_str("- **Scope**: each binary parses the variables of its own scope plus the shared ones; the other binary's names are known (never \"unknown\") but ignored. The orchestrator passes its whole environment to every agent it spawns.\n\n");
     out.push_str("## Invariants\n\n");
     out.push_str("Combinations rejected at boot:\n\n");
-    for rule in invariants::DESCRIPTIONS {
+    for rule in invariants::descriptions() {
         let _w = writeln!(out, "- {rule}");
     }
     out.push('\n');

@@ -265,6 +265,16 @@ mod tests {
         assert!(!leaked, "secret leaked into Debug: {shown}");
     }
 
+    /// A dependency that failed validation is reported once: the rule that
+    /// needs it does not add a misleading "requires X to be set".
+    #[test]
+    fn rejected_dependency_does_not_cascade() {
+        let (_dir, result) = orchestrator(&[("CP_CADDYFILE", "/nonexistent/Caddyfile"), ("CP_FEATURE_IT_PANE", "1")]);
+        let lines = errors(result);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines.first().is_some_and(|line| line.starts_with("CP_CADDYFILE")), "{lines:?}");
+    }
+
     /// Feature flags are checked against what they need to work.
     #[test]
     fn feature_invariants() {
