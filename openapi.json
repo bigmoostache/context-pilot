@@ -611,25 +611,33 @@
         "type": "object"
       },
       "ConvHit": {
+        "description": "One conversation-search hit returned to the backend.\n\nA flattened, transport-ready view of a Meilisearch conversation document:\nenough to render a palette result row (agent name + author + snippet) and\nto navigate to the source agent (`agent_id`).",
         "properties": {
           "agent_id": {
+            "description": "Owning agent id — the navigation target.",
             "type": "string"
           },
           "agent_name": {
+            "description": "Owning agent's display name.",
             "type": "string"
           },
           "author": {
+            "description": "`\"user\"` or `\"assistant\"`.",
             "type": "string"
           },
           "score": {
+            "description": "Meilisearch ranking score (0.0–1.0) — higher is a better match.",
             "format": "double",
             "type": "number"
           },
           "text": {
+            "description": "The matched message body.",
             "type": "string"
           },
           "ts_ms": {
+            "description": "Message timestamp, ms since epoch.",
             "format": "int64",
+            "minimum": 0,
             "type": "integer"
           }
         },

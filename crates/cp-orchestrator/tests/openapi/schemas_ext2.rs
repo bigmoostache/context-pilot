@@ -246,18 +246,7 @@ pub(super) fn deploy() -> Value {
             "required": ["accounts"]
         },
         // ── Conversation search (T671) ──────────────────────────────
-        "ConvHit": {
-            "type": "object",
-            "properties": {
-                "agent_id": { "type": "string" },
-                "agent_name": { "type": "string" },
-                "author": { "type": "string" },
-                "text": { "type": "string" },
-                "ts_ms": { "type": "integer", "format": "int64" },
-                "score": { "type": "number", "format": "double" }
-            },
-            "required": ["agent_id", "agent_name", "author", "text", "ts_ms", "score"]
-        },
+        // `ConvHit` is DERIVED from the Rust type — see [`derived`](super::derived).
         "ConversationSearchResult": {
             "type": "object",
             "properties": {
