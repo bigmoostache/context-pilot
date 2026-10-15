@@ -78,7 +78,7 @@ impl Module for ConsoleModule {
     fn init_state(&self, state: &mut State) {
         state.set_ext(ConsoleState::new());
         // Ensure the console server is running
-        if let Err(e) = manager::find_or_create_server() {
+        if let Err(e) = manager::client::find_or_create_server() {
             drop(writeln!(std::io::stderr(), "Console server startup failed: {e}"));
         }
     }

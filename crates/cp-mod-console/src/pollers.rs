@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use cp_base::cast::Safe as _;
 use cp_base::panels::now_ms;
 
-use super::manager::{find_or_create_server, server_request};
+use super::manager::client::{find_or_create_server, server_request};
 use crate::ring_buffer::RingBuffer;
 use crate::types::ProcessStatus;
 

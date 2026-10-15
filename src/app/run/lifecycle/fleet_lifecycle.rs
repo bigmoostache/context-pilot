@@ -61,7 +61,7 @@ impl App {
             let _bg_new = owners.insert(id);
         }
 
-        cp_mod_console::manager::kill_orphaned_processes(&known, &owners);
+        cp_mod_console::manager::client::kill_orphaned_processes(&known, &owners);
     }
 
     /// Persist **every** agent to disk — the focused agent first, then each

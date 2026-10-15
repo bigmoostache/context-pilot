@@ -215,7 +215,7 @@ fn last_n_lines_reads_tail() {
 
 #[test]
 fn orphan_owner_parsing() {
-    use crate::manager::owner_of;
+    use crate::manager::client::owner_of;
     assert_eq!(owner_of("c_A984_3"), Some("A984"));
     assert_eq!(owner_of("eb_root_12"), Some("root"));
     assert_eq!(owner_of("c_3"), None, "legacy key without owner is never killed");
