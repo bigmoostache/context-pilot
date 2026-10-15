@@ -9485,3 +9485,342 @@ index 29ba377d..009ad6ab 100755
 -echo ""
 -echo "If this is a new shell session, run: source ~/.bashrc"
 # --- End entry #117 ---
+118:2f04d578e49d8d97e8f0aafe69fa20ee930ec2d08d68d97dab8d9cbb437d703e:935a9b81e825b3e88682d46e85ff58b835300d7ec7440053049cde3d9351452a:b53ddfe4e7432ca326cd1bb2cd746e6eec76dcb9bcc109968cfbca220c9180ad
+# --- Diff for entry #118 ---
+diff --git a/.github/checks/protected-files.yaml b/.github/checks/protected-files.yaml
+index abd0b43b..97b4f8ac 100644
+--- a/.github/checks/protected-files.yaml
++++ b/.github/checks/protected-files.yaml
+@@ -46,6 +46,10 @@
+   whole_file: true
+ - path: .github/checks/check-api-contract.sh
+   whole_file: true
++# The failure ledger the family scripts above source: it decides their exit
++# code, so editing it could turn every family green. Locked with them.
++- path: .github/checks/lib-failures.sh
++  whole_file: true
+ 
+ # --- Guard tools the family scripts delegate to (standalone value: --update/
+ #     --show modes or dual-mode logic) ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index d21eeecd..8b887787 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -21,11 +21,13 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
+ ROOT="$(git rev-parse --show-toplevel)"
+-cd "$ROOT"
++cd "$ROOT" || exit 1
+ 
+ MAX_LINES=500
+ MAX_ENTRIES=8
+-fail=0
++# shellcheck source=lib-failures.sh
++. "$ROOT/.github/checks/lib-failures.sh"
++ledger_init check-structure
+ 
+ # ── 1 + 2: Rust tree (src/ + crates/) — ≤500 lines/file, ≤8 entries/dir ──────
+ # (former check-file-lengths.sh + check-folder-sizes.sh)
+@@ -55,7 +57,7 @@ while IFS= read -r f; do
+   if [ "$n" -gt "$MAX_LINES" ]; then
+     echo "::error file=$f::$f has $n lines (max $MAX_LINES)"
+     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
+-    fail=1
++    ledger_fail rust-file-length
+   fi
+ done < <(find . \
+   \( -type d \( -name target \
+@@ -72,7 +74,7 @@ while IFS= read -r dir; do
+   if [ "$count" -gt "$MAX_ENTRIES" ]; then
+     echo "::error::$dir has $count entries (max $MAX_ENTRIES)"
+     echo "FAIL: $dir has $count entries (max $MAX_ENTRIES) — group into a sub-dir." >&2
+-    fail=1
++    ledger_fail rust-dir-entries
+   fi
+ done < <(find . -mindepth 1 \
+   \( -type d \( \
+@@ -132,7 +134,7 @@ if [ -d "$WEB_SRC" ]; then
+     if [ "$n" -gt "$MAX_LINES" ]; then
+       echo "::error file=$f::web file has $n lines (max $MAX_LINES): ${f#"$ROOT"/}"
+       echo "FAIL: web ${f#"$ROOT"/} has $n lines (max $MAX_LINES)." >&2
+-      fail=1
++      ledger_fail web-file-length
+     fi
+   done < <(find "$WEB_SRC" -type f \( -name '*.ts' -o -name '*.tsx' \))
+ 
+@@ -142,16 +144,13 @@ if [ -d "$WEB_SRC" ]; then
+     if [ "$count" -gt "$MAX_ENTRIES" ]; then
+       echo "::error::web dir has $count entries (max $MAX_ENTRIES): ${d#"$ROOT"/}"
+       echo "FAIL: web ${d#"$ROOT"/} has $count entries (max $MAX_ENTRIES)." >&2
+-      fail=1
++      ledger_fail web-dir-entries
+     fi
+   done < <(find "$WEB_SRC" -type d)
+ fi
+ 
+ # ── 3: hash-chain integrity (the protected-files seal) ───────────────────────
+ echo "check-structure: verifying protected-files hash chain…"
+-bash "$ROOT/.github/checks/check-lint-config.sh" || fail=1
++bash "$ROOT/.github/checks/check-lint-config.sh" || ledger_fail hash-chain
+ 
+-if [ "$fail" -eq 0 ]; then
+-  echo "check-structure OK ($MODE): lengths ≤$MAX_LINES, entries ≤$MAX_ENTRIES, chain intact ✓"
+-fi
+-exit "$fail"
++ledger_finish "lengths ≤$MAX_LINES, entries ≤$MAX_ENTRIES, chain intact ✓"
+diff --git a/.github/checks/check-rust-lints.sh b/.github/checks/check-rust-lints.sh
+index a17be473..883c62b5 100755
+--- a/.github/checks/check-rust-lints.sh
++++ b/.github/checks/check-rust-lints.sh
+@@ -31,14 +31,16 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
+ ROOT="$(git rev-parse --show-toplevel)"
+-cd "$ROOT"
+-fail=0
++cd "$ROOT" || exit 1
++# shellcheck source=lib-failures.sh
++. "$ROOT/.github/checks/lib-failures.sh"
++ledger_init check-rust-lints
+ 
+ echo "=== cargo fmt --check ==="
+-cargo fmt -- --check 2>&1 || fail=1
++cargo fmt -- --check 2>&1 || ledger_fail fmt
+ 
+ echo "=== cargo clippy --workspace --all-targets -D warnings ==="
+-cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
++cargo clippy --workspace --all-targets -- -D warnings 2>&1 || ledger_fail clippy
+ 
+ # cargo check runs in --ci only. In --callback it is redundant + too slow: the
+ # rust-tests callback already does a full-workspace `cargo build` (debug) which
+@@ -47,16 +49,13 @@ cargo clippy --workspace --all-targets -- -D warnings 2>&1 || fail=1
+ # zero extra coverage. CI keeps it (the rust job's cache is warm; explicit gate).
+ if [ "$MODE" = "--ci" ]; then
+   echo "=== cargo check --workspace -D warnings ==="
+-  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || fail=1
++  RUSTFLAGS="-D warnings" cargo check --workspace 2>&1 || ledger_fail check
+ fi
+ 
+ echo "=== lint-exception registry ==="
+-bash "$ROOT/.github/checks/check-lint-exceptions.sh" || fail=1
++bash "$ROOT/.github/checks/check-lint-exceptions.sh" || ledger_fail lint-exceptions
+ 
+ echo "=== vault-bypass (full scan) ==="
+-bash "$ROOT/.github/checks/check-vault-bypass.sh" || fail=1
++bash "$ROOT/.github/checks/check-vault-bypass.sh" || ledger_fail vault-bypass
+ 
+-if [ "$fail" -eq 0 ]; then
+-  echo "check-rust-lints OK ($MODE): fmt · clippy · check · exceptions · vault ✓"
+-fi
+-exit "$fail"
++ledger_finish "fmt · clippy · check · exceptions · vault ✓"
+diff --git a/.github/checks/check-rust-tests.sh b/.github/checks/check-rust-tests.sh
+index 6c79b9ac..4849d6f9 100755
+--- a/.github/checks/check-rust-tests.sh
++++ b/.github/checks/check-rust-tests.sh
+@@ -16,21 +16,20 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci = release build · --callback = debug build (tests identical)
+ ROOT="$(git rev-parse --show-toplevel)"
+-cd "$ROOT"
+-fail=0
++cd "$ROOT" || exit 1
++# shellcheck source=lib-failures.sh
++. "$ROOT/.github/checks/lib-failures.sh"
++ledger_init check-rust-tests
+ 
+ if [ "$MODE" = "--callback" ]; then
+   echo "=== cargo build (debug) ==="
+-  cargo build 2>&1 || fail=1
++  cargo build 2>&1 || ledger_fail build
+ else
+   echo "=== cargo build --release ==="
+-  cargo build --release 2>&1 || fail=1
++  cargo build --release 2>&1 || ledger_fail build-release
+ fi
+ 
+ echo "=== cargo test --workspace ==="
+-cargo test --workspace 2>&1 || fail=1
++cargo test --workspace 2>&1 || ledger_fail test
+ 
+-if [ "$fail" -eq 0 ]; then
+-  echo "check-rust-tests OK ($MODE): build · test ✓"
+-fi
+-exit "$fail"
++ledger_finish "build · test ✓"
+diff --git a/.github/checks/check-ts-lints.sh b/.github/checks/check-ts-lints.sh
+index 9ff9c681..807245e0 100755
+--- a/.github/checks/check-ts-lints.sh
++++ b/.github/checks/check-ts-lints.sh
+@@ -25,35 +25,34 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
+ ROOT="$(git rev-parse --show-toplevel)"
+-fail=0
++# shellcheck source=lib-failures.sh
++. "$ROOT/.github/checks/lib-failures.sh"
++ledger_init check-ts-lints
+ 
+-cd "$ROOT/web"
++cd "$ROOT/web" || exit 1
+ 
+ echo "=== eslint (--max-warnings 0) ==="
+-npx eslint . --max-warnings 0 || fail=1
++npx eslint . --max-warnings 0 || ledger_fail eslint
+ 
+ echo "=== prettier (--check) ==="
+-npx prettier --check . || fail=1
++npx prettier --check . || ledger_fail prettier
+ 
+ echo "=== stylelint ==="
+-npx stylelint "src/**/*.css" || fail=1
++npx stylelint "src/**/*.css" || ledger_fail stylelint
+ 
+ echo "=== tsc -b ==="
+-npx tsc -b || fail=1
++npx tsc -b || ledger_fail tsc
+ 
+ echo "=== type-coverage ==="
+-npx type-coverage --project tsconfig.app.json || fail=1
++npx type-coverage --project tsconfig.app.json || ledger_fail type-coverage
+ 
+ echo "=== frontend suppressions (ts lint exceptions) ==="
+-bash "$ROOT/.github/checks/check-frontend-suppressions.sh" || fail=1
++bash "$ROOT/.github/checks/check-frontend-suppressions.sh" || ledger_fail suppressions
+ 
+ echo "=== frontend rule census (ruleset drift) ==="
+-bash "$ROOT/.github/checks/check-frontend-rule-census.sh" || fail=1
++bash "$ROOT/.github/checks/check-frontend-rule-census.sh" || ledger_fail rule-census
+ 
+ echo "=== dead code (knip) ==="
+-bash "$ROOT/.github/checks/check-web-deadcode.sh" || fail=1
++bash "$ROOT/.github/checks/check-web-deadcode.sh" || ledger_fail knip
+ 
+-if [ "$fail" -eq 0 ]; then
+-  echo "check-ts-lints OK ($MODE): eslint · prettier · stylelint · tsc · type-coverage · suppressions · census · knip ✓"
+-fi
+-exit "$fail"
++ledger_finish "eslint · prettier · stylelint · tsc · type-coverage · suppressions · census · knip ✓"
+diff --git a/.github/checks/check-ts-tests.sh b/.github/checks/check-ts-tests.sh
+index 0e2ae66d..b4e522ba 100755
+--- a/.github/checks/check-ts-tests.sh
++++ b/.github/checks/check-ts-tests.sh
+@@ -18,5 +18,9 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci | --callback
+ 
+-echo "check-ts-tests ($MODE): no frontend test suite wired yet (see TODO(playwright)). Skipping."
++# Exit 0 is deliberate (no ephemeral stack to run against), but a silent green
++# hides that the web UI has no automated tests. ::warning:: puts a yellow
++# annotation on every run's summary so the gap stays visible until wired.
++echo "::warning title=TS tests not wired::check-ts-tests is a STUB: no frontend test suite runs, this green proves nothing (see TODO(playwright))."
++echo "check-ts-tests ($MODE): STUB, no frontend test suite wired yet (see TODO(playwright)). Skipping."
+ exit 0
+diff --git a/.github/checks/check-api-contract.sh b/.github/checks/check-api-contract.sh
+index 7d70772f..fa501add 100755
+--- a/.github/checks/check-api-contract.sh
++++ b/.github/checks/check-api-contract.sh
+@@ -22,7 +22,7 @@ set -uo pipefail
+ 
+ MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
+ ROOT="$(git rev-parse --show-toplevel)"
+-cd "$ROOT"
++cd "$ROOT" || exit 1
+ 
+ # Serialize concurrent invocations with a portable mkdir spin-lock. The
+ # TS-codegen step regenerates the hey-api client into a SINGLE shared output dir
+@@ -59,13 +59,15 @@ until mkdir "$LOCK_DIR" 2>/dev/null; do
+ done
+ trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+ 
+-fail=0
++# shellcheck source=lib-failures.sh
++. "$ROOT/.github/checks/lib-failures.sh"
++ledger_init check-api-contract
+ 
+ echo "=== OpenAPI spec + route exhaustiveness ==="
+-cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1 || fail=1
++cargo test -p cp-orchestrator --test openapi -- --ignored 2>&1 || ledger_fail openapi
+ 
+ echo "=== TS client codegen + drift ==="
+-bash "$ROOT/.github/checks/check-typescript-contract.sh" || fail=1
++bash "$ROOT/.github/checks/check-typescript-contract.sh" || ledger_fail ts-drift
+ 
+ echo "=== manual fetch() audit (api layer must use the generated SDK) ==="
+ # The api layer must call the generated SDK. The only acceptable raw fetch is a
+@@ -89,10 +91,7 @@ MANUAL_FETCH=$(find "$ROOT/web/src/lib/api" -type f -name '*.ts' -not -path '*/g
+ if [ -n "$MANUAL_FETCH" ]; then
+   echo "::error::Manual fetch() calls found in API layer — use the generated SDK (or mark // ok:manual):"
+   echo "$MANUAL_FETCH"
+-  fail=1
++  ledger_fail manual-fetch
+ fi
+ 
+-if [ "$fail" -eq 0 ]; then
+-  echo "check-api-contract OK ($MODE): openapi · ts-drift · manual-fetch ✓"
+-fi
+-exit "$fail"
++ledger_finish "openapi · ts-drift · manual-fetch ✓"
+diff --git a/.github/checks/lib-failures.sh b/.github/checks/lib-failures.sh
+new file mode 100644
+index 00000000..1cf939ee
+--- /dev/null
++++ b/.github/checks/lib-failures.sh
+@@ -0,0 +1,42 @@
++# shellcheck shell=bash
++# lib-failures.sh — failure ledger shared by the aggregating family scripts.
++#
++# Sourced, never executed. The family scripts run every sub-check and exit
++# non-zero once at the end, so in a CI log the "exit code 1" lands under the
++# LAST section header whatever actually failed (M-long-10: knip blamed, prettier
++# guilty). The ledger names the culprits twice: an ::error:: annotation right
++# after the failing sub-check, and a closing summary listing every one of them.
++#
++# Usage:
++#   . "$ROOT/.github/checks/lib-failures.sh"
++#   ledger_init check-ts-lints
++#   npx eslint . || ledger_fail eslint
++#   ledger_finish "eslint · prettier ✓"   # exits 0, or 1 with the summary
++
++ledger_init() {
++  LEDGER_SCRIPT="$1"
++  LEDGER_FAILED=""
++}
++
++# Record a failed sub-check. A name recorded twice (e.g. one per offending file
++# in a loop) appears once in the summary.
++ledger_fail() {
++  case " · $LEDGER_FAILED · " in
++    *" · $1 · "*) return 0 ;;
++  esac
++  LEDGER_FAILED="${LEDGER_FAILED:+$LEDGER_FAILED · }$1"
++  echo "::error::$LEDGER_SCRIPT: sub-check '$1' FAILED (its diagnostics are just above)"
++}
++
++# Print the verdict and exit. $1 is the success line suffix.
++ledger_finish() {
++  if [ -z "$LEDGER_FAILED" ]; then
++    echo "$LEDGER_SCRIPT OK ($MODE): $1"
++    exit 0
++  fi
++  echo ""
++  echo "::error::$LEDGER_SCRIPT FAILED sub-checks: $LEDGER_FAILED"
++  echo "FAIL: $LEDGER_SCRIPT — failed sub-checks: $LEDGER_FAILED" >&2
++  echo "      Read the output under each named '=== … ===' header; the last header is not the culprit by default." >&2
++  exit 1
++}
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 1688d741..f1034486 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -117,7 +117,7 @@ jobs:
+ 
+       # Playwright e2e — documented stub (exit 0) until a dedicated ephemeral
+       # stack is provisioned (see TODO(playwright) in the script).
+-      - name: TS tests
++      - name: TS tests (STUB, not wired)
+         run: .github/checks/check-ts-tests.sh --ci
+ 
+       # mobile-components EXACT structural mirror of components: path parity +
+# --- End entry #118 ---

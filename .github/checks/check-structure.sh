@@ -21,11 +21,13 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
 ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 
 MAX_LINES=500
 MAX_ENTRIES=8
-fail=0
+# shellcheck source=lib-failures.sh
+. "$ROOT/.github/checks/lib-failures.sh"
+ledger_init check-structure
 
 # ── 1 + 2: Rust tree (src/ + crates/) — ≤500 lines/file, ≤8 entries/dir ──────
 # (former check-file-lengths.sh + check-folder-sizes.sh)
@@ -55,7 +57,7 @@ while IFS= read -r f; do
   if [ "$n" -gt "$MAX_LINES" ]; then
     echo "::error file=$f::$f has $n lines (max $MAX_LINES)"
     echo "FAIL: $f has $n lines (max $MAX_LINES) — extract into a sibling module." >&2
-    fail=1
+    ledger_fail rust-file-length
   fi
 done < <(find . \
   \( -type d \( -name target \
@@ -72,7 +74,7 @@ while IFS= read -r dir; do
   if [ "$count" -gt "$MAX_ENTRIES" ]; then
     echo "::error::$dir has $count entries (max $MAX_ENTRIES)"
     echo "FAIL: $dir has $count entries (max $MAX_ENTRIES) — group into a sub-dir." >&2
-    fail=1
+    ledger_fail rust-dir-entries
   fi
 done < <(find . -mindepth 1 \
   \( -type d \( \
@@ -132,7 +134,7 @@ if [ -d "$WEB_SRC" ]; then
     if [ "$n" -gt "$MAX_LINES" ]; then
       echo "::error file=$f::web file has $n lines (max $MAX_LINES): ${f#"$ROOT"/}"
       echo "FAIL: web ${f#"$ROOT"/} has $n lines (max $MAX_LINES)." >&2
-      fail=1
+      ledger_fail web-file-length
     fi
   done < <(find "$WEB_SRC" -type f \( -name '*.ts' -o -name '*.tsx' \))
 
@@ -142,16 +144,13 @@ if [ -d "$WEB_SRC" ]; then
     if [ "$count" -gt "$MAX_ENTRIES" ]; then
       echo "::error::web dir has $count entries (max $MAX_ENTRIES): ${d#"$ROOT"/}"
       echo "FAIL: web ${d#"$ROOT"/} has $count entries (max $MAX_ENTRIES)." >&2
-      fail=1
+      ledger_fail web-dir-entries
     fi
   done < <(find "$WEB_SRC" -type d)
 fi
 
 # ── 3: hash-chain integrity (the protected-files seal) ───────────────────────
 echo "check-structure: verifying protected-files hash chain…"
-bash "$ROOT/.github/checks/check-lint-config.sh" || fail=1
+bash "$ROOT/.github/checks/check-lint-config.sh" || ledger_fail hash-chain
 
-if [ "$fail" -eq 0 ]; then
-  echo "check-structure OK ($MODE): lengths ≤$MAX_LINES, entries ≤$MAX_ENTRIES, chain intact ✓"
-fi
-exit "$fail"
+ledger_finish "lengths ≤$MAX_LINES, entries ≤$MAX_ENTRIES, chain intact ✓"

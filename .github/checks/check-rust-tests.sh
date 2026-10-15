@@ -16,21 +16,20 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci = release build · --callback = debug build (tests identical)
 ROOT="$(git rev-parse --show-toplevel)"
-cd "$ROOT"
-fail=0
+cd "$ROOT" || exit 1
+# shellcheck source=lib-failures.sh
+. "$ROOT/.github/checks/lib-failures.sh"
+ledger_init check-rust-tests
 
 if [ "$MODE" = "--callback" ]; then
   echo "=== cargo build (debug) ==="
-  cargo build 2>&1 || fail=1
+  cargo build 2>&1 || ledger_fail build
 else
   echo "=== cargo build --release ==="
-  cargo build --release 2>&1 || fail=1
+  cargo build --release 2>&1 || ledger_fail build-release
 fi
 
 echo "=== cargo test --workspace ==="
-cargo test --workspace 2>&1 || fail=1
+cargo test --workspace 2>&1 || ledger_fail test
 
-if [ "$fail" -eq 0 ]; then
-  echo "check-rust-tests OK ($MODE): build · test ✓"
-fi
-exit "$fail"
+ledger_finish "build · test ✓"
