@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::manager::SessionHandle;
 use crate::monitor::spec::Record;
+use crate::ring_buffer::Matcher;
 use crate::tools::truncate_str;
 
 /// Serializable metadata for a console session (used for persistence across reloads).
@@ -230,8 +231,8 @@ pub struct ConsoleWatcher {
     pub session_name: String,
     /// Watch mode: "exit" or "pattern".
     pub mode: String,
-    /// Regex pattern to match (when mode="pattern").
-    pub pattern: Option<String>,
+    /// Compiled pattern to match (when mode="pattern").
+    pub pattern: Option<Matcher>,
     /// Whether this watcher blocks tool execution.
     pub blocking: bool,
     /// Tool use ID for sentinel replacement (blocking watchers).
@@ -275,7 +276,7 @@ impl Watcher for ConsoleWatcher {
 
         let satisfied = match self.mode.as_str() {
             "exit" => handle.get_status().is_terminal(),
-            "pattern" => self.pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
+            "pattern" => self.pattern.as_ref().is_some_and(|m| handle.take_pattern_match(m)),
             _ => false,
         };
 

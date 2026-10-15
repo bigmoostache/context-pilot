@@ -146,16 +146,10 @@ impl Module for SpineModule {
 
     fn save_module_data(&self, state: &State) -> serde_json::Value {
         let ss = SpineState::get(state);
-        // Prune old processed notifications: keep all unprocessed + latest 10 processed
-        let mut to_save: Vec<_> = ss.notifications.iter().filter(|n| !n.is_processed()).cloned().collect();
-        let mut processed: Vec<_> = ss.notifications.iter().filter(|n| n.is_processed()).cloned().collect();
-        // Keep only the latest 10 processed (they're in chronological order)
-        if processed.len() > 10 {
-            processed = processed.split_off(processed.len().saturating_sub(10));
-        }
-        to_save.extend(processed);
-        // Sort by ID number to maintain order
-        to_save.sort_by_key(|n| n.id.trim_start_matches('N').parse::<usize>().unwrap_or(0));
+        // Keep every unprocessed/blocked one + the latest 10 processed, in
+        // creation order (the Vec already is chronological).
+        let mut to_save = ss.notifications.clone();
+        prune_notifications(&mut to_save);
 
         json!({
             "notifications": to_save,
@@ -284,7 +278,6 @@ impl Module for SpineModule {
         // Human input resets auto-continuation counters — human is back in the loop
         let ss = SpineState::get_mut(state);
         ss.config.auto_continuation_count = 0;
-        ss.config.autonomous_start_ms = None;
         ss.config.user_stopped = false;
         // Reset error backoff — human can immediately trigger a new stream
         ss.config.consecutive_continuation_errors = 0;

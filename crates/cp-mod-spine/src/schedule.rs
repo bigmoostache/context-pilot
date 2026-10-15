@@ -127,11 +127,19 @@ impl CoucouRegistry {
             if now < c.fire_at_ms {
                 return true;
             }
-            fired.push(c.fired());
+            let mut notice = c.fired();
             let next = match c.cron.as_deref() {
-                Some(expr) => Cron::parse(expr).ok().and_then(|cron| cron.next_after(now, offset)),
+                Some(expr) => match Cron::parse(expr) {
+                    Ok(cron) => cron.next_after(now, offset),
+                    Err(err) => {
+                        notice.description =
+                            format!("{} [invalid cron `{expr}` ({err}): reminder removed]", notice.description);
+                        None
+                    }
+                },
                 None => (c.interval_ms > 0).then(|| now.saturating_add(c.interval_ms)),
             };
+            fired.push(notice);
             next.inspect(|at| c.fire_at_ms = *at).is_some()
         });
         fired
@@ -178,6 +186,16 @@ mod tests {
         let first = reg.pending.first();
         assert_eq!(first.map(|c| c.interval_ms), Some(0));
         assert!(first.and_then(|c| c.cron.as_deref()).is_some_and(|e| e.ends_with(" * * *")));
+    }
+
+    #[test]
+    fn invalid_cron_is_reported_not_silently_dropped() {
+        let mut bad = data("coucou_0", 10, 0);
+        bad.cron = Some("not a cron".to_owned());
+        let mut reg = CoucouRegistry { pending: vec![bad], next_id: 1, notices: Vec::new() };
+        let fired = reg.take_due(20);
+        assert!(reg.pending.is_empty());
+        assert!(fired.first().is_some_and(|f| f.description.contains("invalid cron")));
     }
 
     #[test]

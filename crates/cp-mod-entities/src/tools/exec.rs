@@ -146,24 +146,70 @@ fn execute_dml_stmts(conn: &Connection, stmts: &[&str]) -> Result<String, String
     Ok(format!("{total_affected} row(s) affected."))
 }
 
-/// Execute DDL. Writes migration + regenerates dump.
+/// Execute DDL, record its migration, and regenerate the dump.
+///
+/// The schema change, the `_meta` row and the migration file commit together
+/// under `BEGIN IMMEDIATE`, which takes the shared DB's write lock up front:
+/// two agents can't both read the same `MAX(migration_id)`, and a failure
+/// rolls back the change and removes the file. A batch that controls its own
+/// transactions runs as-is; its migration is then recorded in a second
+/// `BEGIN IMMEDIATE`.
 pub(super) fn execute_ddl(
     conn: &Connection,
     sql: &str,
     dump_path: &Path,
     migrations_dir: &Path,
 ) -> Result<String, String> {
-    conn.execute_batch(sql).map_err(|e| format!("{e}"))?;
+    let filename = if has_tx_control(sql) {
+        conn.execute_batch(sql).map_err(|e| format!("{e}"))?;
+        in_write_tx(conn, |c| migrations::write_migration(c, migrations_dir, sql))?
+    } else {
+        in_write_tx(conn, |c| {
+            c.execute_batch(sql).map_err(|e| format!("{e}"))?;
+            migrations::write_migration(c, migrations_dir, sql)
+        })?
+    };
 
-    // Write migration file
-    let filename = migrations::write_migration(conn, migrations_dir, sql)?;
-
-    // Regenerate full dump
     if let Err(e) = db::dump_to_file(conn, dump_path) {
         log::warn!("Failed to regenerate dump after DDL: {e}");
     }
 
     Ok(format!("Schema updated. Migration saved: {filename}"))
+}
+
+/// Run `body` inside `BEGIN IMMEDIATE … COMMIT`. On error (or a failed
+/// commit) roll back and delete the migration file `body` wrote.
+fn in_write_tx(
+    conn: &Connection,
+    body: impl FnOnce(&Connection) -> Result<(String, std::path::PathBuf), String>,
+) -> Result<String, String> {
+    conn.execute_batch("BEGIN IMMEDIATE").map_err(|e| format!("{e}"))?;
+    let (filename, path) = match body(conn) {
+        Ok(written) => written,
+        Err(e) => {
+            let _rb = conn.execute_batch("ROLLBACK");
+            return Err(e);
+        }
+    };
+    if let Err(e) = conn.execute_batch("COMMIT") {
+        let _rb = conn.execute_batch("ROLLBACK");
+        let _rm = std::fs::remove_file(&path);
+        return Err(format!("{e}"));
+    }
+    Ok(filename)
+}
+
+/// Whether the batch manages transactions itself (nesting `BEGIN` would fail).
+fn has_tx_control(sql: &str) -> bool {
+    split_statements(sql).iter().any(|s| {
+        let kw = crate::parse::strip_leading_comments(s)
+            .trim_start()
+            .chars()
+            .take_while(char::is_ascii_alphabetic)
+            .collect::<String>()
+            .to_uppercase();
+        matches!(kw.as_str(), "BEGIN" | "COMMIT" | "ROLLBACK" | "SAVEPOINT" | "RELEASE")
+    })
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -223,6 +269,27 @@ mod tests {
         let out =
             execute_dml(&c, "INSERT INTO t(a,b) VALUES ('r','s') RETURNING a, b;").expect("returning should succeed");
         assert!(out.contains("| r | s |"), "got: {out}");
+    }
+
+    /// A failing DDL batch rolls back its earlier statements and writes no
+    /// migration (B5 atomicity).
+    #[test]
+    fn failed_ddl_rolls_back_and_writes_nothing() {
+        let c = conn();
+        c.execute_batch("CREATE TABLE _meta (migration_id INTEGER PRIMARY KEY, filename TEXT NOT NULL);")
+            .expect("_meta");
+        let dir = std::env::temp_dir().join(format!("cp-entities-ddl-{}", std::process::id()));
+        let _rm = std::fs::remove_dir_all(&dir);
+        let dump = dir.join("dump.sql");
+        let _e = super::execute_ddl(&c, "CREATE TABLE ok (x); CREATE TABLE t (dup)", &dump, &dir)
+            .expect_err("duplicate table must fail");
+        let ok_exists: i64 =
+            c.query_row("SELECT COUNT(*) FROM sqlite_master WHERE name = 'ok'", [], |r| r.get(0)).expect("query");
+        assert_eq!(ok_exists, 0);
+        assert!(crate::migrations::list_files(&dir).is_empty());
+        let ok = super::execute_ddl(&c, "CREATE TABLE ok (x)", &dump, &dir).expect("ddl");
+        assert!(ok.contains("0001_"), "{ok}");
+        let _rm2 = std::fs::remove_dir_all(&dir);
     }
 
     /// A `;` inside a trailing line comment must not break the batch, and the
