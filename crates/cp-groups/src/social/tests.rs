@@ -3,6 +3,11 @@
 use super::*;
 use crate::types::GroupsState;
 
+/// Deterministic `next_fire` for [`tick`]: cron evaluated in UTC.
+fn utc(cron: &Cron, after_ms: u64) -> Option<u64> {
+    cron.next_after(after_ms, 0)
+}
+
 /// Custom group G1 owned by A1 with members A1, A2, A3 and HUMAN.
 fn group() -> Group {
     let mut s = GroupsState::new();
@@ -73,7 +78,7 @@ fn tick_fires_coming_back_then_dispatches_to_idle_non_runnable() {
     g.social.push(Substate::ComingBack { agent_id: "A2".into(), at_ms: 5u64, message: "wake".into(), from: None });
     apply_send(&mut g, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
     let mut gs = vec![g];
-    let fired = tick(&mut gs, (10u64, 0i32), &|_: &str| true);
+    let fired = tick(&mut gs, (10u64, &utc), &|_: &str| true);
     assert_eq!(fired.len(), 1);
     let g0 = gs.first().expect("group");
     assert!(g0.social.contains(&Substate::SimpleTurn { agent_id: "A2".into() }));
@@ -119,10 +124,10 @@ fn armed(groups: &[Group]) -> Vec<u64> {
 fn recurrent_arms_once_then_rearms_after_firing() {
     let mut groups = vec![with_recurrent()];
     let busy = |_: &str| false;
-    assert!(tick(&mut groups, (1_000u64, 0i32), &busy).is_empty());
-    assert!(tick(&mut groups, (2_000u64, 0i32), &busy).is_empty(), "still armed");
+    assert!(tick(&mut groups, (1_000u64, &utc), &busy).is_empty());
+    assert!(tick(&mut groups, (2_000u64, &utc), &busy).is_empty(), "still armed");
     assert_eq!(armed(&groups), vec![60_000u64]);
-    let fired = tick(&mut groups, (60_000u64, 0i32), &busy);
+    let fired = tick(&mut groups, (60_000u64, &utc), &busy);
     assert_eq!(fired.first().and_then(|f| f.recurrent_id.clone()).as_deref(), Some("coucou_7"));
     assert_eq!(armed(&groups), vec![120_000u64], "re-armed at the next match");
 }
@@ -130,8 +135,8 @@ fn recurrent_arms_once_then_rearms_after_firing() {
 #[test]
 fn fired_recurrent_gives_turn_and_stays() {
     let mut groups = vec![with_recurrent()];
-    let _armed = tick(&mut groups, (1_000u64, 0i32), &|_: &str| false);
-    let _fired = tick(&mut groups, (60_000u64, 0i32), &|_: &str| false);
+    let _armed = tick(&mut groups, (1_000u64, &utc), &|_: &str| false);
+    let _fired = tick(&mut groups, (60_000u64, &utc), &|_: &str| false);
     let social = groups.first().map(|g| g.social.clone()).unwrap_or_default();
     assert!(social.contains(&Substate::SimpleTurn { agent_id: "A2".into() }));
     assert!(social.contains(&recurrent()), "the Recurrent itself stays");
@@ -140,7 +145,7 @@ fn fired_recurrent_gives_turn_and_stays() {
 #[test]
 fn remove_recurrent_drops_its_coming_back() {
     let mut groups = vec![with_recurrent()];
-    let _fired = tick(&mut groups, (1_000u64, 0i32), &|_: &str| true);
+    let _fired = tick(&mut groups, (1_000u64, &utc), &|_: &str| true);
     let (gid, removed) = remove_recurrent(&mut groups, "coucou_7").expect("found");
     assert_eq!((gid.as_str(), removed), ("G1", recurrent()));
     assert!(groups.first().is_some_and(|g| g.social.is_empty()));
@@ -192,7 +197,7 @@ fn one_tick_never_dispatches_two_tasks_to_one_agent() {
     apply_send(&mut a, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
     apply_send(&mut b, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
     let mut groups = vec![a, b];
-    let _fired = tick(&mut groups, (0u64, 0i32), &|_: &str| true);
+    let _fired = tick(&mut groups, (0u64, &utc), &|_: &str| true);
     let picks: Vec<Vec<Substate>> = groups.iter().map(|g| g.social.clone()).collect();
     assert_eq!(
         picks,
