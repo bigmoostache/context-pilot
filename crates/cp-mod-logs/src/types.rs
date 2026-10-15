@@ -3,7 +3,50 @@ use cp_base::state::runtime::State;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// A timestamped log entry with importance and freeform tags.
+/// Validated log importance. Stored on disk (and in [`LogEntry::importance`])
+/// as its lowercase name, so pre-enum chunks keep loading unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Importance {
+    /// Background detail.
+    Low,
+    /// Default level.
+    #[default]
+    Medium,
+    /// Decision or fact worth surfacing.
+    High,
+    /// Must never be missed.
+    Critical,
+}
+
+impl Importance {
+    /// Accepted spellings, in ascending order (also the tool schema's enum).
+    pub const NAMES: [&'static str; 4] = ["low", "medium", "high", "critical"];
+
+    /// Parse a level name, ignoring case and surrounding whitespace.
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "low" => Some(Self::Low),
+            "medium" => Some(Self::Medium),
+            "high" => Some(Self::High),
+            "critical" => Some(Self::Critical),
+            _ => None,
+        }
+    }
+
+    /// Lowercase on-disk name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Critical => "critical",
+        }
+    }
+}
+
+/// A timestamped log entry with an importance level.
 ///
 /// Stored as chunked JSON in `.context-pilot/logs/`.  Indexed into
 /// Meilisearch by the search module's file watcher for full-text search.

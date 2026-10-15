@@ -1,19 +1,22 @@
 //! Logs module — timestamped entries and conversation history.
 //!
-//! Two tools: `log_create` (with tags + importance), `Close_conversation_history`
-//! (archive a history panel with log/memory extraction). Logs are stored
-//! globally in chunked JSON files under `.context-pilot/logs/` and indexed
-//! by the search module for full-text retrieval.
+//! Two tools: `log_create` (content + importance) and
+//! `Close_conversation_history` (closes history panels, keeping their logs).
+//! Logs are stored globally in chunked JSON files under
+//! `.context-pilot/logs/` and indexed by the search module for full-text retrieval.
 
 /// Change tracking for chunk files: only changed chunks are rewritten.
 mod dirty;
+/// Regression tests: importance parsing, migration, chunk loading.
+#[cfg(test)]
+mod tests;
 /// Tool implementations: create, close conversation history.
 mod tools;
 use dirty::{chunk_fingerprint, clean_map, next_id_op};
 /// Log state types: `LogEntry`, `LogsState`.
 pub mod types;
 
-use types::{LogEntry, LogsState};
+use types::{Importance, LogEntry, LogsState};
 
 use cp_base::cast::Safe as _;
 
@@ -25,7 +28,7 @@ pub const LOGS_CHUNK_SIZE: usize = 1000;
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use cp_base::config::constants;
 use cp_base::modules::{Module, ToolVisualizer};
@@ -51,49 +54,25 @@ const fn chunk_index(log_id_num: usize) -> usize {
 }
 
 /// Schema version marker file path.
-fn schema_marker_path() -> PathBuf {
-    logs_dir().join(".schema_v2")
+fn schema_marker_path(dir: &Path) -> PathBuf {
+    dir.join(".schema_v2")
 }
 
-/// Delete all `chunk_*.json` and `next_id.json` files in the logs directory.
-fn purge_chunk_files(dir: &std::path::Path) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
-        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("chunk_") || n == "next_id.json") {
-            let _r = fs::remove_file(&path);
-        }
-    }
-}
-
-/// Perform clean-slate migration to the v2 schema (tags + importance, no summaries).
+/// Stamp the logs directory with the v2 schema marker.
 ///
-/// If the marker file `.schema_v2` does not exist in the logs directory,
-/// all existing chunk files are deleted and the counter is reset.
-fn migrate_if_needed() {
-    let marker = schema_marker_path();
+/// Never deletes anything: v2 entries are a superset-compatible reading of
+/// older chunks (unknown fields are ignored, `importance` defaults to medium),
+/// so existing history is kept as is.
+fn migrate_if_needed(dir: &Path) {
+    let marker = schema_marker_path(dir);
     if marker.exists() {
         return;
     }
-
-    let dir = logs_dir();
-    if dir.is_dir() {
-        purge_chunk_files(&dir);
-    } else {
-        let _r = fs::create_dir_all(&dir);
+    if fs::create_dir_all(dir).is_err() {
+        return;
     }
-
-    // Write reset next_id.json
-    let next_id_json = serde_json::json!({ "next_log_id": 1i32 });
-    if let Ok(s) = serde_json::to_string_pretty(&next_id_json) {
-        let _r = fs::write(dir.join("next_id.json"), s);
-    }
-
-    // Write marker
     let _r = fs::write(&marker, "migrated");
-    log::info!("Logs: clean-slate migration to v2 schema complete");
+    log::info!("Logs: stamped v2 schema marker (existing chunks kept)");
 }
 
 /// Build write operations for the log chunks changed since their last write
@@ -142,8 +121,12 @@ fn group_by_chunk(logs: &[LogEntry]) -> HashMap<usize, Vec<&LogEntry>> {
 }
 
 /// Load all logs from chunked JSON files in .context-pilot/logs/
-fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
-    let dir = logs_dir();
+/// Load all logs from the chunked JSON files in `dir`.
+///
+/// A chunk that cannot be read or parsed is renamed aside
+/// (`chunk_N.json.corrupt-<ms>`) and reported, so the next save cannot
+/// overwrite its bytes with a partial chunk and the history stays recoverable.
+fn load_logs_chunked(dir: &Path) -> (Vec<LogEntry>, usize) {
     let mut all_logs: Vec<LogEntry> = Vec::new();
     let mut next_log_id: usize = 1;
 
@@ -157,7 +140,7 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     }
 
     // Load all chunk files
-    if let Ok(entries) = fs::read_dir(&dir) {
+    if let Ok(entries) = fs::read_dir(dir) {
         let mut chunk_files: Vec<(usize, PathBuf)> = entries
             .filter_map(Result::ok)
             .filter_map(|e| {
@@ -170,10 +153,12 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
         chunk_files.sort_by_key(|entry| entry.0);
 
         for (_, path) in chunk_files {
-            if let Ok(content) = fs::read_to_string(&path)
-                && let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content)
+            match fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|content| serde_json::from_str::<Vec<LogEntry>>(&content).map_err(|e| e.to_string()))
             {
-                all_logs.extend(logs);
+                Ok(logs) => all_logs.extend(logs),
+                Err(e) => quarantine_chunk(&path, &e),
             }
         }
     }
@@ -181,7 +166,19 @@ fn load_logs_chunked() -> (Vec<LogEntry>, usize) {
     // Sort by ID number for consistent ordering
     all_logs.sort_by_key(|l| l.id.strip_prefix('L').and_then(|n| n.parse::<usize>().ok()).unwrap_or(0));
 
-    (all_logs, next_log_id)
+    // Never hand out an id already on disk, even if next_id.json lags or is lost.
+    let max_id = all_logs.last().and_then(|l| l.id.strip_prefix('L')?.parse::<usize>().ok()).unwrap_or(0);
+    (all_logs, next_log_id.max(max_id.saturating_add(1)))
+}
+
+/// Move an unreadable chunk aside and report it (see [`load_logs_chunked`]).
+fn quarantine_chunk(path: &Path, err: &str) {
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
+    let aside = path.with_extension(format!("json.corrupt-{stamp}"));
+    match fs::rename(path, &aside) {
+        Ok(()) => log::error!("Logs: unreadable chunk {} ({err}); moved to {}", path.display(), aside.display()),
+        Err(e) => log::error!("Logs: unreadable chunk {} ({err}); could not move it aside: {e}", path.display()),
+    }
 }
 
 /// Logs module: timestamped entries and conversation history management.
@@ -224,7 +221,7 @@ impl Module for LogsModule {
     }
 
     fn init_state(&self, state: &mut State) {
-        migrate_if_needed();
+        migrate_if_needed(&logs_dir());
         state.set_ext(LogsState::new());
     }
 
@@ -239,10 +236,11 @@ impl Module for LogsModule {
     }
 
     fn load_module_data(&self, _data: &serde_json::Value, state: &mut State) {
-        migrate_if_needed();
+        let dir = logs_dir();
+        migrate_if_needed(&dir);
 
         // Load logs from chunked files on disk
-        let (logs, next_log_id) = load_logs_chunked();
+        let (logs, next_log_id) = load_logs_chunked(&dir);
         if !logs.is_empty() || next_log_id > 1 {
             let ls = LogsState::get_mut(state);
             ls.logs = logs;
@@ -269,7 +267,7 @@ impl Module for LogsModule {
                         ToolParam::new("content", ParamType::String).desc("Short, atomic log entry").required(),
                         ToolParam::new("importance", ParamType::String)
                             .desc("Importance level")
-                            .enum_vals(&["low", "medium", "high", "critical"]),
+                            .enum_vals(&Importance::NAMES),
                     ]),
                     true,
                 )
@@ -284,8 +282,16 @@ impl Module for LogsModule {
                         ToolParam::new("panel_id", ParamType::String)
                             .desc("ID of the conversation history panel to close (e.g., 'P12')")
                             .required(),
-                        ToolParam::new("logs", ParamType::Array(Box::new(ParamType::String)))
-                            .desc("Log entries to create \u{2014} simple strings, one per entry"),
+                        ToolParam::new(
+                            "logs",
+                            ParamType::Array(Box::new(ParamType::Object(vec![
+                                ToolParam::new("content", ParamType::String).desc("Short, atomic log entry").required(),
+                                ToolParam::new("importance", ParamType::String)
+                                    .desc("Importance level (default medium)")
+                                    .enum_vals(&Importance::NAMES),
+                            ]))),
+                        )
+                        .desc("Log entries to create, one per fact"),
                     ]),
                     true,
                 )
@@ -329,20 +335,20 @@ impl Module for LogsModule {
                         _ => {}
                     }
 
-                    // Logs: require at least one non-empty string per panel
-                    let has_logs = panel_obj
-                        .get("logs")
-                        .and_then(|v| v.as_array())
-                        .is_some_and(|arr| arr.iter().any(|e| e.as_str().is_some_and(|s| !s.is_empty())));
-                    if !has_logs {
-                        pf.errors.push(format!(
+                    // Logs: at least one non-blank, valid entry per panel
+                    let items = panel_obj.get("logs").and_then(|v| v.as_array()).map_or(&[][..], Vec::as_slice);
+                    match tools::parse_log_items(items) {
+                        Ok(logs) if logs.is_empty() => pf.errors.push(format!(
                             "Panel #{idx} ('{id}'): provide at least one log entry to preserve context."
-                        ));
+                        )),
+                        Ok(_) => {}
+                        Err(errors) => pf.errors.push(format!("Panel #{idx} ('{id}'): {}", errors.join("; "))),
                     }
                 }
 
                 Some(pf)
             }
+            "log_create" => Some(tools::pre_flight_log_create(tool)),
             _ => None,
         }
     }
