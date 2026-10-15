@@ -437,3 +437,9 @@ pub(crate) fn tools_to_oai(tools: &[ToolDefinition]) -> Vec<OaiTool> {
         })
         .collect()
 }
+
+// ─── Tests ──────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[path = "openai_compat_tests.rs"]
+mod tests;
