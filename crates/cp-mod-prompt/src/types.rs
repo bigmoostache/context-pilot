@@ -15,6 +15,19 @@ pub enum PromptType {
     Command,
 }
 
+impl PromptType {
+    /// Parse a tool `type` argument (`system`, legacy `agent`, `skill`, `command`)
+    /// through the serde names, so the accepted set lives in one place.
+    ///
+    /// # Errors
+    ///
+    /// Returns a user-facing message naming the accepted values.
+    pub fn from_arg(s: &str) -> Result<Self, String> {
+        serde_json::from_value(serde_json::Value::String(s.to_owned()))
+            .map_err(|e| format!("Invalid type '{s}' ({e}) — must be 'system', 'skill', or 'command'"))
+    }
+}
+
 impl std::fmt::Display for PromptType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {

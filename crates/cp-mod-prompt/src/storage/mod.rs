@@ -6,6 +6,12 @@ use cp_base::config::constants;
 
 use crate::types::{PromptItem, PromptType};
 
+/// Frontmatter split / parse / serialize / validate for behaviour files.
+pub(crate) mod frontmatter;
+/// Unit tests for frontmatter handling and the local-to-shared migration.
+#[cfg(test)]
+mod tests;
+
 /// Subdirectory names under .context-pilot/ for each prompt type
 const fn subdir_for(pt: PromptType) -> &'static str {
     match pt {
@@ -114,51 +120,6 @@ fn next_suffixed_path(shared: &Path, id: &str) -> PathBuf {
         .unwrap_or_else(|| shared.join(format!("{id}-x.md")))
 }
 
-/// Parse a prompt .md file with YAML frontmatter.
-/// Format:
-/// ```text
-/// ---
-/// name: My Prompt
-/// description: Short description
-/// ---
-/// Body content here...
-/// `
-/// Returns (name, description, body).
-pub(crate) fn parse_prompt_file(content: &str) -> (String, String, String) {
-    #[derive(serde::Deserialize, Default)]
-    struct Frontmatter {
-        #[serde(default)]
-        name: String,
-        #[serde(default)]
-        description: String,
-    }
-
-    let trimmed = content.trim_start();
-    if !trimmed.starts_with("---") {
-        // No frontmatter — treat entire content as body
-        return (String::new(), String::new(), content.to_owned());
-    }
-
-    // Find the closing ---
-    let after_first = trimmed.get(3..).unwrap_or("");
-    let Some(end) = after_first.find("\n---") else {
-        // No closing --- found, treat as plain content
-        return (String::new(), String::new(), content.to_owned());
-    };
-
-    let yaml_block = after_first.get(..end).unwrap_or("");
-    let body_start = end.saturating_add(4); // skip \n---
-    let body = after_first.get(body_start..).unwrap_or("").trim_start_matches('\n').to_owned();
-
-    let fm: Frontmatter = serde_yaml::from_str(yaml_block).unwrap_or_default();
-    (fm.name, fm.description, body)
-}
-
-/// Format a prompt item back to .md file with YAML frontmatter
-pub(crate) fn format_prompt_file(name: &str, description: &str, content: &str) -> String {
-    format!("---\nname: {name}\ndescription: {description}\n---\n{content}")
-}
-
 /// Load all .md prompt files from a directory
 pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptItem> {
     let mut items = Vec::new();
@@ -177,7 +138,7 @@ pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<
         }
 
         if let Ok(content) = fs::read_to_string(&path) {
-            let (name, description, body) = parse_prompt_file(&content);
+            let (name, description, body) = frontmatter::parse(&content);
             items.push(PromptItem {
                 id,
                 name,
@@ -322,24 +283,5 @@ fn read_prompts_for(pt: PromptType) -> Vec<PromptItem> {
 ///
 /// Returns `Err(reason)` if the frontmatter is missing, malformed, or lacks a `name` field.
 pub fn validate_frontmatter(content: &str) -> Result<(), String> {
-    #[derive(serde::Deserialize)]
-    struct Fm {
-        name: Option<String>,
-    }
-
-    let trimmed = content.trim_start();
-    if !trimmed.starts_with("---") {
-        return Err("File must start with YAML frontmatter (---)".to_owned());
-    }
-    let after_first = trimmed.get(3..).unwrap_or("");
-    let Some(end) = after_first.find("\n---") else {
-        return Err("Missing closing frontmatter delimiter (---)".to_owned());
-    };
-    let yaml_block = after_first.get(..end).unwrap_or("");
-
-    let fm: Fm = serde_yaml::from_str(yaml_block).map_err(|e| format!("Invalid YAML frontmatter: {e}"))?;
-    if fm.name.as_deref().unwrap_or("").is_empty() {
-        return Err("Frontmatter must include a non-empty 'name' field".to_owned());
-    }
-    Ok(())
+    frontmatter::validate(content)
 }
