@@ -436,3 +436,78 @@ jobs:
             git worktree remove --force channels-wt
             sleep $((RANDOM % 5 + 2))
           done
+
+  # ── Container image (ghcr.io) ───────────────────────────────────────────
+  # The deploy/docker image, multi-arch (linux/amd64 + linux/arm64), published
+  # under the same tag as the release, plus a moving channel tag that mirrors
+  # the OTA channels:
+  #   • a push to `master`     → :<release tag>  + :nightly
+  #   • a REAL `v*` tag push   → :<release tag>  + :stable + :latest
+  #
+  # It packages the bundles THIS run built (BUNDLE_SOURCE=local), not a
+  # re-download, so the image carries exactly the published tarballs. Only the
+  # arm64 runtime stage runs under QEMU — the bundle stages run natively.
+  #
+  # A new ghcr package is private until made public once in its settings
+  # (Package settings → Change visibility); the source label links it to the repo.
+  docker:
+    name: Publish container image
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image ships the glibc bundles (trixie runtime) — not the musl one.
+      - name: Download linux-x86_64 bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cpilot-linux-x86_64
+          path: deploy/docker/.artifacts
+
+      - name: Download linux-aarch64 bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: cpilot-linux-aarch64
+          path: deploy/docker/.artifacts
+
+      - name: Compute image tags
+        id: meta
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            channels="stable latest"
+          else
+            channels="nightly"
+          fi
+          tags="${image}:${TAG}"
+          for c in $channels; do tags="${tags},${image}:${c}"; done
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+          echo "$tags"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/docker
+          platforms: linux/amd64,linux/arm64
+          build-args: BUNDLE_SOURCE=local
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.TAG }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=docker
+          cache-to: type=gha,scope=docker,mode=max

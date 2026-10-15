@@ -9,37 +9,58 @@
 # There is no entrypoint script: the image is configured entirely by environment
 # variables (see .env.example) and the orchestrator is pid 1's only child.
 #
+# Multi-arch: linux/amd64 and linux/arm64, from the `cpilot-linux-x86_64` and
+# `cpilot-linux-aarch64` (glibc) release bundles. BuildKit sets TARGETARCH; the
+# bundle stages run on the BUILD platform (they only fetch and pick a tarball),
+# so a cross-arch build emulates the runtime stage alone. CI publishes both
+# arches to ghcr.io on every release (.github/workflows/release.yml, `docker`).
+#
 # Two bundle sources, selected by --build-arg BUNDLE_SOURCE=:
-#   release (default) — downloads the `cpilot-linux-x86_64` asset of a published
+#   release (default) — downloads the target arch's asset of a published
 #                       release, checksum-verified. Reproducible, ~1 min.
-#   local             — uses deploy/docker/.artifacts/cpilot-linux-x86_64.tar.gz,
-#                       for testing an unreleased build (see README).
+#   local             — uses deploy/docker/.artifacts/cpilot-linux-<arch>.tar.gz,
+#                       for testing an unreleased build (see README) and for CI.
 ARG BUNDLE_SOURCE=release
 
 # ── Bundle acquisition ───────────────────────────────────────────────────────
-FROM debian:trixie-slim AS bundle-release
-# Pinned tag + checksum, not "latest": an image that silently changes product
-# version between two builds makes every bug report ambiguous. Bump both
+FROM --platform=$BUILDPLATFORM debian:trixie-slim AS bundle-release
+# Pinned tag + checksums, not "latest": an image that silently changes product
+# version between two builds makes every bug report ambiguous. Bump all three
 # together — a VERSION bump alone fails loudly at the sha256 check, which is the
-# intended behaviour, not an annoyance. Set BUNDLE_SHA256="" to skip the check.
+# intended behaviour, not an annoyance. Set a checksum to "" to skip its check.
+ARG TARGETARCH
 ARG VERSION=v0.2.13-d4b747c
-ARG BUNDLE_SHA256=7eadbb712a1e67103a45872a9160ac8a6fd6341cc38219f42571bb9fe69cda57
+ARG BUNDLE_SHA256_AMD64=7eadbb712a1e67103a45872a9160ac8a6fd6341cc38219f42571bb9fe69cda57
+ARG BUNDLE_SHA256_ARM64=f92a4eaa45328315e043b2d47934196b5d728dc89ceeaa36adfec23839cc110b
 ARG REPO=bigmoostache/context-pilot
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
-RUN curl -fSL -o /tmp/bundle.tar.gz \
-      "https://github.com/${REPO}/releases/download/${VERSION}/cpilot-linux-x86_64.tar.gz" \
- && if [ -n "${BUNDLE_SHA256}" ]; then echo "${BUNDLE_SHA256}  /tmp/bundle.tar.gz" | sha256sum -c -; fi
+RUN case "${TARGETARCH}" in \
+      amd64) arch=x86_64;  sha="${BUNDLE_SHA256_AMD64}" ;; \
+      arm64) arch=aarch64; sha="${BUNDLE_SHA256_ARM64}" ;; \
+      *) echo "unsupported TARGETARCH '${TARGETARCH}' (amd64, arm64; BuildKit required)" >&2; exit 1 ;; \
+    esac \
+ && curl -fSL -o /tmp/bundle.tar.gz \
+      "https://github.com/${REPO}/releases/download/${VERSION}/cpilot-linux-${arch}.tar.gz" \
+ && if [ -n "${sha}" ]; then echo "${sha}  /tmp/bundle.tar.gz" | sha256sum -c -; fi
 
-FROM debian:trixie-slim AS bundle-local
-COPY .artifacts/cpilot-linux-x86_64.tar.gz /tmp/bundle.tar.gz
+FROM --platform=$BUILDPLATFORM debian:trixie-slim AS bundle-local
+ARG TARGETARCH
+COPY .artifacts/ /tmp/artifacts/
+RUN case "${TARGETARCH}" in \
+      amd64) arch=x86_64 ;; \
+      arm64) arch=aarch64 ;; \
+      *) echo "unsupported TARGETARCH '${TARGETARCH}' (amd64, arm64; BuildKit required)" >&2; exit 1 ;; \
+    esac \
+ && mv "/tmp/artifacts/cpilot-linux-${arch}.tar.gz" /tmp/bundle.tar.gz
 
 FROM bundle-${BUNDLE_SOURCE} AS bundle
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 # trixie, not bookworm: the x86_64 release target is x86_64-unknown-linux-gnu
 # built on ubuntu-24.04, and the binaries require GLIBC_2.39 (verified with
-# objdump). trixie ships 2.41; bookworm's 2.36 cannot run them at all.
+# objdump). trixie ships 2.41; bookworm's 2.36 cannot run them at all. (The
+# aarch64 bundle is built with `cross`, against an older glibc — trixie runs it.)
 FROM debian:trixie-slim AS runtime
 
 # A floor, not a toolchain: the agent executes shell and installs what a project

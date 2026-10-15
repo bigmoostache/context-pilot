@@ -21,6 +21,20 @@ docker compose up -d --build
 Open <http://127.0.0.1:7878> and log in as the superadmin. The first login forces
 a password change. `docker compose logs -f` shows the seed and the boot.
 
+## Prebuilt images
+
+Every release is also published to the GitHub Container Registry, for
+`linux/amd64` and `linux/arm64` (one tag, Docker picks the right variant):
+
+| Tag | Follows |
+|---|---|
+| `ghcr.io/bigmoostache/context-pilot:nightly` | every merge on `master` (the nightly OTA channel) |
+| `ghcr.io/bigmoostache/context-pilot:stable`, `:latest` | the last `v*` tag (the stable OTA channel) |
+| `ghcr.io/bigmoostache/context-pilot:<release tag>` | one release, e.g. `v0.2.14` or `v0.2.14-abc1234` — pin this one |
+
+To run one with the compose file instead of building, point `image:` at it and
+drop the `build:` block, then `docker compose pull && docker compose up -d`.
+
 ## Configuration
 
 `.env` is the whole surface. Compose passes it into the container's environment,
@@ -182,13 +196,14 @@ local build instead, produce the bundle in the same flat layout
 
 ```sh
 mkdir -p deploy/docker/.artifacts
-cp cpilot-linux-x86_64.tar.gz deploy/docker/.artifacts/
+cp cpilot-linux-x86_64.tar.gz deploy/docker/.artifacts/   # cpilot-linux-aarch64 on arm64
 echo BUNDLE_SOURCE=local >> deploy/docker/.env
 docker compose build
 ```
 
-Bumping the released version means bumping `VERSION` **and** `BUNDLE_SHA256` in
-the Dockerfile; a version bump alone fails at the checksum, which is intended.
+Bumping the released version means bumping `VERSION` **and** both
+`BUNDLE_SHA256_AMD64` / `BUNDLE_SHA256_ARM64` in the Dockerfile; a version bump
+alone fails at the checksum, which is intended.
 
 ## What this image deliberately does not do
 
