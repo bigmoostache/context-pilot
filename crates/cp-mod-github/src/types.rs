@@ -68,10 +68,12 @@ impl GithubState {
 pub struct GithubResultRequest {
     /// Context element ID (e.g., "P15").
     pub context_id: String,
-    /// `gh` CLI command to re-run for content refresh.
-    pub command: String,
+    /// Validated `gh` argv (without the leading `gh`) to re-run.
+    pub args: Vec<String>,
     /// GitHub token for authentication.
     pub github_token: String,
     /// Directory to run `gh` in (the creating agent's workdir).
     pub cwd: std::path::PathBuf,
+    /// Mutation counter when the refresh was built (see `crate::mutation`).
+    pub ticket: u64,
 }
