@@ -97,8 +97,12 @@ fn def_matches_file(matcher: &globset::GlobMatcher, file: &str) -> bool {
 /// `skip_callbacks`. Returns the matched file paths and pushes a warning for
 /// any skip that named this callback but wouldn't have triggered it anyway.
 fn match_one_def(def: &CallbackDefinition, changed_files: &[ChangedFile], warnings: &mut Vec<String>) -> Vec<String> {
-    let Ok(glob) = Glob::new(&def.pattern) else {
-        return Vec::new();
+    let glob = match Glob::new(&def.pattern) {
+        Ok(g) => g,
+        Err(e) => {
+            warnings.push(format!("callback '{}': invalid pattern '{}' never fires: {e}", def.name, def.pattern));
+            return Vec::new();
+        }
     };
     let matcher = glob.compile_matcher();
     let mut crew = Vec::new();
@@ -188,4 +192,47 @@ pub fn partition_callbacks(matched: Vec<MatchedCallback>) -> (Vec<MatchedCallbac
 #[must_use]
 pub fn build_changed_files_env(files: &[String]) -> String {
     files.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn def(pattern: &str) -> CallbackDefinition {
+        CallbackDefinition {
+            id: "CB1".to_owned(),
+            name: "lint".to_owned(),
+            description: String::new(),
+            pattern: pattern.to_owned(),
+            blocking: false,
+            timeout_secs: None,
+            success_message: None,
+            cwd: None,
+            is_global: true,
+            built_in: false,
+            built_in_command: None,
+            concurrency_friendly: false,
+        }
+    }
+
+    fn changed(path: &str) -> Vec<ChangedFile> {
+        vec![ChangedFile { path: path.to_owned(), skip_callbacks: Vec::new() }]
+    }
+
+    #[test]
+    fn invalid_glob_warns() {
+        let mut warnings = Vec::new();
+        let hits = match_one_def(&def("src/[oops"), &changed("src/a.rs"), &mut warnings);
+        assert!(hits.is_empty());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings.first().is_some_and(|w| w.contains("invalid pattern")), "{warnings:?}");
+    }
+
+    #[test]
+    fn valid_glob_matches_basename() {
+        let mut warnings = Vec::new();
+        let hits = match_one_def(&def("*.rs"), &changed("crates/x/src/a.rs"), &mut warnings);
+        assert_eq!(hits, vec!["crates/x/src/a.rs".to_owned()]);
+        assert!(warnings.is_empty());
+    }
 }

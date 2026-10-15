@@ -41,8 +41,6 @@ struct Worker {
     request_tx: RequestTx,
     /// Latest finished snapshot (`None` until the first run completes).
     latest: &'static Mutex<Option<GitSnapshot>>,
-    /// `true` between sending a request and the worker storing its result.
-    in_flight: &'static Mutex<bool>,
 }
 
 /// Lazily-spawned singleton worker.
@@ -53,26 +51,24 @@ fn worker() -> &'static Worker {
     WORKER.get_or_init(|| {
         let (request_tx, request_rx): (RequestTx, Receiver<Request>) = std::sync::mpsc::channel();
         let latest: &'static Mutex<Option<GitSnapshot>> = Box::leak(Box::new(Mutex::new(None)));
-        let in_flight: &'static Mutex<bool> = Box::leak(Box::new(Mutex::new(false)));
 
         let _handle = thread::Builder::new().name("git-status".to_owned()).spawn(move || {
             // Coalesce bursts: if several requests queued while we computed,
-            // keep only the most recent one.
+            // keep only the most recent one, so a slow git never builds a backlog.
             while let Ok(mut req) = request_rx.recv() {
                 while let Ok(newer) = request_rx.try_recv() {
                     req = newer;
                 }
-                let snapshot = compute_git_snapshot(&req.0, req.1.as_deref());
-                if let Ok(mut slot) = latest.lock() {
+                // A panic must not kill the thread: status would freeze for the
+                // rest of the process.
+                let computed = std::panic::catch_unwind(|| compute_git_snapshot(&req.0, req.1.as_deref()));
+                if let (Ok(snapshot), Ok(mut slot)) = (computed, latest.lock()) {
                     *slot = Some(snapshot);
-                }
-                if let Ok(mut flag) = in_flight.lock() {
-                    *flag = false;
                 }
             }
         });
 
-        Worker { request_tx, latest, in_flight }
+        Worker { request_tx, latest }
     })
 }
 
@@ -86,24 +82,47 @@ pub fn take_latest_for(dir: &std::path::Path) -> Option<GitSnapshot> {
     slot.take_if(|s| s.dir == dir)
 }
 
-/// Ask the worker for a fresh snapshot unless one is already being computed.
+/// Ask the worker for a fresh snapshot.
 ///
-/// Non-blocking: dropping the request onto the channel is all it does.
+/// Non-blocking: dropping the request onto the channel is all it does. Every
+/// request is sent (no in-flight gate), so a request for another workdir is
+/// never lost; the worker collapses a backlog to its newest entry.
 pub fn request(dir: std::path::PathBuf, diff_base: Option<String>) {
-    let w = worker();
-    let Ok(mut flag) = w.in_flight.lock() else {
-        return;
-    };
-    if *flag {
-        return;
+    // Send fails only when the worker is gone (process shutting down).
+    drop(worker().request_tx.send((dir, diff_base)));
+}
+
+/// Untracked files larger than this are not read to count lines (a stray
+/// multi-GB dump would otherwise be read in full on every refresh).
+const LINE_COUNT_MAX_BYTES: u64 = 1024 * 1024;
+
+/// Line count of `path`, or 0 when it is unreadable, binary, or over
+/// [`LINE_COUNT_MAX_BYTES`].
+pub(crate) fn count_lines_capped(path: &std::path::Path) -> usize {
+    let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= LINE_COUNT_MAX_BYTES);
+    if !small {
+        return 0;
     }
-    *flag = true;
-    drop(flag);
-    if w.request_tx.send((dir, diff_base)).is_err() {
-        // Worker gone (process shutting down) — clear the guard so a later
-        // attempt is not wedged.
-        if let Ok(mut reset) = w.in_flight.lock() {
-            *reset = false;
-        }
-    }
+    std::fs::read_to_string(path).map_or(0, |c| c.lines().count())
+}
+
+/// Per-call ceiling for status git commands: a hung git (stale lock, prompt)
+/// must not stall every later refresh.
+const STATUS_GIT_TIMEOUT_SECS: u64 = 10;
+
+/// Run one status `git` subcommand in `dir`; `None` on spawn error, timeout or
+/// non-zero exit. Inherited `GIT_DIR`/`GIT_WORK_TREE` are dropped so `dir`
+/// decides the repo, prompts are disabled, and optional locks are skipped so
+/// status never contends with the agent's own `git` calls on `index.lock`.
+pub(crate) fn git_stdout(dir: &std::path::Path, args: &[&str]) -> Option<String> {
+    let mut cmd = std::process::Command::new("git");
+    let _c = cmd
+        .args(args)
+        .current_dir(dir)
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_OPTIONAL_LOCKS", "0");
+    let out = cp_base::modules::run_with_timeout(cmd, STATUS_GIT_TIMEOUT_SECS).ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }

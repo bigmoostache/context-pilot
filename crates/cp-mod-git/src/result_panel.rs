@@ -12,6 +12,14 @@ use super::GIT_CMD_TIMEOUT_SECS;
 use crate::types::GitResultRequest;
 use cp_base::panels::scroll_key_action;
 
+/// `true` when a stored panel command may be re-run on refresh: it passes the
+/// sandbox and only reads. Slow mutating commands (`pull`, `rebase`) also land
+/// in panels; re-running them on a `.git/` change would repeat the mutation.
+pub(crate) fn is_rerunnable(command: &str) -> bool {
+    super::classify::validate_git_command(command)
+        .is_ok_and(|args| super::classify::classify_git(&args) == super::classify::CommandClass::ReadOnly)
+}
+
 /// Panel that displays and auto-refreshes the output of a read-only git command.
 pub(crate) struct GitResultPanel;
 
@@ -25,7 +33,7 @@ impl Panel for GitResultPanel {
     }
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
-        let command = ctx.get_meta_str("result_command")?;
+        let command = ctx.get_meta_str("result_command").filter(|c| is_rerunnable(c))?;
         let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GIT_RESULT),
@@ -62,6 +70,9 @@ impl Panel for GitResultPanel {
         let GitResultRequest { context_id, command, cwd } = *req;
 
         // Parse and execute the command with timeout
+        if !is_rerunnable(&command) {
+            return None;
+        }
         let args = super::classify::validate_git_command(&command).ok()?;
 
         // A vanished worktree makes git report every file as deleted: say so instead.

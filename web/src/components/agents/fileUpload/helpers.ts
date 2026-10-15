@@ -14,23 +14,9 @@ export type { UploadedFile } from "@/lib/live/agentUpload"
 
 import type { UploadedFile } from "@/lib/live/agentUpload"
 
-/**
- * A `/command` offered as a composer suggestion bubble (T348/T350). `command`
- * is the literal slash token (e.g. `/clean`); `name` + `description` label the
- * bubble; `body` is the expanded prompt seeded on click (when present).
- *
- * Lives here — beside {@link UploadedFile} — so the composer's two pill families
- * (file attachments + command suggestions) share ONE module and ONE rendered row
- * (`ComposerBubbles`), instead of two divergent ad-hoc blocks that can't coexist.
- */
-export interface CommandSuggestion {
-  command: string
-  name: string
-  description: string
-  /** the prompt body the `/command` expands to; seeded into the composer on
-   *  click. Falls back to the bare `command` literal when absent. */
-  body?: string | undefined
-}
+// The `/command` suggestion type lives in the shared lib layer so the
+// shared composer hook can use it; re-exported here for existing importers.
+export type { CommandSuggestion } from "@/lib/live/agentUpload"
 
 const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
 

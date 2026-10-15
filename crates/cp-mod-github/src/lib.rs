@@ -1,15 +1,18 @@
 //! GitHub module — PR/issue management via the `gh` CLI.
 //!
-//! One tool: `Gh`. Read-only commands create auto-refreshing panels;
-//! mutating commands execute directly. Depends on the git module and requires
+//! One tool: `Gh`. Short results come back inline; long or slow ones become a
+//! `github_result` panel. Panels of read-only commands re-run only when a
+//! later mutating `gh` call marks them stale; run-once commands (mutations,
+//! downloads, `--web`) never re-run. Depends on the git module and requires
 //! `GITHUB_TOKEN` in the environment.
 
-pub(crate) mod cache_invalidation;
 /// Command classification: read-only vs mutating `gh` subcommands.
 pub mod classify;
+/// Ordering between mutating calls and panel refreshes.
+mod mutation;
 /// GitHub result panel: renders `gh` command output with caching and pagination.
 mod panel;
-/// Output parsing: extract PR/issue data from `gh` CLI output.
+/// Output helpers: token redaction, stdout/stderr merge, CI rollup verdict.
 pub mod parse;
 /// Non-blocking per-worktree PR badge for the threads list.
 pub mod pr_badge;
