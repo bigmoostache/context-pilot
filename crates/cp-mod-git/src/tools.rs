@@ -116,12 +116,7 @@ fn run_git_command(
         let seq = ASKPASS_SEQ.fetch_add(1, Ordering::Relaxed);
         let askpass_path = std::env::temp_dir().join(format!("cpilot_askpass_{}_{seq}", std::process::id()));
         let script = format!("#!/bin/sh\necho '{}'", token.replace('\'', "'\\''"));
-        std::fs::write(&askpass_path, &script).is_ok().then(|| {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt as _;
-                drop(std::fs::set_permissions(&askpass_path, std::fs::Permissions::from_mode(0o700)));
-            }
+        write_private_script(&askpass_path, &script).is_ok().then(|| {
             let _ca = cmd.env("GIT_ASKPASS", &askpass_path);
             askpass_path
         })
@@ -146,6 +141,20 @@ fn run_git_command(
             ToolOutput::error(content)
         }
     }
+}
+
+/// Create `path` owner-only (0700) from the first byte, so the token it holds is
+/// never readable under the default umask. `create_new` refuses a pre-planted file.
+fn write_private_script(path: &std::path::Path, script: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut opts = std::fs::OpenOptions::new();
+    let _o = opts.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        let _m = opts.mode(0o700);
+    }
+    opts.open(path)?.write_all(script.as_bytes())
 }
 
 /// Decide inline-vs-panel for a completed git command.

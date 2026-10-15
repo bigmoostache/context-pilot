@@ -1,7 +1,17 @@
-/// Command classification for git commands.
-/// Determines whether a git command is read-only (safe to cache/auto-refresh)
-/// or mutating (must execute and return output).
+//! Command classification for git commands.
+//!
+//! Determines whether a git command is read-only (safe to cache/auto-refresh)
+//! or mutating (must execute once and return output), and validates the raw
+//! command string before it reaches `git`.
 
+/// Argument sandbox: program-running options and the workdir guard.
+mod sandbox;
+#[cfg(test)]
+mod tests;
+
+pub(crate) use sandbox::check_worktree_safety;
+
+/// Whether a git command may be cached and re-run, or must run exactly once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommandClass {
     /// Command only reads repository state (safe to cache and auto-refresh).
@@ -69,6 +79,10 @@ pub(crate) fn parse_shell_args(command: &str) -> Result<Vec<String>, String> {
 }
 
 /// Check for shell metacharacters outside of quoted strings.
+///
+/// No shell ever runs the command, so this is not the sandbox (see
+/// [`sandbox::check`]); it stops the model from believing pipes or
+/// redirections work.
 pub(crate) fn check_shell_operators(command: &str) -> Result<(), String> {
     let mut in_single = false;
     let mut in_double = false;
@@ -115,42 +129,26 @@ pub(crate) fn validate_git_command(command: &str) -> Result<Vec<String>, String>
         return Err("No git subcommand specified".to_owned());
     }
 
+    sandbox::check(&args)?;
     Ok(args)
 }
 
-/// Refuse `Git` calls that would bypass the agent's workdir.
-///
-/// `-C`, `--git-dir` and `--work-tree` (global options, before the subcommand)
-/// point git at another tree; `worktree add|remove|move|prune` changes
-/// worktrees behind the `Worktree` tool's back, leaving agents aimed at
-/// missing folders.
-pub(crate) fn check_worktree_safety(args: &[String]) -> Result<(), String> {
-    let mut rest = args.iter().map(String::as_str);
-    while let Some(arg) = rest.next() {
-        if !arg.starts_with('-') {
-            return check_worktree_subcmd(arg, rest.next());
-        }
-        if arg == "-C" || arg.starts_with("--git-dir") || arg.starts_with("--work-tree") {
-            return Err(format!(
-                "'{arg}' is not allowed: git already runs in this agent's workdir. Use the Worktree tool to switch trees."
-            ));
-        }
-        // `-c key=value` / `--namespace ns`: the next word is a value, not the subcommand.
-        if arg == "-c" || arg == "--namespace" {
-            let _value = rest.next();
-        }
-    }
-    Ok(())
-}
+/// Global options whose value is the NEXT word (`-c key=val`, `-C dir`).
+const GLOBAL_OPTS_WITH_VALUE: &[&str] =
+    &["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env", "--attr-source"];
 
-/// Refuse `git worktree add|remove|move|prune`: only the `Worktree` tool may reshape worktrees.
-fn check_worktree_subcmd(subcmd: &str, action: Option<&str>) -> Result<(), String> {
-    match (subcmd, action) {
-        ("worktree", Some(a @ ("add" | "remove" | "move" | "prune"))) => {
-            Err(format!("'git worktree {a}' is not allowed here; use the Worktree tool instead."))
+/// Index of the subcommand: the first word that is neither a global option nor
+/// the value of one. `None` for option-only invocations (`git --version`).
+pub(crate) fn subcommand_index(args: &[String]) -> Option<usize> {
+    let mut i = 0usize;
+    while let Some(arg) = args.get(i) {
+        if !arg.starts_with('-') {
+            return Some(i);
         }
-        _ => Ok(()),
+        let skip = if GLOBAL_OPTS_WITH_VALUE.contains(&arg.as_str()) { 2 } else { 1 };
+        i = i.saturating_add(skip);
     }
+    None
 }
 
 /// Git subcommands that only ever read repository state.
@@ -177,9 +175,6 @@ fn is_read_only_subcmd(subcmd: &str) -> bool {
             | "check-attr"
             | "name-rev"
             | "grep"
-            | "reflog"
-            | "archive"
-            | "format-patch"
     )
 }
 
@@ -254,6 +249,19 @@ fn classify_symbolic_ref(rest: &[&str]) -> CommandClass {
     if rest.len() <= 1 || rest.contains(&"--short") { CommandClass::ReadOnly } else { CommandClass::Mutating }
 }
 
+/// `git reflog`: bare / `show` / `exists` / a ref or flag read; `expire` and `delete` rewrite logs.
+fn classify_reflog(rest: &[&str]) -> CommandClass {
+    match rest.first() {
+        Some(&("expire" | "delete")) => CommandClass::Mutating,
+        _ => CommandClass::ReadOnly,
+    }
+}
+
+/// `true` when `rest` writes an output file (`-o x`, `--output x`, `--output=x`).
+fn writes_output_file(rest: &[&str]) -> bool {
+    rest.iter().any(|a| matches!(*a, "-o" | "--output") || a.starts_with("--output="))
+}
+
 /// Classify the context-dependent subcommands (those whose read/write nature
 /// depends on their arguments). Each arm delegates to a small predicate helper.
 fn classify_contextual(subcmd: &str, rest: &[&str]) -> CommandClass {
@@ -274,6 +282,11 @@ fn classify_contextual(subcmd: &str, rest: &[&str]) -> CommandClass {
         "bundle" => classify_by_first_arg(rest, &["verify", "list-heads"], false),
         "apply" => classify_any_flag(rest, &["--stat", "--check"]),
         "symbolic-ref" => classify_symbolic_ref(rest),
+        "reflog" => classify_reflog(rest),
+        // Writes one .patch file per commit unless streamed to stdout.
+        "format-patch" => classify_any_flag(rest, &["--stdout"]),
+        // Read-only when streamed; `-o`/`--output` writes a file (caught below).
+        "archive" => CommandClass::ReadOnly,
         "hash-object" => {
             if rest.contains(&"-w") {
                 CommandClass::Mutating
@@ -287,49 +300,23 @@ fn classify_contextual(subcmd: &str, rest: &[&str]) -> CommandClass {
 }
 
 /// Classify a git command (given as parsed args after "git") as read-only or mutating.
+///
+/// Global options (`--no-pager`, `-c key=val`) are skipped to find the
+/// subcommand; any `--output` file write makes an otherwise read-only command
+/// mutating, since re-running it rewrites the file.
 pub(crate) fn classify_git(args: &[String]) -> CommandClass {
-    let Some(subcmd) = args.first().map(String::as_str) else {
+    let Some(idx) = subcommand_index(args) else {
         return CommandClass::Mutating; // safe default
     };
+    let subcmd = args.get(idx).map_or("", String::as_str);
+    let rest: Vec<&str> = args.get(idx.saturating_add(1)..).unwrap_or_default().iter().map(String::as_str).collect();
 
-    if is_read_only_subcmd(subcmd) {
-        return CommandClass::ReadOnly;
-    }
-    if is_always_mutating_subcmd(subcmd) {
+    let class = if is_read_only_subcmd(subcmd) {
+        CommandClass::ReadOnly
+    } else if is_always_mutating_subcmd(subcmd) {
         return CommandClass::Mutating;
-    }
-
-    let rest: Vec<&str> = args.get(1..).unwrap_or_default().iter().map(String::as_str).collect();
-    classify_contextual(subcmd, &rest)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{check_worktree_safety, validate_git_command};
-
-    /// `true` when the guard refuses `cmd`.
-    fn rejected(cmd: &str) -> bool {
-        check_worktree_safety(&validate_git_command(cmd).expect("valid command")).is_err()
-    }
-
-    #[test]
-    fn worktree_guard_refuses_escapes() {
-        assert!(rejected("git -C /tmp status"));
-        assert!(rejected("git --git-dir=/x/.git log"));
-        assert!(rejected("git --work-tree /x status"));
-    }
-
-    #[test]
-    fn worktree_guard_refuses_reshaping() {
-        assert!(rejected("git worktree add ../x"));
-        assert!(rejected("git worktree remove x"));
-        assert!(rejected("git -c core.pager=cat worktree prune"));
-    }
-
-    #[test]
-    fn worktree_guard_allows_normal_use() {
-        assert!(!rejected("git worktree list"));
-        assert!(!rejected("git log -C --stat"));
-        assert!(!rejected("git status"));
-    }
+    } else {
+        classify_contextual(subcmd, &rest)
+    };
+    if class == CommandClass::ReadOnly && writes_output_file(&rest) { CommandClass::Mutating } else { class }
 }
