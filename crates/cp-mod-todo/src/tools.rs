@@ -1,10 +1,9 @@
 //! Focus-scoping + legacy purge for the thread-owned todo model.
 //!
-//! The task-editing surface itself now lives in [`crate::yaml`] (the `Todo`
-//! tool applies `{prev, new}` diffs to a virtual YAML, reconciled by id). This
-//! module keeps only the small pure ops the main crate still calls around
-//! that: panel focus-scoping, the one-time legacy backlog purge, and the
-//! per-agent purge on agent hard-delete.
+//! Task editing lives in [`crate::upsert`] (the `Todo` tool's structured
+//! upsert). This module keeps the small ops the main crate calls around it:
+//! panel focus-scoping, the one-time legacy backlog purge, and the per-agent
+//! purge on agent hard-delete.
 
 use cp_base::state::runtime::State;
 

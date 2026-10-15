@@ -265,31 +265,35 @@ fn next_order(state: &State, loc: Loc<'_>) -> i32 {
 // Order maintenance
 // =============================================================================
 
-/// One row of the renumber snapshot: (id, `parent_id`, current order, cancelled).
-type OrderRow = (String, Option<String>, i32, bool);
+/// One row of the renumber snapshot: (index into `todos`, `parent_id`, current
+/// order, cancelled, id).
+type OrderRow = (usize, Option<String>, i32, bool, String);
 
-/// Renumber `order` densely (0..n) within every parent group of `agent_id`,
-/// cancelled tasks placed last — the single source of truth both the canonical
-/// render and the wire projection sort by.
+/// Renumber `order` densely (0..n) within every parent group of `agent_id`.
+///
+/// Cancelled tasks are placed last. This order is the single source of truth
+/// both the canonical render and the wire projection sort by. O(n log n): rows
+/// carry their index, so no per-row lookup.
 pub fn renumber_orders(state: &mut State, agent_id: &str) {
     let ts = TodoState::get_mut(state);
     // Snapshot the sort inputs so the borrow ends before we mutate each order.
     let mut rows: Vec<OrderRow> = ts
         .todos
         .iter()
-        .filter(|t| t.agent_id == agent_id)
-        .map(|t| (t.id.clone(), t.parent_id.clone(), t.order, t.status == TodoStatus::Cancelled))
+        .enumerate()
+        .filter(|&(_, t)| t.agent_id == agent_id)
+        .map(|(idx, t)| (idx, t.parent_id.clone(), t.order, t.status == TodoStatus::Cancelled, t.id.clone()))
         .collect();
     // Group by parent, then cancelled-last, then existing order, then id.
-    rows.sort_by(|a, b| (&a.1, a.3, a.2, &a.0).cmp(&(&b.1, b.3, b.2, &b.0)));
+    rows.sort_by(|a, b| (&a.1, a.3, a.2, &a.4).cmp(&(&b.1, b.3, b.2, &b.4)));
     let mut current_parent: Option<Option<String>> = None;
     let mut next = 0i32;
-    for (id, parent, _, _) in rows {
+    for (idx, parent, _, _, _) in rows {
         if current_parent.as_ref() != Some(&parent) {
-            current_parent = Some(parent.clone());
+            current_parent = Some(parent);
             next = 0i32;
         }
-        if let Some(item) = ts.todos.iter_mut().find(|t| t.id == id) {
+        if let Some(item) = ts.todos.get_mut(idx) {
             item.order = next;
         }
         next = next.saturating_add(1);
@@ -299,4 +303,121 @@ pub fn renumber_orders(state: &mut State, agent_id: &str) {
 /// Parse a status string, or `None` when unrecognised.
 fn parse_status(raw: &str) -> Option<TodoStatus> {
     raw.trim().parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use cp_base::state::runtime::State;
+    use serde_json::json;
+
+    use super::{parse_items, upsert};
+    use crate::types::{TodoState, TodoStatus};
+
+    /// Fresh state with an empty todo store.
+    fn fresh() -> State {
+        let mut state = State::default();
+        state.set_ext(TodoState::new());
+        state
+    }
+
+    /// Run one upsert from a JSON payload.
+    fn run(state: &mut State, agent: &str, payload: &serde_json::Value) -> Result<Vec<String>, String> {
+        let items = parse_items(payload)?;
+        upsert(state, agent, &items)
+    }
+
+    /// Run one upsert that must succeed, discarding the created ids.
+    fn apply(state: &mut State, agent: &str, payload: &serde_json::Value) {
+        let _created = run(state, agent, payload).unwrap();
+    }
+
+    /// (id, parent, order, status) of one task.
+    type Row = (String, Option<String>, i32, TodoStatus);
+
+    /// Every task as a [`Row`], in storage order.
+    fn rows(state: &State) -> Vec<Row> {
+        TodoState::get(state).todos.iter().map(|t| (t.id.clone(), t.parent_id.clone(), t.order, t.status)).collect()
+    }
+
+    #[test]
+    fn creates_nested_tree_with_dense_orders() {
+        let mut state = fresh();
+        let created =
+            run(&mut state, "A1", &json!([{"title": "root", "children": [{"title": "a"}, {"title": "b"}]}])).unwrap();
+        assert_eq!(created, ["X1", "X2", "X3"]);
+        assert_eq!(
+            rows(&state),
+            [
+                ("X1".to_owned(), None, 0i32, TodoStatus::Planned),
+                ("X2".to_owned(), Some("X1".to_owned()), 0i32, TodoStatus::Planned),
+                ("X3".to_owned(), Some("X1".to_owned()), 1i32, TodoStatus::Planned),
+            ]
+        );
+    }
+
+    #[test]
+    fn patch_touches_only_provided_fields() {
+        let mut state = fresh();
+        apply(&mut state, "A1", &json!([{"title": "t", "description": "d"}]));
+        apply(&mut state, "A1", &json!([{"id": "X1", "status": "done"}]));
+        let t = TodoState::get(&state).todos.first().unwrap();
+        assert_eq!((t.name.as_str(), t.description.as_str(), t.status), ("t", "d", TodoStatus::Done));
+    }
+
+    #[test]
+    fn invalid_payload_is_atomic_and_reports_every_problem() {
+        let mut state = fresh();
+        apply(&mut state, "A1", &json!([{"title": "keep"}]));
+        let before = rows(&state);
+        let err = run(
+            &mut state,
+            "A1",
+            &json!([
+                {"title": "new"},
+                {"id": "X1", "status": "bogus"},
+                {"id": "X99"},
+                {"description": "no title"},
+                {"title": "p", "children": [{"id": "X1"}]}
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(rows(&state), before, "nothing applied");
+        assert_eq!(TodoState::get(&state).next_todo_id, 2, "no id consumed");
+        for needle in ["bogus", "X99", "title"] {
+            assert!(err.contains(needle), "missing {needle} in {err}");
+        }
+    }
+
+    #[test]
+    fn rejects_repeated_and_foreign_ids() {
+        let mut state = fresh();
+        apply(&mut state, "A1", &json!([{"title": "mine"}]));
+        let _dup = run(&mut state, "A1", &json!([{"id": "X1"}, {"id": "X1"}])).unwrap_err();
+        let _foreign = run(&mut state, "A2", &json!([{"id": "X1", "status": "done"}])).unwrap_err();
+        assert_eq!(TodoState::get(&state).todos.first().unwrap().status, TodoStatus::Planned);
+    }
+
+    #[test]
+    fn cancelled_sorts_last_and_orders_stay_dense() {
+        let mut state = fresh();
+        apply(&mut state, "A1", &json!([{"title": "a"}, {"title": "b"}, {"title": "c"}]));
+        apply(&mut state, "A1", &json!([{"id": "X1", "status": "cancelled"}]));
+        let orders: Vec<(String, i32)> = rows(&state).into_iter().map(|r| (r.0, r.2)).collect();
+        assert_eq!(orders, [("X1".to_owned(), 2i32), ("X2".to_owned(), 0i32), ("X3".to_owned(), 1i32)]);
+    }
+
+    #[test]
+    fn renumber_ignores_other_agents() {
+        let mut state = fresh();
+        apply(&mut state, "A1", &json!([{"title": "a"}]));
+        apply(&mut state, "A2", &json!([{"title": "b"}, {"title": "c"}]));
+        let orders: Vec<i32> = rows(&state).into_iter().map(|r| r.2).collect();
+        assert_eq!(orders, [0i32, 0i32, 1i32]);
+    }
+
+    #[test]
+    fn non_array_payload_is_rejected() {
+        let _obj = parse_items(&json!({"title": "x"})).unwrap_err();
+        let _num = parse_items(&json!([1i32])).unwrap_err();
+    }
 }

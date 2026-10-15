@@ -16,8 +16,9 @@ use cp_base::cast::float_math;
 fn fixed_panel_badge(ctx_type: &str, state: &State) -> Option<String> {
     let count = match ctx_type {
         "todo" => {
+            // Same scope as the panel: the focused agent's open tasks only.
             let ts = cp_mod_todo::types::TodoState::get(state);
-            ts.todos.iter().filter(|t| !matches!(t.status, cp_mod_todo::types::TodoStatus::Done)).count()
+            ts.open_count(ts.focus_filter.as_deref())
         }
         "library" => cp_mod_prompt::types::PromptState::get(state).loaded_skill_ids.len(),
         "tree" => cp_mod_tree::types::TreeView::get(state).open_folders.len(),
