@@ -164,7 +164,10 @@ impl Panel for FilePanel {
             let token_count = estimate_tokens(&msg);
             return Some(CacheUpdate::Content { context_id, content: msg, token_count });
         }
-        let content = fs::read_to_string(&path).ok()?;
+        let content = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) => format!("[Cannot display '{file_path}': {e}. Binary or non-UTF-8 files cannot be opened.]"),
+        };
         let new_hash = hash_content(&content);
         if current_source_hash.as_ref() == Some(&new_hash) {
             return Some(CacheUpdate::Unchanged { context_id });
