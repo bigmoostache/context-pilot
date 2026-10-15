@@ -4,14 +4,15 @@
 //! messages live in their own file, rewritten only when its [`fingerprint`]
 //! changed since the last write. Same scheme as the agents' former files.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, HashMap};
+use std::hash::{Hash as _, Hasher as _};
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use cp_base::config::constants::STORE_DIR;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::chat::{GroupAuthor, GroupMessage};
+use crate::chat::GroupMessage;
 use crate::social::Substate;
 use crate::types::{Group, GroupKind};
 
@@ -45,6 +46,10 @@ pub struct GroupMeta<'group> {
     /// See [`Group::social`].
     #[serde(skip_serializing_if = "<[Substate]>::is_empty")]
     social: &'group [Substate],
+    /// See [`Group::read_upto`]. Without it every cursor resets on reload and
+    /// the whole history reads as unread again.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    read_upto: &'group BTreeMap<String, u64>,
 }
 
 impl<'group> From<&'group Group> for GroupMeta<'group> {
@@ -58,6 +63,7 @@ impl<'group> From<&'group Group> for GroupMeta<'group> {
             kind: g.kind,
             created_at: g.created_at,
             social: &g.social,
+            read_upto: &g.read_upto,
         }
     }
 }
@@ -71,25 +77,30 @@ struct GroupFile<'group> {
     messages: &'group [GroupMessage],
 }
 
-/// Cheap change detector over a group's messages, without serializing.
+/// Owned read side of [`GroupFile`]: parsed once, straight into messages.
+#[derive(Deserialize)]
+struct GroupFileIn {
+    /// Full ordered message log.
+    messages: Vec<GroupMessage>,
+}
+
+/// Change detector over a group's messages, without serializing.
 ///
-/// Folds every field a mutation can touch (count, timestamps, content and
-/// path lengths, flags) so any push/retain/edit/ack changes the value.
+/// Hashes every persisted field, text included, so any push/retain/edit/ack
+/// changes the value (a same-length edit too).
 #[must_use]
 pub fn fingerprint(messages: &[GroupMessage]) -> u64 {
-    const K: u64 = 0x0100_0000_01b3;
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ u64::try_from(messages.len()).unwrap_or(u64::MAX);
+    let mut h = std::hash::DefaultHasher::new();
+    messages.len().hash(&mut h);
     for m in messages {
-        let len = |s: Option<&String>| s.map_or(u64::MAX, |v| u64::try_from(v.len()).unwrap_or(u64::MAX));
-        let flags = u64::from(m.acknowledged)
-            | (u64::from(m.auto) << 1u8)
-            | (u64::from(m.has_been_pushed) << 2u8)
-            | (u64::from(m.author == GroupAuthor::Assistant) << 3u8);
-        for v in [m.timestamp, len(m.content.as_ref()), len(m.file_path.as_ref()), flags] {
-            h = (h ^ v).wrapping_mul(K);
-        }
+        m.timestamp.hash(&mut h);
+        m.author_agent_id.hash(&mut h);
+        m.content.hash(&mut h);
+        m.file_path.hash(&mut h);
+        [m.acknowledged, m.auto, m.has_been_pushed].hash(&mut h);
+        m.author.to_string().hash(&mut h);
     }
-    h
+    h.finish()
 }
 
 /// Fingerprint of each group's file as last written / loaded.
@@ -131,15 +142,42 @@ pub fn dirty_group_file_ops(groups: &[Group]) -> Vec<(PathBuf, Vec<u8>)> {
     ops
 }
 
+/// Read one message file. `Ok(None)` = no file yet; `Err` = present but
+/// unreadable or unparsable.
+fn read_messages(path: &Path) -> Result<Option<Vec<GroupMessage>>, String> {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    serde_json::from_slice::<GroupFileIn>(&bytes).map(|f| Some(f.messages)).map_err(|e| e.to_string())
+}
+
+/// Move a bad message file aside (`<id>.json.corrupt-<ms>`) so the next save,
+/// which writes the group's now-empty log, cannot destroy the history.
+fn quarantine(path: &Path, why: &str) {
+    let mut aside = path.as_os_str().to_owned();
+    aside.push(format!(".corrupt-{}", cp_base::panels::now_ms()));
+    match std::fs::rename(path, &aside) {
+        Ok(()) => log::error!("group file {} unreadable ({why}); moved to {}", path.display(), aside.display()),
+        Err(e) => log::error!("group file {} unreadable ({why}); quarantine failed: {e}", path.display()),
+    }
+}
+
 /// Fill `messages` of groups loaded slim from `config.json` from their files.
+/// A file that exists but cannot be loaded is quarantined, never overwritten.
 pub fn load_group_messages(groups: &mut [Group]) {
     let Ok(mut clean) = clean_map().lock() else { return };
     for g in groups.iter_mut().filter(|g| g.messages.is_empty()) {
-        let Ok(bytes) = std::fs::read(group_file(&g.id)) else { continue };
-        let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) else { continue };
-        let Some(msgs) = v.get("messages").and_then(|m| serde_json::from_value(m.clone()).ok()) else { continue };
-        g.messages = msgs;
-        let _prev = clean.insert(g.id.clone(), fingerprint(&g.messages));
+        let path = group_file(&g.id);
+        match read_messages(&path) {
+            Ok(Some(msgs)) => {
+                g.messages = msgs;
+                let _prev = clean.insert(g.id.clone(), fingerprint(&g.messages));
+            }
+            Ok(None) => {}
+            Err(why) => quarantine(&path, &why),
+        }
     }
 }
 
@@ -154,10 +192,37 @@ mod tests {
         let id = s.create_human_group("A1", "first");
         let g = s.find_mut(&id).expect("created");
         g.messages.push(GroupMessage::user("hi".into()));
+        g.mark_read("A1");
         let json = serde_json::to_value(GroupMeta::from(&*g)).expect("serialize");
         let back: Group = serde_json::from_value(json).expect("deserialize");
         assert_eq!((back.id.as_str(), back.owner_agent_id.as_str()), ("G1", "A1"));
         assert!(back.messages.is_empty());
+        assert_eq!(back.read_upto, g.read_upto, "read cursors survive a reload");
         assert_ne!(fingerprint(&g.messages), fingerprint(&[]));
+    }
+
+    #[test]
+    fn fingerprint_sees_same_length_edit() {
+        let mut msgs = vec![GroupMessage::user("abc".into())];
+        let before = fingerprint(&msgs);
+        if let Some(m) = msgs.first_mut() {
+            m.content = Some("xyz".into());
+        }
+        assert_ne!(before, fingerprint(&msgs));
+    }
+
+    #[test]
+    fn corrupt_file_is_quarantined_not_lost() {
+        let dir = std::env::temp_dir().join(format!("cp-groups-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("G1.json");
+        std::fs::write(&path, b"{ not json").expect("write");
+        let err = read_messages(&path).expect_err("corrupt");
+        quarantine(&path, &err);
+        assert!(!path.exists(), "bad file moved aside");
+        let kept = std::fs::read_dir(&dir).expect("ls").filter_map(Result::ok).count();
+        assert_eq!(kept, 1, "original bytes kept under a .corrupt name");
+        assert!(matches!(read_messages(&dir.join("missing.json")), Ok(None)));
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }
