@@ -26,7 +26,7 @@ pub fn ensure_default_system(state: &mut State) {
 }
 
 /// Get the active system's content (system prompt).
-/// Dynamically loads from disk every call — no caching.
+/// Served from the in-memory prompt index (disk is read only after an invalidation).
 #[must_use]
 pub fn get_active_system_content(state: &State) -> String {
     let ps = PromptState::get(state);
