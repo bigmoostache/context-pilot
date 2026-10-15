@@ -15,7 +15,6 @@ use std::collections::HashMap;
 
 use cp_base::state::runtime::State;
 use cp_fleet::AgentExecState;
-use serde::{Deserialize, Serialize};
 
 /// Per-thread execution state for the agents view. Registered as UI-global
 /// module state and never persisted: rebuilt from the fleet registry each tick.
@@ -24,7 +23,7 @@ use serde::{Deserialize, Serialize};
 /// registry entry, and a freshly created agent has none until the next
 /// reconcile pass. Renderers fall back to [`AgentExecState::Idle`] rather than
 /// failing.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct FleetExecMirror {
     /// Last-known execution state per agent id.
     ///

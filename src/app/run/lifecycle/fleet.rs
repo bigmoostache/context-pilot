@@ -7,24 +7,12 @@
 //! moves: each [`AgentRuntime`] stays in its own `AgentStore` slot. At N=1
 //! the registry is empty and the pass is a no-op.
 
-use cp_fleet::{AgentExecState, Entry, Role, promote};
+use cp_fleet::{AgentExecState, K, exec_state_from_facts, promote};
 use cp_mod_agents::types::{AgentStatus, AgentsState};
 
 use cp_base::state::runtime::bundle::AgentRuntime;
 
 use crate::app::App;
-
-/// Consecutive terminal stream failures (each after its own API retries are
-/// exhausted) before a background agent is parked as
-/// [`Errored`](AgentExecState::Errored).
-///
-/// A one-off blip stays `Runnable` and retries after the spine's exponential
-/// backoff; only an agent that keeps failing is declared *stuck* and removed
-/// from scheduling until a human re-engages it (design doc §8 — human
-/// intervention is the recovery path for a stuck agent). The counter
-/// (`SpineState.config.consecutive_continuation_errors`) is reset to 0 by a
-/// successful stream completion or a fresh user message.
-const STUCK_ERROR_THRESHOLD: usize = 3;
 
 #[expect(clippy::multiple_inherent_impl, reason = "App methods split across run/ submodules for readability")]
 impl App {
@@ -77,12 +65,8 @@ impl App {
                     || !sr.pending_tools.is_empty()
                     || sr.pending_done.is_some()
             });
-        let role = self.fleet.get(&have_id).map_or(Role::Agent, |e| e.role);
-        let mut entry = Entry::new(role);
-        if mid_exec {
-            entry.exec_state = AgentExecState::Streaming;
-        }
-        self.fleet.insert(have_id, entry);
+        let state = if mid_exec { AgentExecState::Streaming } else { AgentExecState::Idle };
+        self.fleet.insert(have_id, state);
     }
 
     /// Give the incoming agent a stored runtime if it has none (the boot
@@ -126,11 +110,11 @@ impl App {
     ///   removed (a vanished or archived agent also loses its runtime);
     /// - each surviving **non-active** entry's `exec_state` is derived from its
     ///   agent status (`MyTurn` → `Runnable`, else `Idle`); active entries are
-    ///   left to the step loop (see [`derive_exec_state`](Self::derive_exec_state)).
+    ///   left to the step loop (see [`FleetRegistry::derive_from_turn`](cp_fleet::FleetRegistry::derive_from_turn)).
     ///
     /// Promotion + stepping live in `advance_background_agents`; reconcile only
     /// mirrors membership and the Idle↔Runnable derivation.
-    pub(super) fn reconcile_fleet_registry(&mut self, now_ms: u64) {
+    pub(super) fn reconcile_fleet_registry(&mut self) {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
 
         // Snapshot the current roster: (id, status, eligible) for every agent
@@ -172,12 +156,8 @@ impl App {
                 let runtime = self.fresh_runtime();
                 self.state.agent_store.insert(id.clone(), runtime);
             }
-            if !self.fleet.contains(id) {
-                self.fleet.insert(id.clone(), Entry::new(Role::Agent));
-            }
-            if let Some(reg_entry) = self.fleet.get_mut(id) {
-                Self::derive_exec_state(reg_entry, status, now_ms);
-            }
+            self.fleet.ensure(id);
+            self.fleet.derive_from_turn(id, status == AgentStatus::MyTurn);
         }
 
         // Promotion is applied by `advance_background_agents` (it needs to
@@ -203,7 +183,6 @@ impl App {
     /// boot is byte-identical: reconcile then behaves exactly as before.
     pub(super) fn load_background_agents(&mut self) {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
-        let now = cp_base::panels::now_ms();
         let roster: Vec<(String, AgentStatus)> = AgentsState::get(&self.state)
             .agents
             .iter()
@@ -219,45 +198,8 @@ impl App {
                 continue; // cold agent: no persisted file; reconcile gives it a fresh runtime
             };
             self.state.agent_store.insert(id.clone(), runtime);
-            let mut entry = Entry::new(Role::Agent);
-            Self::derive_exec_state(&mut entry, status, now);
-            self.fleet.insert(id, entry);
-        }
-    }
-
-    /// Derive one background entry's [`AgentExecState`] from its agent status.
-    ///
-    /// An **active** entry ([`Streaming`](AgentExecState::Streaming) /
-    /// [`AwaitingLlm`](AgentExecState::AwaitingLlm)) is owned by the advancement
-    /// step loop ([`advance_background_agents`](Self::advance_background_agents)
-    /// re-derives it from the post-step stream phase), so reconcile leaves it
-    /// untouched — otherwise a mid-stream agent, whose `AgentStatus` is still
-    /// `MyTurn`, would be clobbered back to `Runnable` every tick.
-    ///
-    /// For a non-active entry: `MyTurn` means user input awaits the agent →
-    /// `Runnable` (stamping `waiting_since_ms` once, on the Idle→Runnable edge,
-    /// for oldest-waiting-first promotion); `TheirTurn` → `Idle` (waiting on the
-    /// human), clearing any stale wait stamp.
-    fn derive_exec_state(entry: &mut Entry, status: AgentStatus, now_ms: u64) {
-        if entry.exec_state.is_active() || entry.exec_state == AgentExecState::Errored {
-            // Active: owned by the advancement step loop (re-derived post-step).
-            // Errored: parked as stuck — never auto-revived here; only a fresh
-            // user message clears it (see `clear_errored_entry`), matching the
-            // human-intervention recovery model. Never clobber either back to
-            // Runnable just because the agent's status is still MyTurn.
-            return;
-        }
-        match status {
-            AgentStatus::MyTurn => {
-                if entry.exec_state != AgentExecState::Runnable {
-                    entry.exec_state = AgentExecState::Runnable;
-                    entry.waiting_since_ms = Some(now_ms);
-                }
-            }
-            AgentStatus::TheirTurn => {
-                entry.exec_state = AgentExecState::Idle;
-                entry.waiting_since_ms = None;
-            }
+            self.fleet.ensure(&id);
+            self.fleet.derive_from_turn(&id, status == AgentStatus::MyTurn);
         }
     }
 
@@ -273,17 +215,11 @@ impl App {
     /// agent. Switching is an id change; nothing is copied. Empty at N=1 → no-op.
     pub(super) fn advance_background_agents(&mut self) {
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
-        let promotable: std::collections::HashSet<String> = promote(&self.fleet).into_iter().collect();
-        let ids: Vec<String> = self
-            .fleet
-            .iter()
-            .filter(|entry| {
-                entry.1.role.is_capped()
-                    && (entry.1.exec_state.is_active() || promotable.contains(entry.0.as_str()))
-                    && focused.as_deref() != Some(entry.0.as_str())
-            })
-            .map(|entry| entry.0.clone())
-            .collect();
+        // The focused agent is outside the registry; its live stream still takes a slot.
+        let focused_active = usize::from(self.state.agent().stream.phase.is_streaming());
+        let mut ids = self.fleet.ids_in(AgentExecState::Streaming);
+        ids.extend(promote(&self.fleet, K, focused_active));
+        ids.retain(|id| focused.as_deref() != Some(id.as_str()));
 
         let prev = self.state.executing_agent_id().map(str::to_owned);
         for id in ids {
@@ -298,16 +234,14 @@ impl App {
             let exec_state = self.post_step_exec_state(&id); // from this agent's new stream phase
             self.stepping_agent = None;
             self.state.agent_store.set_executing(prev.clone());
-            if let Some(entry) = self.fleet.get_mut(&id) {
-                entry.exec_state = exec_state;
-            }
+            let _known = self.fleet.set_state(&id, exec_state);
         }
     }
 
     /// Re-derive a just-stepped background agent's [`AgentExecState`] from the
     /// state it left behind (the agent is still the executing one).
     ///
-    /// Delegates to [`exec_state_from_facts`](Self::exec_state_from_facts)
+    /// Delegates to [`exec_state_from_facts`]
     /// so the step loop and the display mirror cannot drift apart.
     fn post_step_exec_state(&self, id: &str) -> AgentExecState {
         let errs = cp_mod_spine::types::SpineState::get(&self.state).config.consecutive_continuation_errors;
@@ -316,39 +250,7 @@ impl App {
             .iter()
             .find(|t| t.id == id)
             .map(|t| cp_mod_agents::types::turn::status(&self.state, &t.id));
-        Self::exec_state_from_facts(self.state.agent().stream.phase.is_streaming(), errs, status)
-    }
-
-    /// The single definition of "what exec state do these agent facts imply".
-    ///
-    /// Shared by two callers that must agree: the step loop's post-step
-    /// derivation ([`post_step_exec_state`](Self::post_step_exec_state)) and the
-    /// display mirror ([`publish_fleet_view_states`](Self::publish_fleet_view_states)).
-    /// A second, drifting definition would show the human a state the scheduler
-    /// never actually held.
-    ///
-    /// Order matters: a live stream wins (the agent holds its `K` slot), then a
-    /// fatal error streak parks it as `Errored`, and only then does the turn
-    /// status decide `Runnable` vs `Idle`.
-    const fn exec_state_from_facts(
-        is_streaming: bool,
-        consecutive_errors: usize,
-        status: Option<AgentStatus>,
-    ) -> AgentExecState {
-        if is_streaming {
-            return AgentExecState::Streaming;
-        }
-        // Repeated terminal failures → park as Errored (stuck, needs a human).
-        // Excluded from both `promote` and the step loop, so a persistently
-        // failing agent stops churning a promotion slot and can never stall the
-        // fleet; it waits for a fresh user message to re-engage it.
-        if consecutive_errors >= STUCK_ERROR_THRESHOLD {
-            return AgentExecState::Errored;
-        }
-        match status {
-            Some(AgentStatus::MyTurn) => AgentExecState::Runnable,
-            _ => AgentExecState::Idle,
-        }
+        exec_state_from_facts(self.state.agent().stream.phase.is_streaming(), errs, status == Some(AgentStatus::MyTurn))
     }
 
     /// Republish the display-only exec-state mirror
@@ -366,7 +268,7 @@ impl App {
     /// which is the focused one while the loop is at rest.
     pub(super) fn publish_fleet_view_states(&mut self) {
         let mut exec_states: std::collections::HashMap<String, AgentExecState> =
-            self.fleet.iter().map(|entry| (entry.0.clone(), entry.1.exec_state)).collect();
+            self.fleet.iter().map(|entry| (entry.0.clone(), entry.1.exec_state())).collect();
 
         let focused = cp_mod_agents::types::FocusState::get(&self.state).focused_agent_id.clone();
         if let Some(id) = focused {
@@ -376,8 +278,11 @@ impl App {
                 .iter()
                 .find(|t| t.id == id)
                 .map(|t| cp_mod_agents::types::turn::status(&self.state, &t.id));
-            let focused_state =
-                Self::exec_state_from_facts(self.state.agent().stream.phase.is_streaming(), errs, status);
+            let focused_state = exec_state_from_facts(
+                self.state.agent().stream.phase.is_streaming(),
+                errs,
+                status == Some(AgentStatus::MyTurn),
+            );
             let _inserted = exec_states.insert(id, focused_state);
         }
 

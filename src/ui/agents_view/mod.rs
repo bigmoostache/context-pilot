@@ -169,13 +169,7 @@ fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent, my_turn: bool) -> (u8, 
 /// TOOLING / WAITING). `Idle` is READY (void) and `Errored` is parked (void),
 /// exactly like the footer's READY / BLOCKED badges carry no spinner.
 const fn agent_is_working(exec: AgentExecState) -> bool {
-    matches!(
-        exec,
-        AgentExecState::Runnable
-            | AgentExecState::Streaming
-            | AgentExecState::AwaitingLlm
-            | AgentExecState::AwaitingTool
-    )
+    matches!(exec, AgentExecState::Runnable | AgentExecState::Streaming)
 }
 
 /// Whether `agent` holds an LLM reply the human has not yet seen in the TUI:
