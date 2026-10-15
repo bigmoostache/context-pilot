@@ -100,7 +100,7 @@ pub(super) fn handle_download(request: Request, state: &Arc<Mutex<Backend>>, id:
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], &b"application/octet-stream"[..]) {
                 response = response.with_header(h);
             }
-            for header in cors_headers() {
+            for header in cors_headers(&request) {
                 response = response.with_header(header);
             }
             let _sent = request.respond(response);
@@ -122,7 +122,7 @@ pub(super) fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str
             if let Ok(h) = Header::from_bytes(&b"Content-Disposition"[..], &b"inline"[..]) {
                 response = response.with_header(h);
             }
-            for header in cors_headers() {
+            for header in cors_headers(&request) {
                 response = response.with_header(header);
             }
             let _sent = request.respond(response);
@@ -143,7 +143,7 @@ pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &
             if let Ok(h) = Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=3600"[..]) {
                 response = response.with_header(h);
             }
-            for header in cors_headers() {
+            for header in cors_headers(&request) {
                 response = response.with_header(header);
             }
             let _sent = request.respond(response);
