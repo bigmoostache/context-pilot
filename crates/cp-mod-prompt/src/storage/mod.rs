@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -120,8 +121,43 @@ fn next_suffixed_path(shared: &Path, id: &str) -> PathBuf {
         .unwrap_or_else(|| shared.join(format!("{id}-x.md")))
 }
 
-/// Load all .md prompt files from a directory
+/// Parsed `(name, description, body)` of one behaviour file.
+type Parsed = (String, String, String);
+
+/// Per-file parse cache keyed by path, valid while `(len, mtime)` match.
+/// A change to one behaviour file drops [`INDEX`]; without this cache the
+/// rebuild re-read and re-parsed every `.md` of the fleet (198 ms worst).
+type FileCache = HashMap<PathBuf, (u64, Option<std::time::SystemTime>, Parsed)>;
+
+/// See [`FileCache`].
+static FILE_CACHE: Mutex<Option<FileCache>> = Mutex::new(None);
+
+/// Parse `path`, reusing the cached result when its size and mtime are unchanged.
+fn parse_cached(path: &Path) -> Option<Parsed> {
+    let meta = fs::metadata(path).ok()?;
+    let key = (meta.len(), meta.modified().ok());
+    let hit = FILE_CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .and_then(|cache| cache.get(path))
+        .filter(|&&(len, mtime, _)| (len, mtime) == key)
+        .map(|entry| entry.2.clone());
+    if hit.is_some() {
+        return hit;
+    }
+    let parsed = frontmatter::parse(&fs::read_to_string(path).ok()?);
+    let _prev = FILE_CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get_or_insert_with(HashMap::new)
+        .insert(path.to_path_buf(), (key.0, key.1, parsed.clone()));
+    Some(parsed)
+}
+
+/// Load all .md prompt files from a directory (unchanged files from [`FILE_CACHE`]).
 pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<PromptItem> {
+    let _p = cp_base::perf_span!("lib_read_dir");
     let mut items = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else { return items };
 
@@ -137,8 +173,7 @@ pub(crate) fn load_prompts_from_dir(dir: &Path, prompt_type: PromptType) -> Vec<
             continue;
         }
 
-        if let Ok(content) = fs::read_to_string(&path) {
-            let (name, description, body) = frontmatter::parse(&content);
+        if let Some((name, description, body)) = parse_cached(&path) {
             items.push(PromptItem {
                 id,
                 name,
@@ -194,6 +229,7 @@ const fn type_slot(pt: PromptType) -> usize {
 #[must_use]
 pub fn dirs_fingerprint() -> u64 {
     use std::hash::{Hash as _, Hasher as _};
+    let _p = cp_base::perf_span!("lib_fingerprint");
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for pt in [PromptType::System, PromptType::Skill, PromptType::Command] {
         // Sum of per-file hashes: `read_dir` order is unspecified.
