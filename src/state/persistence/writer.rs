@@ -211,16 +211,75 @@ fn execute_batch(maybe_batch: Option<WriteBatch>) {
     }
 }
 
-/// Write a file, creating parent directories if needed.
-/// Logs errors instead of silently swallowing them.
-fn write_file(path: &PathBuf, content: &[u8]) {
-    if let Some(parent) = path.parent()
-        && let Err(e) = fs::create_dir_all(parent)
-    {
-        drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
-        return;
+/// Paths whose write failed since the last [`take_failed_writes`]. Lets the
+/// save path re-emit dirty-only files (module stamps, history messages) that
+/// it already marked written when it built the op.
+static FAILED_WRITES: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+/// Drain the paths whose write failed since the last call.
+pub(crate) fn take_failed_writes() -> Vec<PathBuf> {
+    FAILED_WRITES.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
+}
+
+/// Replace `path` with `content` atomically: write a sibling temp file, fsync
+/// it, rename it over `path`, then fsync the directory. A crash leaves either
+/// the old file or the new one, never a truncated mix that boot can't parse.
+pub(crate) fn write_atomic(path: &std::path::Path, content: &[u8]) -> std::io::Result<()> {
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| std::path::Path::new("."));
+    fs::create_dir_all(parent)?;
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let staging = parent.join(format!(".{name}.tmp.{}", std::process::id()));
+    let result = (|| {
+        let mut file = fs::File::create(&staging)?;
+        file.write_all(content)?;
+        file.sync_all()?;
+        fs::rename(&staging, path)
+    })();
+    if result.is_err() {
+        let _cleanup = fs::remove_file(&staging);
+        return result;
     }
-    if let Err(e) = fs::write(path, content) {
+    // Directory fsync makes the rename itself durable; best effort (not
+    // supported on every platform/filesystem).
+    let _dir_sync = fs::File::open(parent).and_then(|d| d.sync_all());
+    Ok(())
+}
+
+/// Atomically write a file (see [`write_atomic`]). Logs failures and records
+/// the path in [`FAILED_WRITES`] so the next save can retry it.
+pub(crate) fn write_file(path: &std::path::Path, content: &[u8]) {
+    if let Err(e) = write_atomic(path, content) {
         drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", path.display(), e));
+        if let Ok(mut failed) = FAILED_WRITES.lock() {
+            failed.push(path.to_path_buf());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{take_failed_writes, write_atomic, write_file};
+
+    #[test]
+    fn atomic_write_replaces_content_and_leaves_no_temp() {
+        let dir = std::env::temp_dir().join(format!("cp-atomic-{}", std::process::id()));
+        let path = dir.join("nested").join("config.json");
+        write_atomic(&path, b"{\"a\":1}").expect("first write");
+        write_atomic(&path, b"{\"a\":2}").expect("second write");
+        assert_eq!(std::fs::read(&path).expect("read"), b"{\"a\":2}");
+        let leftovers = std::fs::read_dir(dir.join("nested")).expect("dir").count();
+        assert_eq!(leftovers, 1, "temp file must be renamed away");
+        let _cleanup = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn failed_write_is_recorded_for_retry() {
+        let blocker = std::env::temp_dir().join(format!("cp-blocker-{}", std::process::id()));
+        std::fs::write(&blocker, b"x").expect("blocker");
+        // Parent is a regular file, so create_dir_all fails.
+        let path = blocker.join("modules").join("todo.json");
+        write_file(&path, b"{}");
+        assert!(take_failed_writes().contains(&path));
+        let _cleanup = std::fs::remove_file(&blocker);
     }
 }
