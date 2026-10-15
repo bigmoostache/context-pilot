@@ -16,6 +16,7 @@ use cp_base::config::constants::{WORKTREES_DIR, project_root};
 use cp_base::modules::run_with_timeout;
 use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
+use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolDefinition, ToolResult, ToolTexts, ToolUse};
 
 use super::GIT_CMD_TIMEOUT_SECS;
@@ -31,20 +32,41 @@ pub(crate) fn definition(t: &ToolTexts) -> ToolDefinition {
         .build()
 }
 
-/// Dispatch one `Worktree` call.
+/// Git work an action hands off the main loop: a checkout or a folder
+/// deletion can take seconds on a large repo.
+type Job = Box<dyn FnOnce() -> Result<String, String> + Send>;
+
+/// An action's outcome: done now, or finished by a background [`Job`].
+enum Step {
+    /// Result ready on the main loop.
+    Now(String),
+    /// Result produced by a worker thread (see [`spawn_async_tool`]).
+    Later(Job),
+}
+
+/// Dispatch one `Worktree` call. Validation and bookkeeping run inline;
+/// `git worktree add/remove` runs on a worker so render and input stay live.
 pub(crate) fn execute(tool: &ToolUse, state: &mut State) -> ToolResult {
     let action = tool.input.get("action").and_then(|v| v.as_str()).unwrap_or("");
     let branch = tool.input.get("branch").and_then(|v| v.as_str());
     let outcome = match (action, branch) {
-        ("leave", _) => leave(state),
-        ("list", _) => list(state),
+        ("leave", _) => leave(state).map(Step::Now),
+        ("list", _) => list(state).map(Step::Now),
         ("enter", Some(b)) => validate_branch(b).and_then(|()| enter(state, b)),
         ("remove", Some(b)) => validate_branch(b).and_then(|()| remove(state, b)),
         ("enter" | "remove", None) => Err(format!("'branch' is required for action '{action}'")),
         _ => Err(format!("Unknown action '{action}' (expected enter|leave|list|remove)")),
     };
     match outcome {
-        Ok(msg) => ToolResult::new(tool.id.clone(), msg, false),
+        Ok(Step::Now(msg)) => ToolResult::new(tool.id.clone(), msg, false),
+        Ok(Step::Later(job)) => {
+            spawn_async_tool(state, tool, GIT_CMD_TIMEOUT_SECS.saturating_mul(2).saturating_add(5), move || {
+                match job() {
+                    Ok(msg) => ToolOutput::new(msg, false, None, false),
+                    Err(msg) => ToolOutput::error(format!("Error: {msg}")),
+                }
+            })
+        }
         Err(msg) => ToolResult::new(tool.id.clone(), format!("Error: {msg}"), true),
     }
 }
@@ -120,39 +142,59 @@ fn set_workdir(state: &mut State, dir: Option<PathBuf>) {
 }
 
 /// Enter `branch`'s worktree, creating it (and the branch if new) when git has none.
-fn enter(state: &mut State, branch: &str) -> Result<String, String> {
+/// An existing worktree is entered inline; a new one is checked out by a [`Job`],
+/// with the workdir set up front so the agent's next call already lands there.
+fn enter(state: &mut State, branch: &str) -> Result<Step, String> {
     let root = project_root();
-    let (dir, created) = match registered(&root, branch)? {
+    let dir = match registered(&root, branch)? {
         Some(dir) if same_dir(&dir, &root) => {
             return Err(format!(
                 "branch '{branch}' is checked out at the project root; run Worktree(action=leave) to work there"
             ));
         }
-        Some(dir) if dir.is_dir() => (dir, false),
+        Some(dir) if dir.is_dir() => {
+            let msg = entered_msg("Entered", &dir, branch);
+            set_workdir(state, Some(dir));
+            return Ok(Step::Now(msg));
+        }
         Some(dir) => {
             return Err(format!(
                 "the worktree for '{branch}' ({}) was deleted from disk; run Worktree(action=remove, branch={branch}) to clean it up, then enter again",
                 dir.display()
             ));
         }
-        None => (add_worktree(&root, branch)?, true),
+        None => prepare_add(&root, branch)?,
     };
-    let shown = dir.display().to_string();
-    set_workdir(state, Some(dir));
-    let verb = if created { "Created and entered" } else { "Entered" };
-    Ok(format!(
-        "{verb} worktree {shown} (branch {branch}). Relative paths, git, gh, consoles and callbacks now run there. \
-         Search still indexes the project root only."
-    ))
+    set_workdir(state, Some(dir.clone()));
+    let owned = branch.to_owned();
+    Ok(Step::Later(Box::new(move || {
+        run_add(&root, &owned, &dir).map(|()| entered_msg("Created and entered", &dir, &owned)).map_err(|e| {
+            format!("{e}. This agent's workdir points at the missing folder: run Worktree(action=leave) to return to the root.")
+        })
+    })))
 }
 
-/// `git worktree add` a fresh folder for `branch` (new branch when it doesn't exist).
-fn add_worktree(root: &Path, branch: &str) -> Result<PathBuf, String> {
+/// Success line shared by both enter paths.
+fn entered_msg(verb: &str, dir: &Path, branch: &str) -> String {
+    format!(
+        "{verb} worktree {} (branch {branch}). Relative paths, git, gh, consoles and callbacks now run there. \
+         Search still indexes the project root only.",
+        dir.display()
+    )
+}
+
+/// Inline half of creating a worktree: pick the folder and make `.worktrees/`.
+fn prepare_add(root: &Path, branch: &str) -> Result<PathBuf, String> {
     let dir = worktree_dir(branch);
     if dir.exists() {
         return Err(format!("{} exists but is not a worktree of '{branch}'; move it away first", dir.display()));
     }
     ensure_worktrees_dir(root)?;
+    Ok(dir)
+}
+
+/// Background half: `git worktree add` (new branch when it doesn't exist).
+fn run_add(root: &Path, branch: &str, dir: &Path) -> Result<(), String> {
     let path = dir.to_string_lossy().into_owned();
     let ref_name = format!("refs/heads/{branch}");
     let args: Vec<&str> = if git(root, &["rev-parse", "--verify", "--quiet", &ref_name]).is_ok() {
@@ -160,8 +202,7 @@ fn add_worktree(root: &Path, branch: &str) -> Result<PathBuf, String> {
     } else {
         vec!["worktree", "add", "-b", branch, &path]
     };
-    let _out = git(root, &args).map_err(|e| friendly_add_error(branch, &e))?;
-    Ok(dir)
+    git(root, &args).map(drop).map_err(|e| friendly_add_error(branch, &e))
 }
 
 /// Turn git's "already checked out" refusal into a plain explanation.
@@ -196,7 +237,8 @@ fn leave(state: &mut State) -> Result<String, String> {
         return Ok("Already at the project root.".to_owned());
     };
     let me = state.agent_store.executing().map(str::to_owned);
-    if other_users(state, &dir, me.as_deref()).is_empty() {
+    // A folder that never materialised (failed background add) strands nothing.
+    if dir.is_dir() && other_users(state, &dir, me.as_deref()).is_empty() {
         let branch = git(&dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_else(|_| "<branch>".to_owned());
         return Err(format!(
             "this agent is the last one in {}; leaving would orphan it. Commit (or discard) your work, then \
@@ -250,7 +292,8 @@ fn list(state: &State) -> Result<String, String> {
 
 /// Delete `branch`'s worktree (the branch is kept). Refuses on uncommitted
 /// changes; a folder already deleted from disk is pruned from git's records.
-fn remove(state: &mut State, branch: &str) -> Result<String, String> {
+/// Checks run inline; the deletion itself runs as a background [`Job`].
+fn remove(state: &mut State, branch: &str) -> Result<Step, String> {
     let root = project_root();
     let Some(dir) = registered(&root, branch)? else {
         return Err(format!("no worktree for branch '{branch}'"));
@@ -258,19 +301,23 @@ fn remove(state: &mut State, branch: &str) -> Result<String, String> {
     if same_dir(&dir, &root) {
         return Err(format!("branch '{branch}' is checked out at the project root, which cannot be removed"));
     }
-    let path = dir.display().to_string();
-    remove_dir(state, &dir)?;
-    let mut msg = format!("Removed worktree {path} (branch {branch} kept).");
+    check_removable(state, &dir)?;
+    let mut msg = format!("Removed worktree {} (branch {branch} kept).", dir.display());
     if state.agent().workdir.as_deref().is_some_and(|w| same_dir(w, &dir)) {
         set_workdir(state, None);
         msg.push_str(" This agent was inside it and is back at the project root.");
     }
-    Ok(msg)
+    Ok(Step::Later(Box::new(move || run_remove(&root, &dir).map(|()| msg))))
 }
 
-/// Delete the worktree at `dir` (branch kept). Refuses while consoles run
-/// inside it or on uncommitted changes; a folder already gone is pruned.
+/// Delete the worktree at `dir` (branch kept), synchronously. Used on agent archive.
 fn remove_dir(state: &State, dir: &Path) -> Result<(), String> {
+    check_removable(state, dir)?;
+    run_remove(&project_root(), dir)
+}
+
+/// Refuse while consoles run inside `dir` or it has uncommitted changes.
+fn check_removable(state: &State, dir: &Path) -> Result<(), String> {
     let path = dir.display().to_string();
     let live = live_consoles(state, dir);
     if !live.is_empty() {
@@ -279,16 +326,20 @@ fn remove_dir(state: &State, dir: &Path) -> Result<(), String> {
             live.join(", ")
         ));
     }
-    let root = project_root();
-    if dir.is_dir() {
-        if !git(dir, &["status", "--porcelain"])?.is_empty() {
-            return Err(format!("{path} has uncommitted changes; commit or discard them first"));
-        }
-        let _out = git(&root, &["worktree", "remove", &path])?;
-    } else {
-        let _out = git(&root, &["worktree", "prune"])?;
+    if dir.is_dir() && !git(dir, &["status", "--porcelain"])?.is_empty() {
+        return Err(format!("{path} has uncommitted changes; commit or discard them first"));
     }
     Ok(())
+}
+
+/// `git worktree remove`, or `prune` when the folder is already gone.
+fn run_remove(root: &Path, dir: &Path) -> Result<(), String> {
+    if dir.is_dir() {
+        let path = dir.to_string_lossy().into_owned();
+        git(root, &["worktree", "remove", &path]).map(drop)
+    } else {
+        git(root, &["worktree", "prune"]).map(drop)
+    }
 }
 
 /// Running console panels, in any agent, whose cwd lies inside `dir`:
