@@ -119,12 +119,11 @@ pub struct SpineConfig {
     pub user_stopped: bool,
 
     // === Runtime tracking (persisted for guard rails) ===
-    /// Count of consecutive auto-continuations without human input
+    /// Count of consecutive auto-continuations since the last human message.
+    /// Only `on_user_message` and `reset_counters` zero it — a successful
+    /// stream must not, or a healthy runaway loop never reaches the cap.
     #[serde(default)]
     pub auto_continuation_count: usize,
-    /// Timestamp when autonomous operation started (for duration guard)
-    #[serde(default)]
-    pub autonomous_start_ms: Option<u64>,
 
     /// Count of consecutive auto-continuations that ended in a stream error
     /// (all retries exhausted). Used for exponential backoff. Reset on successful
@@ -164,7 +163,40 @@ impl Default for SpineState {
     }
 }
 
+/// In-memory notification cap enforced by [`gc_notifications`].
+pub const NOTIFICATION_CAP: usize = 100;
+
+/// Trim `notifications` to `cap`, oldest first: processed ones go before
+/// blocked ones. Unprocessed ones are never dropped (they still owe a wake-up).
+pub fn gc_notifications(notifications: &mut Vec<Notification>, cap: usize) {
+    for status in [NotificationStatus::Processed, NotificationStatus::Blocked] {
+        let mut excess = notifications.len().saturating_sub(cap);
+        if excess == 0 {
+            return;
+        }
+        notifications.retain(|n| {
+            if excess > 0 && n.status == status {
+                excess = excess.saturating_sub(1);
+                return false;
+            }
+            true
+        });
+    }
+}
+
 impl SpineState {
+    /// A stream completed successfully: the API is healthy, so clear the error
+    /// backoff and give guard-rail-blocked notifications another chance.
+    ///
+    /// Deliberately leaves `auto_continuation_count` alone: zeroing it here
+    /// made `MaxAutoRetries` blind to a loop whose every turn succeeds.
+    pub fn on_stream_success(state: &mut State) {
+        let cfg = &mut Self::get_mut(state).config;
+        cfg.consecutive_continuation_errors = 0;
+        cfg.last_continuation_error_ms = None;
+        Self::unblock_all(state);
+    }
+
     /// Create an empty spine state with default configuration.
     #[must_use]
     pub fn new() -> Self {
@@ -280,21 +312,7 @@ impl SpineState {
             let mut notification = Notification::new(id.clone(), kind, source, content);
             notification.agent_id = owner;
             ss.notifications.push(notification);
-            // Inline gc: cap at 100
-            if ss.notifications.len() > 100 {
-                let excess = ss.notifications.len().saturating_sub(100);
-                let mut removed = 0usize;
-                ss.notifications.retain(|n| {
-                    if removed >= excess {
-                        return true;
-                    }
-                    if n.is_processed() {
-                        removed = removed.saturating_add(1);
-                        return false;
-                    }
-                    true
-                });
-            }
+            gc_notifications(&mut ss.notifications, NOTIFICATION_CAP);
         }
         state.touch_panel(Kind::SPINE);
         id
