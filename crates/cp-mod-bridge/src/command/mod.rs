@@ -45,8 +45,8 @@
 //! [`crate::boot::Boot`]-owned service) to journal through, so command effects
 //! and the stream loop's own records share one durable log.
 
-use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
+use std::time::Duration;
 
 use cp_oplog::replay;
 use cp_oplog::service::Service as OplogService;
@@ -60,19 +60,32 @@ use cp_wire::types::snapshot::SeenSet;
 use crate::error::{BootResult, Error};
 
 /// Read-path query answering (bearer check + injected lookup + framing).
+pub mod auth;
+mod conn;
 pub mod reply;
+pub mod server;
 
-/// Largest accumulated read (per connection) before a frame is abandoned as
-/// junk — bounds memory against a peer that sends an endless un-decodable
-/// stream. 32 MiB comfortably fits any realistic command frame (a `SendMessage`
-/// carries the full message text); the old 1 MiB cap rejected a large paste,
-/// contributing to the "big messages don't go through" symptom (T274). Kept in
-/// lockstep with the backend transport's `MAX_BODY` (the other cap on the same
-/// path).
-const MAX_CONNECTION_BUFFER: usize = 32 * 1024 * 1024;
+use conn::Conn;
 
-/// Read-chunk size for [`Intake::handle_connection`].
-const READ_CHUNK: usize = 4096;
+/// Default whole-connection budget.
+///
+/// Matches the orchestrator's `ACK_READ_TIMEOUT` (5 s): past it the commander has already given up on
+/// the ack, so serving the connection further only wastes the intake thread.
+pub const DEFAULT_CONNECTION_BUDGET: Duration = Duration::from_secs(5);
+
+/// What one connection produced: the commands freshly accepted (journaled and
+/// acked, so they **must** be applied) and the fault that ended it, if any.
+///
+/// The commands survive the fault on purpose: a command acked before the peer
+/// misbehaved is durable and its commander believes it accepted, so dropping
+/// it here would lose an acknowledged effect.
+#[derive(Debug, Default)]
+pub struct Served {
+    /// Fresh commands, in arrival order.
+    pub applied: Vec<Command>,
+    /// The socket fault or deadline that ended the connection, `None` on EOF.
+    pub error: Option<Error>,
+}
 
 /// The agent-side command intake authority.
 ///
@@ -87,6 +100,9 @@ pub struct Intake {
     /// Dedup authority: tokens of effects already durable. Seeded from replay
     /// on [`new`](Self::new), advanced as commands are accepted.
     seen: SeenSet,
+
+    /// Whole-connection deadline applied by [`serve_connection`](Self::serve_connection).
+    connection_budget: Duration,
 }
 
 impl Intake {
@@ -100,7 +116,14 @@ impl Intake {
     pub fn new(oplog_dir: &std::path::Path, cap_token: String) -> BootResult<Self> {
         let recovered =
             replay::replay(oplog_dir).map_err(|e| Error::io("replay oplog for command dedup", into_io(&e)))?;
-        Ok(Self { cap_token, seen: recovered.seen })
+        Ok(Self { cap_token, seen: recovered.seen, connection_budget: DEFAULT_CONNECTION_BUDGET })
+    }
+
+    /// Override the whole-connection budget (tests use a short one).
+    #[must_use]
+    pub const fn with_connection_budget(mut self, budget: Duration) -> Self {
+        self.connection_budget = budget;
+        self
     }
 
     /// Process one framed [`CommandFrame`], returning the framed [`Ack`] to send
@@ -137,55 +160,80 @@ impl Intake {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Io`] on a socket read/write fault. A peer that floods
-    /// un-decodable bytes past [`MAX_CONNECTION_BUFFER`] ends the connection
-    /// with an `Error::Io` rather than growing memory without bound.
+    /// Returns [`Error::Io`] on a socket fault, once the connection's budget
+    /// ([`DEFAULT_CONNECTION_BUDGET`] unless overridden) runs out, or when a
+    /// peer floods un-decodable bytes past the 32 MiB buffer cap. Commands
+    /// accepted before the fault are lost to the caller here; use
+    /// [`serve_connection`](Self::serve_connection) to keep them.
     pub fn handle_connection(
         &mut self,
         oplog: &OplogService,
         stream: &mut UnixStream,
         responder: reply::Responder<'_>,
     ) -> BootResult<Vec<Command>> {
-        let mut buf: Vec<u8> = Vec::new();
-        let mut chunk = vec![0u8; READ_CHUNK].into_boxed_slice();
-        let mut applied: Vec<Command> = Vec::new();
+        let served = self.serve_connection(oplog, stream, responder);
+        served.error.map_or(Ok(served.applied), Err)
+    }
 
+    /// Like [`handle_connection`](Self::handle_connection), but always returns
+    /// the commands accepted so far alongside the fault that ended the
+    /// connection, so an acked command is never dropped (see [`Served`]).
+    pub fn serve_connection(
+        &mut self,
+        oplog: &OplogService,
+        stream: &mut UnixStream,
+        responder: reply::Responder<'_>,
+    ) -> Served {
+        let mut served = Served::default();
+        let mut conn = match Conn::new(stream, self.connection_budget) {
+            Ok(c) => c,
+            Err(e) => {
+                served.error = Some(Error::io("prepare command connection", e));
+                return served;
+            }
+        };
         loop {
-            // Drain every complete frame currently buffered.
-            while let Some((consumed, inbound)) = take_inbound(&buf) {
-                let out = match inbound {
-                    Inbound::Command(frame) => {
-                        let (ack, to_apply) = self.process(oplog, frame);
-                        if let Some(command) = to_apply {
-                            applied.push(command);
-                        }
-                        encode_ack(&ack)
-                    }
-                    Inbound::Query(frame) => reply::encode(&reply::answer(&frame, &self.cap_token, responder)),
-                };
-                let _p = cp_base::perf_span!("bridge_write_reply");
-                stream.write_all(&out).map_err(|e| Error::io("write command reply", e))?;
-                let _drained: Vec<u8> = buf.drain(..consumed).collect();
+            if let Err(e) = self.answer_buffered(&mut conn, (oplog, responder), &mut served.applied) {
+                served.error = Some(Error::io("write command reply", e));
+                return served;
             }
-
-            if buf.len() > MAX_CONNECTION_BUFFER {
-                return Err(Error::io(
-                    "command connection",
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, "frame buffer overflow"),
-                ));
-            }
-
-            let read = {
+            let more = {
                 let _p = cp_base::perf_span!("bridge_read");
-                stream.read(&mut chunk).map_err(|e| Error::io("read command", e))?
+                conn.read_more()
             };
-            if read == 0 {
-                return Ok(applied); // EOF: commander closed the connection.
-            }
-            if let Some(got) = chunk.get(..read) {
-                buf.extend_from_slice(got);
+            match more {
+                Ok(true) => {}
+                Ok(false) => return served, // EOF: commander closed the connection.
+                Err(e) => {
+                    served.error = Some(Error::io("read command", e));
+                    return served;
+                }
             }
         }
+    }
+
+    /// Answer every complete frame currently buffered in `conn`, pushing fresh
+    /// commands onto `applied` before their ack is written.
+    fn answer_buffered(
+        &mut self,
+        conn: &mut Conn<'_>,
+        (oplog, responder): (&OplogService, reply::Responder<'_>),
+        applied: &mut Vec<Command>,
+    ) -> std::io::Result<()> {
+        while let Some((consumed, inbound)) = take_inbound(conn.buffered()) {
+            let out = match inbound {
+                Inbound::Command(frame) => {
+                    let (ack, to_apply) = self.process(oplog, frame);
+                    applied.extend(to_apply);
+                    encode_ack(&ack)
+                }
+                Inbound::Query(frame) => reply::encode(&reply::answer(&frame, &self.cap_token, responder)),
+            };
+            conn.consume(consumed);
+            let _p = cp_base::perf_span!("bridge_write_reply");
+            conn.write(&out)?;
+        }
+        Ok(())
     }
 
     /// Authenticate, dedup, and (if fresh) journal one decoded frame.
@@ -193,7 +241,7 @@ impl Intake {
         let command = frame.command;
 
         // 1. Authenticate the bearer before trusting anything else.
-        if frame.auth.is_empty() || frame.auth != self.cap_token {
+        if !auth::bearer_matches(&frame.auth, &self.cap_token) {
             return (reject(&command.id, "bad bearer token"), None);
         }
 
@@ -280,183 +328,4 @@ fn into_io(e: &cp_oplog::error::Error) -> std::io::Error {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    const TOKEN: &str = "cap-token-256bit";
-
-    fn frame(auth: &str, dedup: &str) -> Vec<u8> {
-        frame_of(auth, dedup, Kind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() })
-    }
-
-    fn frame_of(auth: &str, dedup: &str, kind: Kind) -> Vec<u8> {
-        let cf = CommandFrame::new(auth.to_owned(), Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), kind));
-        framing::encode_raw(&serde_json::to_vec(&cf).expect("ser")).expect("frame")
-    }
-
-    #[test]
-    fn unknown_kind_is_rejected_and_not_journalled() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (ack_bytes, to_apply) = intake.handle_frame(&oplog, &frame_of(TOKEN, "dt-u", Kind::Unknown));
-        assert!(matches!(decode_ack(&ack_bytes).status, Status::Rejected { .. }), "unknown kind must be rejected");
-        assert!(to_apply.is_none(), "an unknown kind is never applied");
-
-        oplog.shutdown().expect("shutdown");
-        let state = replay::replay(dir.path()).expect("replay");
-        assert!(!state.seen.contains("dt-u"), "a rejected unknown kind leaves no effect in the log");
-    }
-
-    fn decode_ack(bytes: &[u8]) -> Ack {
-        let (payload, _c) = framing::decode_raw(bytes).expect("decode frame");
-        serde_json::from_slice(payload).expect("decode ack")
-    }
-
-    #[test]
-    fn valid_command_is_journalled_and_accepted() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (ack_bytes, to_apply) = intake.handle_frame(&oplog, &frame(TOKEN, "dt-1"));
-        let ack = decode_ack(&ack_bytes);
-        assert_eq!(ack.status, Status::Accepted);
-        assert_eq!(ack.rev, Some(0), "first durable effect lands at rev 0");
-        assert!(to_apply.is_some(), "a fresh accept hands back the command to apply");
-
-        oplog.shutdown().expect("shutdown");
-        let state = replay::replay(dir.path()).expect("replay");
-        assert!(state.seen.contains("dt-1"), "effect is durable in the log");
-    }
-
-    #[test]
-    fn bad_bearer_is_rejected_and_not_journalled() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (ack_bytes, to_apply) = intake.handle_frame(&oplog, &frame("wrong-token", "dt-x"));
-        let ack = decode_ack(&ack_bytes);
-        assert!(matches!(ack.status, Status::Rejected { .. }), "bad bearer must be rejected");
-        assert!(to_apply.is_none(), "a rejected command is never applied");
-
-        oplog.shutdown().expect("shutdown");
-        let state = replay::replay(dir.path()).expect("replay");
-        assert!(!state.seen.contains("dt-x"), "a rejected command must not be journalled");
-    }
-
-    #[test]
-    fn empty_bearer_is_rejected() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (ack_bytes, _none) = intake.handle_frame(&oplog, &frame("", "dt-y"));
-        assert!(matches!(decode_ack(&ack_bytes).status, Status::Rejected { .. }));
-        oplog.shutdown().expect("shutdown");
-    }
-
-    #[test]
-    fn malformed_frame_is_rejected() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (ack_bytes, to_apply) = intake.handle_frame(&oplog, b"not a valid frame at all");
-        assert!(matches!(decode_ack(&ack_bytes).status, Status::Rejected { .. }));
-        assert!(to_apply.is_none());
-        oplog.shutdown().expect("shutdown");
-    }
-
-    #[test]
-    fn duplicate_token_is_idempotent_exactly_once() {
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (first, apply1) = intake.handle_frame(&oplog, &frame(TOKEN, "dt-dup"));
-        assert_eq!(decode_ack(&first).status, Status::Accepted);
-        assert!(apply1.is_some(), "first delivery applies");
-
-        let (second, apply2) = intake.handle_frame(&oplog, &frame(TOKEN, "dt-dup"));
-        let ack2 = decode_ack(&second);
-        assert_eq!(ack2.status, Status::Accepted, "a duplicate is still acknowledged accepted");
-        assert_eq!(ack2.rev, Some(0), "the duplicate ack carries the original rev");
-        assert!(apply2.is_none(), "a duplicate is never applied a second time");
-
-        oplog.shutdown().expect("shutdown");
-        let state = replay::replay(dir.path()).expect("replay");
-        assert_eq!(state.seen.len(), 1, "exactly one durable effect for a repeated token");
-    }
-
-    #[test]
-    fn dedup_survives_deadman_reexec() {
-        // V2: an effect journalled before a re-exec must not be re-applied
-        // after it. Reopening the oplog + a fresh Intake re-seeds the seen-set
-        // from the durable log, so a redelivered command is recognised as done.
-        let dir = tempdir().expect("dir");
-        {
-            let oplog = OplogService::spawn(dir.path()).expect("spawn");
-            let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-            let (_ack, apply) = intake.handle_frame(&oplog, &frame(TOKEN, "dt-survive"));
-            assert!(apply.is_some(), "accepted before the crash");
-            oplog.shutdown().expect("shutdown");
-        } // simulated deadman: process state gone, only the durable log remains.
-
-        let oplog = OplogService::spawn(dir.path()).expect("respawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("reopen intake");
-        let (ack_bytes, apply) = intake.handle_frame(&oplog, &frame(TOKEN, "dt-survive"));
-        assert_eq!(decode_ack(&ack_bytes).status, Status::Accepted);
-        assert!(apply.is_none(), "after re-exec the redelivered command is NOT re-applied");
-
-        oplog.shutdown().expect("shutdown");
-        let state = replay::replay(dir.path()).expect("replay");
-        assert_eq!(state.seen.len(), 1, "still exactly one effect across the re-exec");
-    }
-
-    #[test]
-    fn handle_connection_acks_a_streamed_command() {
-        use std::thread;
-        let dir = tempdir().expect("dir");
-        let oplog = OplogService::spawn(dir.path()).expect("spawn");
-        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
-
-        let (mut server, mut client) = UnixStream::pair().expect("socketpair");
-
-        // A commander writes one framed command, then closes its end.
-        let writer = thread::spawn(move || {
-            client.write_all(&frame(TOKEN, "dt-conn")).expect("write");
-            // Read the ack the server writes back.
-            let mut chunk = [0u8; 256];
-            let mut buf: Vec<u8> = Vec::new();
-            loop {
-                let n = client.read(&mut chunk).expect("read ack");
-                if n == 0 {
-                    break;
-                }
-                if let Some(got) = chunk.get(..n) {
-                    buf.extend_from_slice(got);
-                }
-                if framing::decode_raw(&buf).is_ok() {
-                    break;
-                }
-            }
-            drop(client); // EOF so the server loop returns.
-            decode_ack(&buf).status
-        });
-
-        // A command-only connection never consults the responder.
-        let never = |_q: &cp_wire::types::payload::query::Query| -> cp_wire::types::payload::query::Outcome {
-            panic!("no query frame on this connection");
-        };
-        let applied = intake.handle_connection(&oplog, &mut server, &never).expect("handle");
-        assert_eq!(applied.len(), 1, "one fresh command was accepted off the connection");
-        let status = writer.join().expect("join");
-        assert_eq!(status, Status::Accepted, "the commander saw an Accepted ack");
-
-        oplog.shutdown().expect("shutdown");
-    }
-}
+mod tests;
