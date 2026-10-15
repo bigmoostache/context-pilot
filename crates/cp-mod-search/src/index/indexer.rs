@@ -78,17 +78,27 @@ struct IndexerCtx {
 pub(crate) fn start(params: IndexerParams) -> Result<(mpsc::Sender<IndexerCmd>, RecommendedWatcher), String> {
     let (tx, rx) = mpsc::channel::<IndexerCmd>();
 
-    // Clone sender for the watcher callback
+    // Clone sender + root for the watcher callback
     let watcher_tx = tx.clone();
+    let watch_root = params.project_root.clone();
 
     // Set up event-driven file watcher — RecommendedWatcher maps to `FSEvents`
     // on macOS (single kernel FD, event-driven, negligible CPU) and inotify on
     // Linux.  The previous PollWatcher walked the ENTIRE directory tree every
     // 3 s doing lstat() on each file, consuming ~50 % CPU at ~3 000 files.
+    //
+    // Paths that can never be indexed (`target/`, `node_modules/`, binaries)
+    // are dropped HERE, by path alone: their `Remove` events used to reach
+    // Meilisearch as one delete task each, so a `cargo clean` enqueued
+    // hundreds of thousands of no-op tasks (tasks DB grew to 20 GB).
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<notify::Event, notify::Error>| {
             if let Ok(event) = res {
                 for path in &event.paths {
+                    let rel = path.strip_prefix(&watch_root).unwrap_or(path);
+                    if !crate::index::filters::is_indexable_rel(rel) {
+                        continue;
+                    }
                     let cmd = match event.kind {
                         EventKind::Create(_) | EventKind::Modify(_) => IndexerCmd::IndexFile(path.clone()),
                         EventKind::Remove(_) => IndexerCmd::DeleteFile(path.clone()),
@@ -162,7 +172,7 @@ fn collect_batch(rx: &mpsc::Receiver<IndexerCmd>, first: IndexerCmd) -> Option<V
 fn dispatch_cmd(ctx: &mut IndexerCtx, cmd: IndexerCmd) {
     match cmd {
         IndexerCmd::IndexFile(path) => index_one_file(ctx, &path),
-        IndexerCmd::DeleteFile(path) => delete_one_file(ctx, &path),
+        IndexerCmd::DeleteFile(path) => delete_files(ctx, &[path]),
         IndexerCmd::ScanComplete => {
             if let Ok(mut m) = ctx.metrics.lock() {
                 m.scan_complete = true;
@@ -215,10 +225,18 @@ fn indexer_loop(rx: &mpsc::Receiver<IndexerCmd>, params: &IndexerParams) {
         let Some(batch) = collect_batch(rx, first) else {
             return; // channel disconnected
         };
-        // Deduplicate: keep only the latest operation per path
+        // Deduplicate: keep only the latest operation per path. Deletes are
+        // batched into `file_path IN [...]` filters (one task per 200 paths).
+        let mut deletes: Vec<PathBuf> = Vec::new();
         for cmd in deduplicate(batch) {
-            dispatch_cmd(&mut ctx, cmd);
+            match cmd {
+                IndexerCmd::DeleteFile(path) => deletes.push(path),
+                other @ (IndexerCmd::IndexFile(_)
+                | IndexerCmd::ScanComplete
+                | IndexerCmd::ReconcileConversations(_)) => dispatch_cmd(&mut ctx, other),
+            }
         }
+        delete_files(&mut ctx, &deletes);
     }
 }
 
@@ -383,11 +401,11 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
         return;
     };
 
-    // Delete existing chunks for this path (delete → re-insert strategy)
-    let escaped = rel_str.replace('\'', "\\'");
-    let filter = format!("file_path = '{escaped}'");
-    if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
-        let _r = crate::meili::tasks::wait_for_task(&ctx.client, task);
+    // Delete existing chunks for this path (delete → re-insert strategy).
+    // Not awaited: Meilisearch runs one index's tasks in enqueue order, so the
+    // add below still lands after the delete — one round-trip wait per file.
+    if let Some(filter) = crate::index::filters::file_path_filter(&rel_str) {
+        let _r = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter);
     }
 
     // Split into chunks
@@ -409,22 +427,31 @@ fn index_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
     let _prev = ctx.last_indexed_mtime.insert(rel_str.to_string(), last_modified_ms);
 }
 
-/// Delete all indexed chunks for a single file.
-fn delete_one_file(ctx: &mut IndexerCtx, abs_path: &Path) {
-    if abs_path.file_name().is_some_and(|n| n == ".gitignore") {
-        ctx.gitignore.clear();
+/// Delete all indexed chunks for `abs_paths` in as few Meilisearch tasks as
+/// possible (see [`crate::index::filters::delete_filters`]).
+///
+/// Deliberately NOT gated on indexability: reconcile deletes come from the
+/// index itself and must stay removable even if the filters tightened since.
+/// Live watcher noise is already dropped upstream in [`start`].
+fn delete_files(ctx: &mut IndexerCtx, abs_paths: &[PathBuf]) {
+    if abs_paths.is_empty() {
+        return;
     }
-    let rel_path = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path);
-    let rel_str = rel_path.to_string_lossy();
-    let escaped = rel_str.replace('\'', "\\'");
-    let filter = format!("file_path = '{escaped}'");
-
-    if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
-        let _r = crate::meili::tasks::wait_for_task(&ctx.client, task);
+    let mut rels: Vec<String> = Vec::with_capacity(abs_paths.len());
+    for abs_path in abs_paths {
+        if abs_path.file_name().is_some_and(|n| n == ".gitignore") {
+            ctx.gitignore.clear();
+        }
+        let rel_str = abs_path.strip_prefix(&ctx.project_root).unwrap_or(abs_path).to_string_lossy().into_owned();
+        // Clear cached mtime so the file gets re-indexed if recreated
+        let _prev = ctx.last_indexed_mtime.remove(&rel_str);
+        rels.push(rel_str);
     }
-
-    // Clear cached mtime so the file gets re-indexed if recreated
-    let _prev = ctx.last_indexed_mtime.remove(rel_str.as_ref());
+    for filter in crate::index::filters::delete_filters(&rels) {
+        if let Ok(task) = ctx.client.delete_documents_by_filter(&ctx.files_uid, &filter) {
+            let _r = crate::meili::tasks::wait_for_task(&ctx.client, task);
+        }
+    }
 }
 
 // -- Directory scan ----------------------------------------------------------
