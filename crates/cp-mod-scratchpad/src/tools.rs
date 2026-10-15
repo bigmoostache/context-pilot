@@ -2,12 +2,17 @@ use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
-use crate::types::{ScratchpadCell, ScratchpadState};
+use crate::types::{MAX_CELL_BYTES, MAX_CELLS_PER_AGENT, ScratchpadCell, ScratchpadState};
 use std::fmt::Write as _;
 
-/// Set the injected focused-thread filter used by the panel + tools. Returns
-/// whether it changed (which drives the caller's forced panel refresh).
-/// Mirrors `cp_mod_todo::tools::set_focus_filter`.
+/// Error text when no agent is executing (cells always belong to one).
+const NO_AGENT: &str = "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.";
+
+/// Record the focused agent id; `true` when it changed.
+///
+/// Scoping does NOT read this value (it follows `State::executing_agent_id`);
+/// the main crate only uses the return value to force a Scratchpad panel
+/// refresh on a focus switch. Mirrors `cp_mod_todo::tools::set_focus_filter`.
 pub fn set_focus_filter(state: &mut State, agent_id: Option<String>) -> bool {
     // Read first: `get_mut` refreshes the change stamp, and this runs every tick.
     if ScratchpadState::get(state).focus_filter == agent_id {
@@ -17,112 +22,113 @@ pub fn set_focus_filter(state: &mut State, agent_id: Option<String>) -> bool {
     true
 }
 
-/// Drop every cell lacking a `agent_id` (the legacy, pre-rework backlog).
-/// Called once on load — a permanent, forever purge (mirrors todo FR4).
+/// Drop every cell lacking an `agent_id` (the legacy, pre-rework backlog).
+/// Called once on load — a permanent purge (mirrors todo FR4).
 pub fn purge_agentless(state: &mut State) {
+    if ScratchpadState::get(state).scratchpad_cells.iter().all(|c| !c.agent_id.is_empty()) {
+        return;
+    }
     ScratchpadState::get_mut(state).scratchpad_cells.retain(|c| !c.agent_id.is_empty());
 }
 
-/// Remove every cell owned by `agent_id` — cascade cleanup when an agent is
-/// hard-deleted (mirrors the thread-owned model). Returns the number removed.
+/// Remove every cell and the id counter owned by `agent_id` — cascade
+/// cleanup when an agent is hard-deleted. Returns the number of cells removed.
 pub fn purge_agent_cells(state: &mut State, agent_id: &str) -> usize {
+    let ro = ScratchpadState::get(state);
+    if ro.agent_cell_count(agent_id) == 0 && !ro.next_ids.contains_key(agent_id) {
+        return 0;
+    }
     let ss = ScratchpadState::get_mut(state);
+    let _counter = ss.next_ids.remove(agent_id);
     let before = ss.scratchpad_cells.len();
     ss.scratchpad_cells.retain(|c| c.agent_id != agent_id);
     before.saturating_sub(ss.scratchpad_cells.len())
 }
 
+/// Error text if `title + content` exceeds [`MAX_CELL_BYTES`].
+fn oversize(title: &str, content: &str) -> Option<String> {
+    let size = title.len().saturating_add(content.len());
+    (size > MAX_CELL_BYTES).then(|| {
+        format!("Cell too large: {size} bytes (max {MAX_CELL_BYTES}). Keep scratchpad cells short; split or summarize.")
+    })
+}
+
 /// Create a new scratchpad cell
 pub(crate) fn execute_create(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_create");
-    let title = match tool.input.get("cell_title").and_then(|v| v.as_str()) {
-        Some(t) => t.to_owned(),
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_title' parameter".to_owned(), true);
-        }
+    let err = |msg: String| ToolResult::new(tool.id.clone(), msg, true);
+    let Some(title) = tool.input.get("cell_title").and_then(|v| v.as_str()) else {
+        return err("Missing 'cell_title' parameter".to_owned());
     };
-
-    let contents = match tool.input.get("cell_contents").and_then(|v| v.as_str()) {
-        Some(c) => c.to_owned(),
-        None => {
-            return ToolResult::new(tool.id.clone(), "Missing 'cell_contents' parameter".to_owned(), true);
-        }
+    let Some(contents) = tool.input.get("cell_contents").and_then(|v| v.as_str()) else {
+        return err("Missing 'cell_contents' parameter".to_owned());
     };
-
-    // Thread-owned: a cell must live in the focused agent (mirrors Think.todo).
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
-        return ToolResult::new(
-            tool.id.clone(),
-            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
-            true,
-        );
+        return err(NO_AGENT.to_owned());
     };
+    if let Some(msg) = oversize(title, contents) {
+        return err(msg);
+    }
+    if ScratchpadState::get(state).agent_cell_count(&agent_id) >= MAX_CELLS_PER_AGENT {
+        return err(format!("Too many cells (max {MAX_CELLS_PER_AGENT}). Wipe cells you no longer need first."));
+    }
 
     let ss = ScratchpadState::get_mut(state);
-    let id = format!("C{}", ss.next_scratchpad_id);
-    ss.next_scratchpad_id = ss.next_scratchpad_id.saturating_add(1);
+    let id = ss.alloc_id(&agent_id);
     ss.scratchpad_cells.push(ScratchpadCell {
         id: id.clone(),
         agent_id,
-        title: title.clone(),
-        content: contents.clone(),
+        title: title.to_owned(),
+        content: contents.to_owned(),
     });
-
-    // Update Scratchpad panel timestamp
     state.touch_panel(Kind::SCRATCHPAD);
 
     let preview = if contents.len() > 50 {
         format!("{}...", contents.get(..contents.floor_char_boundary(47)).unwrap_or(""))
     } else {
-        contents
+        contents.to_owned()
     };
-
     ToolResult::new(tool.id.clone(), format!("Created cell {id} '{title}': {preview}"), false)
 }
 
 /// Edit an existing scratchpad cell
 pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("scratch_edit");
+    let err = |msg: String| ToolResult::new(tool.id.clone(), msg, true);
     let Some(cell_id) = tool.input.get("cell_id").and_then(|v| v.as_str()) else {
-        return ToolResult::new(tool.id.clone(), "Missing 'cell_id' parameter".to_owned(), true);
+        return err("Missing 'cell_id' parameter".to_owned());
     };
-
-    // Thread-owned: only cells of the focused agent are editable.
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
-        return ToolResult::new(
-            tool.id.clone(),
-            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
-            true,
-        );
+        return err(NO_AGENT.to_owned());
     };
+    let new_title = tool.input.get("cell_title").and_then(|v| v.as_str());
+    let new_content = tool.input.get("cell_contents").and_then(|v| v.as_str());
 
-    let ss = ScratchpadState::get_mut(state);
-    let cell = ss.scratchpad_cells.iter_mut().find(|c| c.id == cell_id && c.agent_id == agent_id);
-
-    match cell {
-        Some(c) => {
-            let mut changes = Vec::new();
-
-            if let Some(title) = tool.input.get("cell_title").and_then(|v| v.as_str()) {
-                title.clone_into(&mut c.title);
-                changes.push("title");
-            }
-
-            if let Some(contents) = tool.input.get("cell_contents").and_then(|v| v.as_str()) {
-                contents.clone_into(&mut c.content);
-                changes.push("contents");
-            }
-
-            if changes.is_empty() {
-                ToolResult::new(tool.id.clone(), format!("No changes specified for cell {cell_id}"), true)
-            } else {
-                // Update Scratchpad panel timestamp
-                state.touch_panel(Kind::SCRATCHPAD);
-                ToolResult::new(tool.id.clone(), format!("Updated cell {}: {}", cell_id, changes.join(", ")), false)
-            }
-        }
-        None => ToolResult::new(tool.id.clone(), format!("Cell not found: {cell_id}"), true),
+    // Validate against a shared borrow: a rejected edit must not bump the stamp.
+    let Some(cell) = ScratchpadState::get(state).agent_cells(&agent_id).find(|c| c.id == cell_id) else {
+        return err(format!("Cell not found: {cell_id}"));
+    };
+    if new_title.is_none() && new_content.is_none() {
+        return err(format!("No changes specified for cell {cell_id}"));
     }
+    if let Some(msg) = oversize(new_title.unwrap_or(&cell.title), new_content.unwrap_or(&cell.content)) {
+        return err(msg);
+    }
+
+    let mut changes = Vec::new();
+    let ss = ScratchpadState::get_mut(state);
+    if let Some(c) = ss.scratchpad_cells.iter_mut().find(|c| c.id == cell_id && c.agent_id == agent_id) {
+        if let Some(t) = new_title {
+            t.clone_into(&mut c.title);
+            changes.push("title");
+        }
+        if let Some(body) = new_content {
+            body.clone_into(&mut c.content);
+            changes.push("contents");
+        }
+    }
+    state.touch_panel(Kind::SCRATCHPAD);
+    ToolResult::new(tool.id.clone(), format!("Updated cell {}: {}", cell_id, changes.join(", ")), false)
 }
 
 /// Wipe scratchpad cells (delete by IDs, or all if empty array)
@@ -131,46 +137,30 @@ pub(crate) fn execute_wipe(tool: &ToolUse, state: &mut State) -> ToolResult {
     let Some(cell_ids) = tool.input.get("cell_ids").and_then(|v| v.as_array()) else {
         return ToolResult::new(tool.id.clone(), "Missing 'cell_ids' array parameter".to_owned(), true);
     };
-
-    // Thread-owned: wiping only ever touches the focused agent's cells.
     let Some(agent_id) = state.executing_agent_id().map(str::to_owned) else {
-        return ToolResult::new(
-            tool.id.clone(),
-            "No focused agent \u{2014} scratchpad cells live in an agent; Read an agent first.".to_owned(),
-            true,
-        );
+        return ToolResult::new(tool.id.clone(), NO_AGENT.to_owned(), true);
     };
 
-    // If empty array, wipe all of THIS agent's cells
-    if cell_ids.is_empty() {
-        let ss = ScratchpadState::get_mut(state);
-        let before = ss.scratchpad_cells.len();
-        ss.scratchpad_cells.retain(|c| c.agent_id != agent_id);
-        let count = before.saturating_sub(ss.scratchpad_cells.len());
-        // Update Scratchpad panel timestamp
+    // Empty array = all of THIS agent's cells.
+    let wipe_all = cell_ids.is_empty();
+    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
+    let doomed = |c: &ScratchpadCell| c.agent_id == agent_id && (wipe_all || ids_to_delete.contains(&c.id));
+
+    // Count first: a wipe that matches nothing must not bump the change stamp.
+    let deleted_count = ScratchpadState::get(state).scratchpad_cells.iter().filter(|c| doomed(c)).count();
+    if deleted_count > 0 {
+        ScratchpadState::get_mut(state).scratchpad_cells.retain(|c| !doomed(c));
         state.touch_panel(Kind::SCRATCHPAD);
-        return ToolResult::new(tool.id.clone(), format!("Wiped all {count} scratchpad cell(s)"), false);
     }
 
-    // Otherwise, delete specific cells (restricted to the focused agent)
-    let ids_to_delete: Vec<String> = cell_ids.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
-
-    let ss = ScratchpadState::get_mut(state);
-    let initial_count = ss.scratchpad_cells.len();
-    ss.scratchpad_cells.retain(|c| !(c.agent_id == agent_id && ids_to_delete.contains(&c.id)));
-    let deleted_count = initial_count.saturating_sub(ss.scratchpad_cells.len());
-
+    if wipe_all {
+        return ToolResult::new(tool.id.clone(), format!("Wiped all {deleted_count} scratchpad cell(s)"), false);
+    }
     let mut output = format!("Deleted {deleted_count} cell(s)");
-
-    if deleted_count < ids_to_delete.len() {
-        let missing_count = ids_to_delete.len().saturating_sub(deleted_count);
+    let missing_count = ids_to_delete.len().saturating_sub(deleted_count);
+    if missing_count > 0 {
         let _r = write!(output, ", {missing_count} not found");
     }
-
-    // Update Scratchpad panel timestamp if any cells were deleted
-    if deleted_count > 0 {
-        state.touch_panel(Kind::SCRATCHPAD);
-    }
-
-    ToolResult::new(tool.id.clone(), output, deleted_count == 0)
+    // Missing ids are only a pre_flight warning, so nothing-deleted is not an error.
+    ToolResult::new(tool.id.clone(), output, false)
 }

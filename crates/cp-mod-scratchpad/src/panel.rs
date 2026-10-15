@@ -23,8 +23,7 @@ impl ScratchpadPanel {
         let Some(focus) = state.executing_agent_id() else {
             return "No focused agent".to_owned();
         };
-        let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
+        let cells: Vec<&crate::types::ScratchpadCell> = ss.agent_cells(focus).collect();
         if cells.is_empty() {
             return "No scratchpad cells".to_owned();
         }
@@ -54,8 +53,7 @@ impl Panel for ScratchpadPanel {
         let Some(focus) = state.executing_agent_id() else {
             return vec![Block::Line(vec![S::muted("  No focused agent".into()).italic()])];
         };
-        let cells: Vec<&crate::types::ScratchpadCell> =
-            ss.scratchpad_cells.iter().filter(|c| c.agent_id == focus).collect();
+        let cells: Vec<&crate::types::ScratchpadCell> = ss.agent_cells(focus).collect();
 
         if cells.is_empty() {
             return vec![
@@ -111,7 +109,7 @@ impl Panel for ScratchpadPanel {
             .context
             .iter()
             .find(|c| c.context_type.as_str() == Kind::SCRATCHPAD)
-            .map_or(("P7", 0), |c| (c.id.as_str(), c.last_refresh_ms));
+            .map_or(("", 0), |c| (c.id.as_str(), c.last_refresh_ms));
         vec![ContextItem::new(id, "Scratchpad", content, last_refresh_ms)]
     }
 
