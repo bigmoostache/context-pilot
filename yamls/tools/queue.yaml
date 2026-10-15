@@ -5,7 +5,7 @@ tools:
 
   Queue_execute:
     description: |
-      Executes all queued tool calls in order, atomically. Returns a summary of results. Clears the queue after execution. This is the 'commit' — one cache break instead of N.
+      Executes all queued tool calls in order, one by one (no rollback: a failed call does not undo or stop the others). Each call is re-checked just before it runs. Returns a summary listing any failures. Clears the queue after execution. This is the 'commit' — one cache break instead of N.
 
   Queue_undo:
     description: |
