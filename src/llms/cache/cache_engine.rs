@@ -108,7 +108,9 @@ impl CacheEngine {
 
     /// Compute optimal breakpoint positions for the given prompt.
     ///
-    /// Uses the v3 two-level DP optimizer with quadratic divergence density.
+    /// Uses the v3 two-level DP optimizer weighted by
+    /// [`ConversationTailDensity`](super::density::ConversationTailDensity)
+    /// (uniform weight on hot tail blocks, zero on cold ones).
     /// Places a beacon at `frontier + LOOKBACK_WINDOW`, then runs the optimizer
     /// with alive BPs + beacon as fixed boundaries (Ω) and budget K=3.
     pub(crate) fn compute_breakpoints(&self, api_messages: &[ApiMessage]) -> BreakpointPlan {
