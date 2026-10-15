@@ -82,6 +82,10 @@ pub enum FleetStatus {
     Stopping,
     /// Agent has exited (registry entry may linger until reaped).
     Down,
+    /// A status from a newer protocol version (N-1 forward-compat): decodes
+    /// here so the registry record stays readable.
+    #[serde(other)]
+    Unknown,
 }
 
 #[cfg(test)]

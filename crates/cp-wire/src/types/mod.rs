@@ -163,6 +163,10 @@ pub enum Phase {
     Streaming,
     /// One or more tool calls are executing.
     Tooling,
+    /// A phase from a newer protocol version (N-1 forward-compat): decodes
+    /// here instead of failing the whole enclosing record.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Lifecycle state observable by the backend (oplog-recorded, not just a
@@ -180,6 +184,10 @@ pub enum LifecycleState {
     Stopping,
     /// Clean exit completed.
     Stopped,
+    /// A lifecycle state from a newer protocol version (N-1 forward-compat):
+    /// decodes here instead of failing the whole enclosing record.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Whose turn it is on an agent — the wire mirror of the agents module's

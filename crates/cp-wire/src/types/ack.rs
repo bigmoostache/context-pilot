@@ -53,6 +53,11 @@ pub enum Status {
         /// Human-readable reason for the rejection.
         reason: String,
     },
+
+    /// A status from a newer protocol version (N-1 forward-compat). The
+    /// commander must not treat it as accepted.
+    #[serde(other)]
+    Unknown,
 }
 
 #[cfg(test)]
@@ -91,5 +96,12 @@ mod tests {
         }"#;
         let ack: Ack = serde_json::from_str(json).expect("tolerant decode");
         assert_eq!(ack.status, Status::Accepted);
+    }
+
+    #[test]
+    fn ack_unknown_status_decodes_to_unknown() {
+        let json = r#"{"schema_version":1,"cmd_id":"c","status":{"status":"deferred","until":9},"rev":null}"#;
+        let ack: Ack = serde_json::from_str(json).expect("newer status must not fail the ack");
+        assert_eq!(ack.status, Status::Unknown);
     }
 }
