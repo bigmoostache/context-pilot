@@ -81,11 +81,11 @@ pub(crate) fn execute_undo(tool: &ToolUse, state: &mut State) -> ToolResult {
         }
     }
 
-    // Auto-deactivate when the queue is drained completely
-    let deactivated = qs.queued_calls.is_empty() && qs.active;
+    // Auto-deactivate when the main agent's calls are drained (reverie calls
+    // don't keep the main toggle on; `clear`/`flush` reset the index counter)
+    let deactivated = qs.count_owned(None) == 0 && qs.active;
     if deactivated {
         qs.active = false;
-        qs.next_index = 1;
     }
     let msg = format_undo_result(&removed, &not_found, qs.queued_calls.len(), deactivated);
 
