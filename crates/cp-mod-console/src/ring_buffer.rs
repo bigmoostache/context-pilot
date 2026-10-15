@@ -3,6 +3,10 @@ use std::sync::{Arc, Mutex};
 /// Maximum ring buffer size in bytes (256 KB).
 pub const RING_BUFFER_CAPACITY: usize = 256 * 1024;
 
+/// Window scanned by [`RingBuffer::last_n_lines`] — enough for a handful of
+/// lines without copying the whole 256 KiB buffer on every wait result.
+const TAIL_WINDOW: u64 = 16 * 1024;
+
 /// Internal mutable state of the ring buffer, protected by a mutex.
 #[derive(Debug)]
 struct RingBufferInner {
@@ -22,6 +26,37 @@ struct RingBufferInner {
 pub struct RingBuffer {
     /// Shared inner state behind an `Arc<Mutex>`.
     inner: Arc<Mutex<RingBufferInner>>,
+}
+
+/// A compiled `console_wait` pattern: regex, or literal bytes when the
+/// pattern is not a valid regex (the documented fallback).
+#[derive(Debug, Clone)]
+pub struct Matcher {
+    /// Compiled regex; `None` when the pattern is not a valid regex.
+    regex: Option<regex::bytes::Regex>,
+    /// Raw pattern bytes, matched literally when `regex` is `None`.
+    literal: Vec<u8>,
+}
+
+impl Matcher {
+    /// Compile `pattern`, falling back to a literal match if it is not a valid regex.
+    #[must_use]
+    pub fn new(pattern: &str) -> Self {
+        Self { regex: regex::bytes::Regex::new(pattern).ok(), literal: pattern.as_bytes().to_vec() }
+    }
+
+    /// End offset (exclusive) of the first match in `hay`.
+    #[must_use]
+    pub fn find_end(&self, hay: &[u8]) -> Option<usize> {
+        if let Some(re) = self.regex.as_ref() {
+            return re.find(hay).map(|m| m.end());
+        }
+        let lit = self.literal.as_slice();
+        if lit.is_empty() {
+            return Some(0);
+        }
+        hay.windows(lit.len()).position(|w| w == lit).map(|p| p.saturating_add(lit.len()))
+    }
 }
 
 impl Default for RingBuffer {
@@ -45,56 +80,62 @@ impl RingBuffer {
     }
 
     /// Append bytes to the ring buffer, wrapping around as needed.
+    ///
+    /// Copies in at most two slices; input longer than the capacity keeps only
+    /// its last `RING_BUFFER_CAPACITY` bytes (the rest would be overwritten anyway).
     pub fn write(&self, data: &[u8]) {
         let mut inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut pos = inner.write_pos;
-        for &byte in data {
-            if let Some(slot) = inner.buf.get_mut(pos) {
-                *slot = byte;
-            }
-            pos = pos.saturating_add(1);
-            if pos >= RING_BUFFER_CAPACITY {
-                pos = 0;
-                inner.wrapped = true;
-            }
-        }
-        inner.write_pos = pos;
         inner.total_written = inner.total_written.saturating_add(u64::try_from(data.len()).unwrap_or(u64::MAX));
+        let kept = data.get(data.len().saturating_sub(RING_BUFFER_CAPACITY)..).unwrap_or_default();
+        if kept.len() < data.len() {
+            inner.wrapped = true;
+        }
+        let pos = inner.write_pos;
+        let first = kept.len().min(RING_BUFFER_CAPACITY.saturating_sub(pos));
+        let (head, rest) = kept.split_at(first);
+        if let Some(dst) = inner.buf.get_mut(pos..pos.saturating_add(first)) {
+            dst.copy_from_slice(head);
+        }
+        if let Some(dst) = inner.buf.get_mut(..rest.len()) {
+            dst.copy_from_slice(rest);
+        }
+        let end = pos.saturating_add(kept.len());
+        if end >= RING_BUFFER_CAPACITY {
+            inner.wrapped = true;
+            inner.write_pos = end.saturating_sub(RING_BUFFER_CAPACITY);
+        } else {
+            inner.write_pos = end;
+        }
     }
 
     /// Read the entire buffer contents as a string.
     /// Returns (content, `total_bytes_written`).
     #[must_use]
     pub fn read_all(&self) -> (String, u64) {
-        let inner = self.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let total = inner.total_written;
-        let bytes = if inner.wrapped {
-            // Data from write_pos..end, then 0..write_pos
-            let mut v = Vec::with_capacity(RING_BUFFER_CAPACITY);
-            v.extend_from_slice(inner.buf.get(inner.write_pos..).unwrap_or_default());
-            v.extend_from_slice(inner.buf.get(..inner.write_pos).unwrap_or_default());
-            v
-        } else {
-            inner.buf.get(..inner.write_pos).unwrap_or_default().to_vec()
-        };
+        let (bytes, total) = self.read_since(0);
         (String::from_utf8_lossy(&bytes).into_owned(), total)
     }
 
-    /// Return the last N lines of buffer content.
+    /// Return the last N lines of buffer content (scans only the last 16 KiB).
     #[must_use]
     pub fn last_n_lines(&self, n: usize) -> String {
-        let (content, _) = self.read_all();
+        let (bytes, _) = self.read_since(self.total_written().saturating_sub(TAIL_WINDOW));
+        let content = String::from_utf8_lossy(&bytes);
         let lines: Vec<&str> = content.lines().collect();
         let start = lines.len().saturating_sub(n);
         lines.get(start..).unwrap_or_default().join("\n")
     }
 
-    /// Check if the buffer content matches a regex pattern.
-    /// Falls back to literal substring match if the regex is invalid.
+    /// First match of `matcher` in output written after `cursor`.
+    ///
+    /// Returns the absolute (monotonic) offset just past the match, so callers
+    /// can advance their cursor and never match the same output twice.
     #[must_use]
-    pub fn contains_pattern(&self, pattern: &str) -> bool {
-        let (content, _) = self.read_all();
-        regex::Regex::new(pattern).map_or_else(|_| content.contains(pattern), |re| re.is_match(&content))
+    pub fn find_since(&self, cursor: u64, matcher: &Matcher) -> Option<u64> {
+        let (bytes, total) = self.read_since(cursor);
+        let start = total.saturating_sub(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        let end = matcher.find_end(&bytes)?;
+        Some(start.saturating_add(u64::try_from(end).unwrap_or(u64::MAX)))
     }
 
     /// Bytes written after the monotonic offset `cursor`, plus the new cursor.

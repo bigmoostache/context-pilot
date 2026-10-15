@@ -1,6 +1,6 @@
 # Design & Plan — Mobile Component Tree
 
-Status: **proposed** (no code written). Branch: `mobile` (cut from `origin/master`).
+Status: **shipped**. Mobile tree in `web/src/mobile-components`, device switch in `web/src/switch`, parity enforced by `.github/checks/check-mobile-mirror.sh`.
 Owner: frontend. Scope: `web/`.
 
 ---

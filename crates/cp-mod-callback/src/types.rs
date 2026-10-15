@@ -134,3 +134,60 @@ impl CallbackState {
         state.ext_mut::<Self>()
     }
 }
+
+/// Field separator in dedup keys: ASCII unit separator, absent from agent ids,
+/// callback ids and file paths, so the join is collision-free.
+pub(crate) const KEY_SEP: char = '\u{1f}';
+
+/// Dedup key `"<agent>␟<callback_id>[␟<file>]"` for one callback invocation.
+///
+/// Agent-scoped so two agents never kill each other's run (§13/H2, S6).
+/// File-scoped for local callbacks: each file is its own invocation, so file N
+/// must not replace file N−1 of the same batch.
+pub(crate) fn session_key_for(agent: &str, callback_id: &str, file: Option<&str>) -> String {
+    file.map_or_else(
+        || format!("{agent}{KEY_SEP}{callback_id}"),
+        |f| format!("{agent}{KEY_SEP}{callback_id}{KEY_SEP}{f}"),
+    )
+}
+
+/// Split a dedup key into `(agent, callback_id)`, ignoring any file component.
+pub(crate) fn parse_key(key: &str) -> Option<(&str, &str)> {
+    let mut parts = key.split(KEY_SEP);
+    Some((parts.next()?, parts.next()?))
+}
+
+/// Watcher id for a callback run; unique per console session.
+pub(crate) fn watcher_id_for(callback_id: &str, session_key: &str) -> String {
+    format!("callback_{callback_id}_{session_key}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn per_file_keys_are_distinct() {
+        let a = session_key_for("A1", "CB4", Some("src/a.rs"));
+        let b = session_key_for("A1", "CB4", Some("src/b.rs"));
+        assert_ne!(a, b, "file N must not replace file N-1 of the same batch");
+        assert_ne!(a, session_key_for("A1", "CB4", None));
+    }
+
+    #[test]
+    fn agent_scoped_keys_are_distinct() {
+        assert_ne!(session_key_for("A1", "CB4", None), session_key_for("A2", "CB4", None));
+    }
+
+    #[test]
+    fn parse_key_ignores_file_component() {
+        assert_eq!(parse_key(&session_key_for("A1", "CB4", Some("x.rs"))), Some(("A1", "CB4")));
+        assert_eq!(parse_key(&session_key_for("A1", "CB4", None)), Some(("A1", "CB4")));
+        assert_eq!(parse_key("no-separator"), None);
+    }
+
+    #[test]
+    fn watcher_id_is_per_session() {
+        assert_ne!(watcher_id_for("CB4", "cb_A1_1"), watcher_id_for("CB4", "cb_A2_2"));
+    }
+}

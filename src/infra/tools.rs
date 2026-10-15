@@ -54,6 +54,6 @@ pub(crate) fn write_reload_flag() {
             s.push_str(",\n  \"reload_requested\": true\n}");
             s
         };
-        let _r = fs::write(config_path, updated);
+        crate::state::persistence::writer::write_file(&std::path::PathBuf::from(config_path), updated.as_bytes());
     }
 }

@@ -96,7 +96,7 @@ fn execute_queue_control(
     }
     if tool.name == "Queue_execute" {
         // Queue flush: execute all queued calls, collect them for pipeline replay
-        let (summary_result, flushed) = super::queue_flush::execute_queue_flush(tool, &mut app.state);
+        let (summary_result, flushed) = super::queue_flush::execute_queue_flush(tool, &mut app.state, None);
         *flushed_tools = flushed;
         return summary_result;
     }
@@ -134,7 +134,7 @@ fn enqueue_tool(
         && crate::modules::conversation_history::trap::would_defuse_trap(&app.state)
     {
         crate::modules::conversation_history::trap::force_deactivate_trap(&mut app.state);
-        let (flush_result, flushed) = super::queue_flush::execute_queue_flush(tool, &mut app.state);
+        let (flush_result, flushed) = super::queue_flush::execute_queue_flush(tool, &mut app.state, None);
         let n = flushed.len();
         *flushed_tools = flushed;
         return crate::infra::tools::ToolResult::new(

@@ -2,7 +2,6 @@
 //!
 //! Separated from trigger.rs which handles file collection and pattern matching.
 
-// Queue ID test marker — delete me later
 use cp_base::config::constants;
 use cp_base::panels::now_ms;
 use cp_base::panels::time_arith::ms_to_secs;
@@ -14,7 +13,7 @@ use cp_mod_console::manager::SessionHandle;
 use cp_mod_console::types::ConsoleState;
 
 use crate::trigger::{MatchedCallback, build_changed_files_env};
-use crate::types::CallbackState;
+use crate::types::{CallbackState, parse_key, session_key_for, watcher_id_for};
 
 /// Result of firing a callback, including dedup info.
 #[derive(Debug)]
@@ -25,17 +24,17 @@ pub struct FireResult {
     pub replaced: bool,
 }
 
-/// Dedup key for a callback's active session: `"<agent>\u{1f}<callback_id>"`.
-///
-/// The agent component is the executing (executing) agent at fire time, so two
-/// agents firing the same callback get distinct keys and never kill each
-/// other's in-flight run (§13/H2, S6). The `\u{1f}` (ASCII unit separator) can't
-/// appear in an agent id or callback id, so the join is collision-free. At N=1
-/// `executing_agent_id()` is `None` → the key degrades to the old callback-id-only
-/// behaviour with a constant prefix.
-fn dedup_key(state: &State, callback_id: &str) -> String {
-    let tid = state.executing_agent_id().unwrap_or(constants::DEFAULT_WORKER_ID);
-    format!("{tid}\u{1f}{callback_id}")
+/// Exit code a script returns for "nothing to do": the run is consumed silently,
+/// with no success line. Lets broad-pattern callbacks stay quiet on no-op files.
+pub const NOTHING_TO_DO_EXIT: i32 = 7;
+
+/// Source tag shared by every callback watcher (stable, never leaked per run).
+const CALLBACK_SOURCE_TAG: &str = "callback";
+
+/// Dedup key for the executing agent (`DEFAULT_WORKER_ID` at N=1).
+fn dedup_key(state: &State, callback_id: &str, file: Option<&str>) -> String {
+    let agent = state.executing_agent_id().unwrap_or(constants::DEFAULT_WORKER_ID);
+    session_key_for(agent, callback_id, file)
 }
 
 /// Informational note (§13/H2) appended to a callback *failure* when another
@@ -49,11 +48,10 @@ fn dedup_key(state: &State, callback_id: &str) -> String {
 fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>) -> Option<String> {
     let cs = CallbackState::get(state);
     let console = ConsoleState::get(state);
-    let suffix = format!("\u{1f}{callback_id}");
     let other_live = cs.active_sessions.iter().any(|(key, session)| {
         // Same callback id, different executing agent.
-        let Some(other_tid) = key.strip_suffix(&suffix) else { return false };
-        if Some(other_tid) == fired_by {
+        let Some((other_tid, cb)) = parse_key(key) else { return false };
+        if cb != callback_id || Some(other_tid) == fired_by {
             return false;
         }
         // That agent's session must still be running to count as concurrent.
@@ -68,12 +66,12 @@ fn concurrent_run_note(state: &State, callback_id: &str, fired_by: Option<&str>)
 
 /// Kill an existing session for the same callback definition (dedup).
 ///
-/// If the same callback already has an active session **for this agent**, kills
-/// its process, removes its watcher, and cleans up the console entry. Returns
-/// `true` if a running session was replaced.
-fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
+/// If the same invocation (agent, callback, file) already has an active session,
+/// kills its process, removes *its* watcher only, and cleans up the console
+/// entry. Returns `true` if a running session was replaced.
+fn kill_existing_callback(state: &mut State, callback_id: &str, file: Option<&str>) -> bool {
     let _p = cp_base::perf_span!("cb_kill_existing");
-    let key = dedup_key(state, callback_id);
+    let key = dedup_key(state, callback_id, file);
     let cs = CallbackState::get_mut(state);
     let Some(old_key) = cs.active_sessions.remove(&key) else {
         return false;
@@ -90,9 +88,9 @@ fn kill_existing_callback(state: &mut State, callback_id: &str) -> bool {
     // Remove session from console state
     drop(ConsoleState::get_mut(state).sessions.remove(&old_key));
 
-    // Remove watcher from registry
-    let tag = format!("callback_{callback_id}");
-    WatcherRegistry::get_mut(state).remove_by_tag(&tag);
+    // Remove this run's watcher only — a tag-wide removal would drop other
+    // agents' watchers for the same callback while their processes keep running.
+    let _removed = WatcherRegistry::get_mut(state).remove_by_id(&watcher_id_for(callback_id, &old_key));
 
     true
 }
@@ -177,7 +175,7 @@ pub fn fire_callback(
     let command = build_callback_command(def, env_key, &env_val, &project_root)?;
 
     // Dedup: kill any existing session for the same callback definition
-    let replaced = kill_existing_callback(state, &def.id);
+    let replaced = kill_existing_callback(state, &def.id, single_file);
 
     // Generate session key via console state
     let session_key = ConsoleState::alloc_key(state, "cb");
@@ -204,10 +202,10 @@ pub fn fire_callback(
     };
 
     let watcher = CallbackWatcher {
-        watcher_id: format!("callback_{}_{}", def.id, session_key),
+        watcher_id: watcher_id_for(&def.id, &session_key),
         session_name: session_key.clone(),
         callback_name: def.name.clone(),
-        callback_tag: Box::leak(format!("callback_{}", def.id).into_boxed_str()),
+        callback_id: def.id.clone(),
         success_message: def.success_message.clone(),
         blocking: is_blocking,
         tool_use_id: blocking_tool_use_id.map(str::to_owned),
@@ -231,7 +229,7 @@ pub fn fire_callback(
     registry.register(Box::new(watcher));
 
     // Track this session for dedup, keyed per (executing agent, callback).
-    let key = dedup_key(state, &def.id);
+    let key = dedup_key(state, &def.id, single_file);
     drop(CallbackState::get_mut(state).active_sessions.insert(key, session_key.clone()));
 
     Ok(FireResult { session_key, replaced })
@@ -319,8 +317,8 @@ pub struct CallbackWatcher {
     pub session_name: String,
     /// Human-readable callback name.
     pub callback_name: String,
-    /// Source tag for watcher registry filtering (e.g., "`callback_CB3`").
-    pub callback_tag: &'static str,
+    /// Callback definition id (e.g. `CB3`).
+    pub callback_id: String,
     /// Custom message to display on success (exit 0).
     pub success_message: Option<String>,
     /// Whether this watcher blocks the tool pipeline (sentinel replacement).
@@ -370,15 +368,18 @@ impl Watcher for CallbackWatcher {
         let handle = cs.sessions.get(&self.session_name)?;
 
         if !handle.get_status().is_terminal() {
+            // Past the deadline: kill the run now so a hung cargo/clippy doesn't
+            // outlive its TIMED OUT report; check_timeout reports it this poll.
+            if self.deadline_ms.is_some_and(|d| now_ms() >= d) {
+                handle.kill();
+            }
             return None;
         }
 
         let exit_code = handle.get_status().exit_code().unwrap_or(-1i32);
 
-        // Exit code 7 = "nothing to do" — silent success, suppress entirely.
-        // Used by callbacks that fire broadly (e.g., pattern "*") but often have nothing to do.
-        // Returning None consumes the watcher without producing any visible result.
-        if exit_code == 7i32 {
+        // "Nothing to do" — silent success: consume the watcher, show nothing.
+        if exit_code == NOTHING_TO_DO_EXIT {
             return Some(
                 WatcherResult::new(String::new())
                     .tool_use_id_opt(self.tool_use_id.clone())
@@ -402,8 +403,7 @@ impl Watcher for CallbackWatcher {
             // Panel content is already final — the pipeline waited for process exit before resuming
             let mut msg = format!("· {} FAILED (exit {})", self.callback_name, exit_code);
             if self.concurrency_friendly
-                && let Some(cbid) = self.callback_tag.strip_prefix("callback_")
-                && let Some(note) = concurrent_run_note(state, cbid, self.fired_by_agent.as_deref())
+                && let Some(note) = concurrent_run_note(state, &self.callback_id, self.fired_by_agent.as_deref())
             {
                 msg.push_str(&note);
             }
@@ -450,7 +450,7 @@ impl Watcher for CallbackWatcher {
     }
 
     fn source_tag(&self) -> &'static str {
-        self.callback_tag
+        CALLBACK_SOURCE_TAG
     }
 
     fn suicide(&self, state: &State) -> bool {
