@@ -6,6 +6,7 @@ use cp_base::state::watchers::WatcherRegistry;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::manager::SessionHandle;
+use crate::ring_buffer::Matcher;
 use crate::types::{ConsoleState, ConsoleWatcher, format_wait_result};
 
 /// Truncate a string to at most `max_bytes` without splitting a UTF-8 char.
@@ -241,7 +242,7 @@ fn early_watch_result(
     };
     let already_met = match req.mode.as_str() {
         "exit" => handle.get_status().is_terminal(),
-        "pattern" => req.pattern.as_ref().is_some_and(|pat| handle.buffer.contains_pattern(pat)),
+        "pattern" => req.pattern.as_deref().is_some_and(|pat| handle.take_pattern_match(&Matcher::new(pat))),
         _ => false,
     };
     if !already_met {
@@ -280,7 +281,7 @@ pub fn execute_wait(tool: &ToolUse, state: &mut State) -> ToolResult {
         watcher_id: format!("console_{session_key}_{mode}"),
         session_name: session_key,
         mode,
-        pattern,
+        pattern: pattern.as_deref().map(Matcher::new),
         blocking: true,
         tool_use_id: Some(tool.id.clone()),
         registered_at_ms: now,
