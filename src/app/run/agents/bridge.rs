@@ -2,9 +2,9 @@
 //!
 //! Two responsibilities, both gated on the orchestration bridge being ON:
 //!
-//! 1. **Command intake (K7 path).** [`poll_bridge_commands`] accepts inbound
-//!    commands from the backend over the bridge socket and applies them on the
-//!    main loop — `SendMessage`/`CreateAgent`/`ArchiveAgent`/`RestoreAgent`
+//! 1. **Command intake (K7 path).** The bridge intake thread accepts inbound
+//!    commands from the backend over the bridge socket; [`poll_bridge_commands`]
+//!    applies them on the main loop — `SendMessage`/`CreateAgent`/`ArchiveAgent`/`RestoreAgent`
 //!    enter the agent exactly as local user input would, and `Stop`/`Interrupt`
 //!    mirror the Esc key.
 //! 2. **Live-state emission (Leg 0 keystone).** The instant a mutation applies,
@@ -18,12 +18,12 @@
 //! Extracted from the parent `agents` module so each file stays under the
 //! 500-line limit.
 
-use std::time::Duration;
+use std::sync::Arc;
 
 use cp_base::state::runtime::State;
 use cp_mod_agents::types::{AgentStatus, AgentsState};
 use cp_mod_bridge::BridgeState;
-use cp_wire::types::command::Command;
+use cp_mod_bridge::command::server::{Server, SharedResponder};
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::payload::query::Query;
 use cp_wire::types::{AgentTurn, Phase};
@@ -35,10 +35,6 @@ use crate::app::App;
 // applies them on the main loop (K7 path).
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Maximum time the main loop will wait for a single command connection to
-/// finish reading.  A wedged commander is dropped after this window.
-const READ_TIMEOUT: Duration = Duration::from_millis(500);
-
 /// Whether the orchestration bridge is active (booted) for this agent.
 ///
 /// Cheap `TypeMap` lookup used by the main loop to decide its idle poll
@@ -49,14 +45,12 @@ pub(in crate::app::run) fn bridge_active(state: &State) -> bool {
     state.get_ext::<BridgeState>().is_some_and(|bs| bs.boot.is_some())
 }
 
-/// Poll the bridge listener for inbound command connections and apply every
-/// accepted command.
+/// Apply every command the bridge intake thread has accepted since last tick.
 ///
-/// Drains **all** currently-pending connections each tick (bounded by
-/// [`DRAIN_BUDGET`]) rather than one per loop iteration, so a burst of web
-/// commands applies in the same tick instead of trickling in one-per-tick
-/// (design doc Phase 3.1). Safe to call every tick: returns immediately when
-/// the bridge is OFF, the listener is absent, or no connection is pending.
+/// The intake thread does the socket I/O, journal `fdatasync` and query
+/// lookups; this only drains its channel (never blocks), so a burst of web
+/// commands still applies in one tick. Safe to call every tick: a no-op when
+/// the bridge is OFF or nothing is pending.
 ///
 /// When at least one command applied, the agent's tier-② state is persisted
 /// (`save_state_async`). This is load-bearing for commands whose effect lives
@@ -68,22 +62,15 @@ pub(in crate::app::run) fn bridge_active(state: &State) -> bool {
 /// promptness bonus for their disk backstop, never a correctness dependency.
 /// The write is async + click-frequency, so it never burdens the loop.
 pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
-    let mut budget = DRAIN_BUDGET;
-    let mut applied_any = false;
-    while budget > 0 {
-        budget = budget.saturating_sub(1);
-        let accepted = {
-            let _g = crate::profile!("bridge_accept");
-            accept_commands(&mut app.state)
-        };
-        let Some(commands) = accepted else {
-            break; // no pending connection — done draining this tick.
-        };
-        for cmd in commands {
-            let _g = crate::profile!("apply_command");
-            super::commands::apply_command(app, cmd);
-            applied_any = true;
-        }
+    sync_query_responder(&app.state);
+    let commands = {
+        let _g = crate::profile!("bridge_accept");
+        app.state.get_ext::<BridgeState>().and_then(|bs| bs.intake.as_ref()).map(Server::drain).unwrap_or_default()
+    };
+    let applied_any = !commands.is_empty();
+    for cmd in commands {
+        let _g = crate::profile!("apply_command");
+        super::commands::apply_command(app, cmd);
     }
     if applied_any {
         let _g = crate::profile!("bridge_save");
@@ -91,70 +78,28 @@ pub(in crate::app::run) fn poll_bridge_commands(app: &mut App) {
     }
 }
 
-/// Upper bound on connections drained per tick — guards the drain loop against
-/// a misbehaving flood while still clearing any realistic command burst.
-const DRAIN_BUDGET: u32 = 64;
-
-/// Try to accept one pending connection and process it through the command
-/// intake.
+/// Keep the intake thread's query responder in step with the search module.
 ///
-/// Returns `None` when no connection is pending (the bridge is OFF, the
-/// listener is absent, or `accept` would block) — the signal to stop draining.
-/// Returns `Some(cmds)` when a connection was handled, even if it yielded no
-/// accepted commands (an errored connection still counts, so draining
-/// continues to the next pending one).
-fn accept_commands(state: &mut State) -> Option<Vec<Command>> {
-    // Resolve the search credentials BEFORE borrowing `BridgeState`. The
-    // responder closure below must not touch `State`: the command-path `Intake`
-    // is `&mut`-borrowed out of that same `State` for the whole connection, so a
-    // second borrow for `SearchState` would not type-check. Copying the (small,
-    // session-stable) credentials out first makes the closure self-contained.
-    // `None` when the search module is down — queries then answer with a
-    // graceful "search unavailable" rather than failing the connection.
-    let search_creds = cp_mod_search::meili_credentials(state)
+/// The intake thread cannot read `State`, so it answers queries through a
+/// closure that owns a copy of the Meilisearch credentials. This installs that
+/// closure once the credentials exist, replaces it when they change (the key
+/// is `port:project_hash`), and clears it when search goes down, so queries
+/// then answer "search unavailable". A no-op on the common tick: one key
+/// comparison under an uncontended lock.
+fn sync_query_responder(state: &State) {
+    let Some(server) = state.get_ext::<BridgeState>().and_then(|bs| bs.intake.as_ref()) else {
+        return;
+    };
+    let creds: Option<super::query::SearchCreds> = cp_mod_search::meili_credentials(state)
         .and_then(|(port, key)| cp_mod_search::project_hash(state).map(|hash| (port, key, hash)));
-
-    let bs = state.ext_mut::<BridgeState>();
-
-    // Split borrows: &boot (for listener + oplog) and &mut intake.
-    let (Some(boot), Some(intake)) = (bs.boot.as_ref(), bs.intake.as_mut()) else {
-        return None;
-    };
-
-    // Non-blocking accept — WouldBlock means no connection is pending.
-    let Ok((mut stream, _addr)) = boot.listener().accept() else {
-        return None;
-    };
-
-    // The accepted stream INHERITS the listener's non-blocking flag on macOS
-    // (and Linux without `accept4`). Left non-blocking, `handle_connection`'s
-    // read loop hits a transient `WouldBlock` the instant the socket buffer
-    // momentarily drains mid-frame and treats it as fatal — so any command
-    // larger than the kernel's AF_UNIX socket buffer (~8 KiB) closes the
-    // connection before it is fully read, surfacing to the backend as a
-    // `BrokenPipe`/`502 agent unreachable` (the "big messages don't go through"
-    // bug, T274). Forcing the stream back to BLOCKING makes the per-read
-    // timeout below the real wedge-guard: each read blocks (up to the timeout)
-    // for the next chunk instead of erroring on a normal in-flight gap, so a
-    // multi-MiB frame streams in correctly.
-    let _set_blocking = stream.set_nonblocking(false);
-
-    // Bound how long we wait for the commander to finish writing.
-    let _ignored = stream.set_read_timeout(Some(READ_TIMEOUT));
-
-    let responder = |query: &Query| {
-        let _g = crate::profile!("bridge_query");
-        super::query::answer(search_creds.as_ref(), query)
-    };
-
-    let _g = crate::profile!("bridge_handle_conn");
-    match intake.handle_connection(boot.oplog(), &mut stream, &responder) {
-        Ok(cmds) => Some(cmds),
-        Err(e) => {
-            log::error!("bridge: command intake error: {e:?}");
-            Some(Vec::new())
-        }
+    let wanted = creds.as_ref().map(|c| format!("{}:{}", c.0, c.2));
+    if server.responder_key() == wanted {
+        return;
     }
+    server.set_responder(creds.zip(wanted).map(|(owned, key)| {
+        let respond: SharedResponder = Arc::new(move |query: &Query| super::query::answer(Some(&owned), query));
+        (key, respond)
+    }));
 }
 
 // ── Roster delta emission (Leg 0 keystone — design doc I8/I10) ───────────
