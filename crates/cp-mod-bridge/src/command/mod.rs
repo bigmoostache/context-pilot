@@ -52,7 +52,7 @@ use cp_oplog::replay;
 use cp_oplog::service::Service as OplogService;
 use cp_wire::framing;
 use cp_wire::types::ack::{Ack, Status};
-use cp_wire::types::command::{Command, Frame as CommandFrame};
+use cp_wire::types::command::{Command, Frame as CommandFrame, Kind};
 use cp_wire::types::oplog::OpEntryKind;
 use cp_wire::types::payload::query::Inbound;
 use cp_wire::types::snapshot::SeenSet;
@@ -197,6 +197,12 @@ impl Intake {
             return (reject(&command.id, "bad bearer token"), None);
         }
 
+        // 1b. A kind this agent cannot decode (newer protocol) is never applied,
+        //     so it must never be acknowledged as accepted nor journalled.
+        if matches!(command.kind, Kind::Unknown) {
+            return (reject(&command.id, "unknown command kind (protocol too new for this agent)"), None);
+        }
+
         // 2. Dedup: a token already durable is acknowledged without re-work.
         if self.seen.contains(&command.dedup_token) {
             let rev = self.seen.rev_of(&command.dedup_token);
@@ -276,22 +282,32 @@ fn into_io(e: &cp_oplog::error::Error) -> std::io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cp_wire::types::command::Kind;
     use tempfile::tempdir;
 
     const TOKEN: &str = "cap-token-256bit";
 
     fn frame(auth: &str, dedup: &str) -> Vec<u8> {
-        let cf = CommandFrame::new(
-            auth.to_owned(),
-            Command::new(
-                format!("cmd-{dedup}"),
-                1,
-                dedup.to_owned(),
-                Kind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() },
-            ),
-        );
+        frame_of(auth, dedup, Kind::SendMessage { agent_id: "T1".to_owned(), content: "hi".to_owned() })
+    }
+
+    fn frame_of(auth: &str, dedup: &str, kind: Kind) -> Vec<u8> {
+        let cf = CommandFrame::new(auth.to_owned(), Command::new(format!("cmd-{dedup}"), 1, dedup.to_owned(), kind));
         framing::encode_raw(&serde_json::to_vec(&cf).expect("ser")).expect("frame")
+    }
+
+    #[test]
+    fn unknown_kind_is_rejected_and_not_journalled() {
+        let dir = tempdir().expect("dir");
+        let oplog = OplogService::spawn(dir.path()).expect("spawn");
+        let mut intake = Intake::new(dir.path(), TOKEN.to_owned()).expect("intake");
+
+        let (ack_bytes, to_apply) = intake.handle_frame(&oplog, &frame_of(TOKEN, "dt-u", Kind::Unknown));
+        assert!(matches!(decode_ack(&ack_bytes).status, Status::Rejected { .. }), "unknown kind must be rejected");
+        assert!(to_apply.is_none(), "an unknown kind is never applied");
+
+        oplog.shutdown().expect("shutdown");
+        let state = replay::replay(dir.path()).expect("replay");
+        assert!(!state.seen.contains("dt-u"), "a rejected unknown kind leaves no effect in the log");
     }
 
     fn decode_ack(bytes: &[u8]) -> Ack {
