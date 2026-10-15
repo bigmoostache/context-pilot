@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 use cp_base::modules::run_with_timeout;
 use serde_json::Value;
 
+use crate::parse::Checks;
+
 /// A workdir of a repository and its current branch.
 type Member = (PathBuf, String);
 
@@ -226,23 +228,31 @@ fn pr_entry(pr: &Value) -> Option<(String, Badge)> {
     let number = pr.get("number")?.as_u64()?;
     let branch = pr.get("headRefName")?.as_str()?.to_owned();
     let conflicting = pr.get("mergeable").and_then(Value::as_str) == Some("CONFLICTING");
-    let checks = crate::parse::parse_checks_status(&pr.to_string());
-    let color = match checks.as_deref() {
-        _ if conflicting => CheckColor::Blue,
-        Some("failing") => CheckColor::Red,
-        Some("pending") => CheckColor::Yellow,
-        _ => CheckColor::Green,
+    let color = if conflicting {
+        CheckColor::Blue
+    } else {
+        match crate::parse::checks_status(pr) {
+            Some(Checks::Failing) => CheckColor::Red,
+            Some(Checks::Pending) => CheckColor::Yellow,
+            Some(Checks::Passing) | None => CheckColor::Green,
+        }
     };
     Some((branch, Badge { number, color }))
 }
 
-/// Persist a repository's last good answer (best effort).
+/// Persist a repository's last good answer (best effort). Written to a temp
+/// file then renamed, so a crash never leaves a truncated cache behind.
 fn save_disk(common: &Path, by_branch: &HashMap<String, Badge>) {
     let map: serde_json::Map<String, Value> = by_branch
         .iter()
         .map(|(br, b)| (br.clone(), Value::Array(vec![Value::from(b.number), Value::from(b.color.name())])))
         .collect();
-    let _ignored = std::fs::write(common.join(DISK_CACHE), Value::Object(map).to_string());
+    let staging = common.join(format!("{DISK_CACHE}.{}.tmp", std::process::id()));
+    if std::fs::write(&staging, Value::Object(map).to_string()).is_ok()
+        && std::fs::rename(&staging, common.join(DISK_CACHE)).is_err()
+    {
+        let _ignored = std::fs::remove_file(&staging);
+    }
 }
 
 /// Read a repository's last good answer; empty when missing or unreadable.

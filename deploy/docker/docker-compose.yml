@@ -67,7 +67,9 @@ services:
   # so setting the variable without enabling the profile leaves the agent posting
   # to a host that does not exist.
   litellm:
-    image: docker.litellm.ai/berriai/litellm:main-latest
+    # Pinned release tag, never main-latest (a moving tag changes the gateway
+    # under a running deploy). Override with LITELLM_IMAGE in .env to upgrade.
+    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-v1.105.1}
     profiles: [gateway]
     restart: unless-stopped
     command: ["--config", "/app/config.yaml"]

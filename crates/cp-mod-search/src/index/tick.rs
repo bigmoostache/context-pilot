@@ -123,4 +123,7 @@ fn tick(params: &TickParams) {
     if let Err(e) = backup::export_backup(&client, &files_uid, &logs_uid) {
         log::warn!("Hourly embedding backup failed: {e}");
     }
+
+    // 3. Drop finished Meilisearch tasks older than an hour (tasks DB growth).
+    crate::meili::tasks::purge_finished_tasks_logged(&client, "hourly");
 }

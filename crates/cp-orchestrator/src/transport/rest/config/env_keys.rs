@@ -21,10 +21,13 @@ use crate::services::auth::types::User;
 /// key that currently resolves to a value.  Designed for [`BridgeVault`] cache
 /// warm-up.  Keys without a value are omitted (not `null`).
 ///
-/// Admin-only when auth is enabled.
-pub(crate) fn vault_snapshot(auth_user: Option<&User>) -> HttpReply {
-    if auth_user.is_some_and(|u| !u.can_manage_secrets()) {
-        return HttpReply::error(403, "superadmin required");
+/// Machine-to-machine only: the caller must present the bridge token
+/// (`Bearer`, see [`cp_vault::token`]). A user session never qualifies, and
+/// neither does an anonymous caller when access control is off (the leak this
+/// gate closes). Admins read single keys via `GET /api/env-keys/{name}`.
+pub(crate) fn vault_snapshot(auth_token: Option<&str>) -> HttpReply {
+    if !cp_vault::token::verify(auth_token) {
+        return HttpReply::error(401, "vault bridge token required");
     }
 
     let snapshot: serde_json::Map<String, serde_json::Value> = cp_env::specs::secrets::ALL_KEYS
@@ -196,5 +199,13 @@ mod tests {
     fn update_rejects_unknown_key() {
         let reply = env_key_update("NOT_REAL", None, r#"{"value":"val"}"#);
         assert_eq!(reply.status, 404);
+    }
+
+    /// Regression: with access control off every caller is anonymous, and the
+    /// snapshot used to hand them every secret.
+    #[test]
+    fn snapshot_refuses_without_bridge_token() {
+        assert_eq!(vault_snapshot(None).status, 401);
+        assert_eq!(vault_snapshot(Some("not-the-token")).status, 401);
     }
 }
