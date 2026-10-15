@@ -1,254 +1,69 @@
 # Contributing to Context Pilot
 
-Thank you for your interest in contributing to Context Pilot! We welcome contributions from the community and are grateful for any help you can provide.
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately per [SECURITY.md](SECURITY.md), never in a public issue.
 
-## Table of Contents
+Read [README.md](README.md) first for the architecture, and [docs/README.md](docs/README.md) for which design docs are current.
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [How to Contribute](#how-to-contribute)
-- [Pull Request Process](#pull-request-process)
-- [Coding Guidelines](#coding-guidelines)
-- [Architecture Overview](#architecture-overview)
-- [Testing](#testing)
-- [Documentation](#documentation)
-- [Community](#community)
+## Setup
 
-## Code of Conduct
-
-By participating in this project, you agree to abide by our Code of Conduct. Please be respectful, inclusive, and constructive in all interactions.
-
-## Getting Started
-
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/tui.git
-   cd tui
-   ```
-3. **Add the upstream remote**:
-   ```bash
-   git remote add upstream https://github.com/contextpilot/tui.git
-   ```
-
-## Development Setup
-
-### Prerequisites
-
-- **Rust 1.75+** - Install via [rustup](https://rustup.rs/)
-- **tmux** - For terminal pane features
-- **An LLM API key** - Anthropic, Grok, or Groq
-
-### Building
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Rust | **1.97.1**, pinned in `rust-toolchain.toml` | rustup picks it up automatically. CI reads the same version (`RUST_VERSION` in `.github/workflows/ci.yml` and `release.yml`); change all three together. |
+| Node.js + pnpm | Node **22**, pnpm **11.6.0** (as in CI) | Frontend only. Always `pnpm`, never npm/yarn. |
 
 ```bash
-# Debug build (faster compilation)
-cargo build
-
-# Release build (optimized)
-cargo build --release
-
-# Run
-cargo run --release
+cargo build --release                 # agent (tui) + all crates
+cargo build --release -p cp-orchestrator
+cd web && pnpm install && pnpm dev    # web cockpit (Vite)
 ```
 
-### Configuration
+Environment variables are typed specs in `crates/cp-env`; [docs/ENV.md](docs/ENV.md) is generated from them. Adding a `CP_*` variable means: a spec in `crates/cp-env/src/specs/`, a model field, regenerating ENV.md (`cargo test -p cp-env --test generate -- --ignored`) and a line in each `deploy/env/*.example`. An unknown variable fails boot.
 
-Create a `.env` file in the project root:
+## Rules the checks enforce
 
-```env
-ANTHROPIC_API_KEY=your_key_here
-# Optional:
-XAI_API_KEY=your_grok_key
-GROQ_API_KEY=your_groq_key
-```
+Every rule below is a script in `.github/checks/` and a CI job. Run the script locally before pushing; a red check is a hard stop.
 
-Every environment variable the binaries read — provider keys, orchestrator
-topology, feature flags — is documented in the generated reference
-[`docs/ENV.md`](docs/ENV.md). Both binaries validate their environment
-strictly at boot and refuse to start on any problem; `cpilot --check-env` and
-`cp-orchestrator --check-env` run the same validation and print the report.
+| Rule | Script |
+| --- | --- |
+| `cargo fmt`, `cargo clippy -D warnings` against the workspace lint table (~1,000 lints, most at `forbid`) | `check-rust-lints.sh` |
+| `cargo test --workspace` | `check-rust-tests.sh` |
+| Files ≤ 500 lines, directories ≤ 8 entries (Rust and `web/src`), hash chain intact | `check-structure.sh` |
+| `openapi.json` matches Rust routes and types; the generated TS client has no drift; no hand-written `fetch` | `check-api-contract.sh` |
+| eslint, prettier, stylelint, `tsc -b`, type coverage, suppression and rule-census budgets, knip | `check-ts-lints.sh` |
+| `web/src/mobile-components` mirrors `web/src/components` path for path, with no imports leaking across trees | `check-mobile-mirror.sh` |
 
-## How to Contribute
+**Lint suppressions.** `#[allow(...)]` is banned. When a lint truly cannot be satisfied, use `#[expect(lint, reason = "...")]` and add an entry (path, match, reason, strategy) to `.github/checks/allowed-lint-exceptions.yaml`; frontend suppressions go in `allowed-eslint-exceptions.yaml`. An unregistered suppression fails the build. Prefer fixing the code: split the function, or use `cp_macros::deref_match!` for reference patterns.
 
-### Reporting Bugs
+**Structure caps.** When a file nears 500 lines, factor code into a new file. Don't trim comments or docs to fit.
 
-- Check existing issues to avoid duplicates
-- Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md)
-- Include environment details, steps to reproduce, and logs
+**Hash chain.** The lint config (`Cargo.toml` lint sections, `clippy.toml`, `rustfmt.toml`), the check scripts, the exception registries and the deploy scripts are listed in `.github/checks/protected-files.yaml` and sealed by a password-protected hash chain. Editing any of them breaks the chain until a maintainer runs `./chain.sh`. Contributors propose such changes in the PR; they cannot lower the bar alone.
 
-### Suggesting Features
+**Blocking callbacks.** Inside Context Pilot, the same checks run as blocking edit callbacks: `*.rs` edits run the lint, structure and API-contract families, and `web/src/**` edits run the TS, mirror and structure families. An edit that breaks a rule is reported immediately.
 
-- Use the [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.md)
-- Explain the problem you're solving
-- Describe your proposed solution
+## Code conventions
 
-### Submitting Code
+- **Backend owns logic.** All business logic, filesystem access, env handling and data shaping live in Rust. The frontend renders what the backend returns.
+- **Docs.** Every public item has a doc comment that says something the signature doesn't. Changes to behaviour update the matching doc in `docs/` (and its status in `docs/README.md`).
+- **Frontend.** Every new desktop component has a mobile twin at the same path (`pnpm mirror:scaffold` generates a stub). No entry animations on main content.
+- **Commits.** Imperative subject, one logical change per commit. Never commit `.context-pilot/shared/entities/`.
 
-1. **Create a branch** for your feature/fix:
-   ```bash
-   git checkout -b feature/your-feature-name
-   # or
-   git checkout -b fix/issue-description
-   ```
+## Pull requests
 
-2. **Make your changes** following our coding guidelines
-
-3. **Test your changes**:
-   ```bash
-   cargo build --release
-   cargo test
-   # Manual testing with the TUI
-   ```
-
-4. **Commit with clear messages**:
-   ```bash
-   git commit -m "feat: add cool new feature"
-   # or
-   git commit -m "fix: resolve issue with file caching"
-   ```
-
-5. **Push and create a PR**:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-## Pull Request Process
-
-1. **Fill out the PR template** completely
-2. **Link related issues** using `Fixes #123` or `Closes #123`
-3. **Ensure CI passes** - builds must succeed
-4. **Request review** from maintainers
-5. **Address feedback** promptly
-6. **Squash commits** if requested before merge
-
-### Code Owners
-
-We use [CODEOWNERS](/.github/CODEOWNERS) for automatic reviewer assignment. When you open a PR, the right people are automatically assigned based on the files you changed:
-
-| Area | Files | Reviewers |
-|------|-------|-----------|
-| Core | `/src/core/`, `state.rs`, `actions.rs` | Lead maintainers |
-| LLM | `/src/llms/`, `api.rs` | LLM specialists |
-| Tools | `/src/tools/`, `tool_defs.rs` | Tools team |
-| UI | `/src/ui/`, `/src/panels/` | UI developers |
-| Backend | `/src/persistence/`, `cache.rs` | Backend team |
-| Docs | `*.md`, `/docs/` | Documentation team |
-| Security | `SECURITY.md`, `/src/llms/` | Security reviewers |
-
-**Note:** The CODEOWNERS file uses placeholder usernames. Replace them with your actual GitHub usernames.
-
-### Commit Message Format
-
-We follow conventional commits:
-
-```
-type(scope): description
-
-[optional body]
-
-[optional footer]
-```
-
-Types:
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation only
-- `style` - Code style (formatting, no logic change)
-- `refactor` - Code refactoring
-- `perf` - Performance improvement
-- `test` - Adding/updating tests
-- `chore` - Maintenance tasks
-
-## Coding Guidelines
-
-### Rust Style
-
-- Follow standard Rust conventions (`cargo fmt`)
-- Use `cargo clippy` and address all warnings
-- Prefer explicit types over complex inference
-- Document public APIs with doc comments
-
-### Architecture Patterns
-
-- **State**: All mutable state lives in `State` struct
-- **Actions**: State changes go through `Action` enum and `apply_action()`
-- **Panels**: UI panels implement the `Panel` trait
-- **Tools**: LLM tools go in `src/tools/` with matching entry in `tool_defs.rs`
-- **Caching**: Heavy I/O goes through background cache system
-
-### File Organization
-
-```
-src/
-├── core/          # App loop, initialization
-├── tools/         # Tool implementations
-├── panels/        # UI panel renderers
-├── persistence/   # State persistence
-├── ui/            # UI components
-├── llms/          # LLM provider integrations
-└── help/          # Command palette
-```
-
-### Adding a New Tool
-
-1. Create `src/tools/your_tool.rs`
-2. Add tool definition in `src/tool_defs.rs`
-3. Add dispatch case in `src/tools/mod.rs`
-4. Update documentation
-
-### Adding a New Panel
-
-1. Create `src/panels/your_panel.rs`
-2. Implement the `Panel` trait
-3. Add to `ContextType` enum in `src/state.rs`
-4. Add dispatch in `src/panels/mod.rs`
+1. Branch from the current working branch, not `master`.
+2. Keep the PR focused; describe what changed and why, and link the task or issue.
+3. All CI jobs green: Rust, Structure, Contract, Frontend.
+4. Changes to protected files need a maintainer to re-seal the chain.
 
 ## Testing
 
 ```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_name
-
-# Run with output
-cargo test -- --nocapture
+cargo test --workspace                # everything CI runs
+cargo test -p <crate> <name>          # one crate / one test
+cd web && pnpm build                  # type-checks the frontend
 ```
 
-### Manual Testing Checklist
+Frontend e2e (`check-ts-tests.sh`) is a stub until an ephemeral test stack exists.
 
-- [ ] Basic chat functionality works
-- [ ] File operations (open, edit, create) work
-- [ ] Panel switching works
-- [ ] Streaming responses display correctly
-- [ ] Reload preserves state
-- [ ] No UI glitches or rendering issues
+## License
 
-## Documentation
-
-- Update README.md for user-facing changes
-- Add doc comments (`///`) for public APIs
-- Update tool descriptions in `tool_defs.rs`
-- Add tree descriptions for new files
-
-## Community
-
-- **Issues**: For bugs and feature requests
-- **Discussions**: For questions and ideas
-- **Pull Requests**: For code contributions
-
-### Getting Help
-
-If you're stuck or have questions:
-
-1. Check existing issues and discussions
-2. Read the codebase - it's well-documented
-3. Open a discussion for general questions
-4. Reach out to maintainers
-
----
-
-Thank you for contributing to Context Pilot! 🚀
+Contributions are licensed under the [MIT License](LICENSE).
