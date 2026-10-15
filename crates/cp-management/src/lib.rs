@@ -6,10 +6,13 @@
 //! hard deletion need the main loop (bridge announce, runtime teardown), so
 //! the tool queues them in [`types::ManagementState`] for the app to drain.
 
-/// Fleet-wide delete confirmation keys (5-minute validity).
+/// Delete confirmation keys bound to one `(caller, target)` (5-minute validity).
 pub mod keys;
 /// `Agent` tool operations.
 pub mod ops;
+/// `Agent` tool rule tests.
+#[cfg(test)]
+mod tests;
 /// `ManagementState`: depth cap + outboxes drained by the main loop.
 pub mod types;
 /// `ManagementModule`: tool registration + config persistence.
