@@ -10,8 +10,28 @@ use cp_mod_search::meili::api::MeiliClient;
 use crate::db;
 use crate::types::EntitiesState;
 
+/// Write-effect detection (dirty / dropped tables) from `sqlite_master`.
+pub(crate) mod affected;
+#[cfg(test)]
+mod tests;
+
 /// Maximum character length for a single column value in `_all_text`.
 const VALUE_CAP: usize = 500;
+
+/// Meilisearch filter selecting one table's docs. Quotes and backslashes in
+/// the name are escaped so a table name can't break out of the string.
+fn table_filter(table: &str) -> String {
+    let escaped = table.replace('\\', "\\\\").replace('\'', "\\'");
+    format!("entity_table = '{escaped}'")
+}
+
+/// Truncate to at most [`VALUE_CAP`] characters (never splits a UTF-8 char).
+fn cap_value(val: String) -> String {
+    match val.char_indices().nth(VALUE_CAP) {
+        Some((cut, _)) => format!("{}…", val.get(..cut).unwrap_or_default()),
+        None => val,
+    }
+}
 
 // =============================================================================
 // Index management
@@ -64,8 +84,7 @@ pub(crate) fn sync_table(
     table_name: &str,
 ) -> Result<(), String> {
     // Delete existing docs for this table
-    let filter = format!("entity_table = '{table_name}'");
-    let _del_task = client.delete_documents_by_filter(index_uid, &filter)?;
+    let _del_task = client.delete_documents_by_filter(index_uid, &table_filter(table_name))?;
 
     // Open connection and read all rows
     let conn = db::open(db_path)?;
@@ -85,8 +104,7 @@ pub(crate) fn sync_table(
 ///
 /// Returns an error if the Meilisearch API call fails.
 pub(crate) fn delete_table_docs(client: &MeiliClient, index_uid: &str, table_name: &str) -> Result<(), String> {
-    let filter = format!("entity_table = '{table_name}'");
-    let _task = client.delete_documents_by_filter(index_uid, &filter)?;
+    let _task = client.delete_documents_by_filter(index_uid, &table_filter(table_name))?;
     Ok(())
 }
 
@@ -160,7 +178,9 @@ fn cleanup_orphan_tables(client: &MeiliClient, index_uid: &str, current_tables: 
         && let Some(tables_map) = facets.get("entity_table").and_then(serde_json::Value::as_object)
     {
         for indexed_table in tables_map.keys() {
-            if !current_tables.contains(indexed_table) {
+            // Case-insensitive: Meili string filters ignore case, so deleting a
+            // legacy lowercased `runs` would also wipe the live `Runs` docs.
+            if !current_tables.iter().any(|t| t.eq_ignore_ascii_case(indexed_table)) {
                 let _r = delete_table_docs(client, index_uid, indexed_table);
             }
         }
@@ -255,22 +275,12 @@ fn ddl_table(words: &[&str]) -> Option<String> {
     None
 }
 
-/// Table name affected by one SQL statement, if any (DML first, then DDL).
+/// Table name named by one SQL statement, if any (DML first, then DDL),
+/// lowercased. Callers resolve it to the stored case (see [`affected`]).
 fn table_from_statement(stmt: &str) -> Option<String> {
-    let upper = stmt.trim().to_uppercase();
+    let upper = crate::parse::strip_leading_comments(stmt).trim().to_uppercase();
     let words: Vec<&str> = upper.split_whitespace().collect();
     dml_table(&words).or_else(|| ddl_table(&words))
-}
-
-/// Extract affected table names from SQL statements.
-///
-/// Parses `INSERT INTO`, `UPDATE`, `DELETE FROM`, `CREATE TABLE`,
-/// `ALTER TABLE`, `DROP TABLE`, and `CREATE INDEX ON`.
-pub(crate) fn extract_affected_tables(statements: &[&str]) -> Vec<String> {
-    let mut tables: Vec<String> = statements.iter().filter_map(|stmt| table_from_statement(stmt)).collect();
-    tables.sort();
-    tables.dedup();
-    tables
 }
 
 /// Extract a clean table name from a raw SQL token.
@@ -322,21 +332,23 @@ fn build_docs(conn: &rusqlite::Connection, table: &str) -> Result<Vec<serde_json
 
     let (query, rowid_offset) =
         if has_rowid { (row_query, true) } else { (format!("SELECT * FROM \"{table}\""), false) };
+    // WITHOUT ROWID tables always declare a primary key: build the id from it.
+    let pk_idx = if has_rowid { Vec::new() } else { pk_column_indices(conn, table) };
+    // Lowercased so ids stay stable across case variants of the same name.
+    let id_table = table.to_lowercase();
 
     let mut stmt = conn.prepare(&query).map_err(|e| format!("{e}"))?;
     let mut rows = stmt.query([]).map_err(|e| format!("{e}"))?;
     let mut docs = Vec::new();
 
     while let Some(row) = rows.next().map_err(|e| format!("{e}"))? {
-        // Build row ID
-        let row_id = if rowid_offset {
+        let row_key = if rowid_offset {
             let rid: i64 = row.get(0).unwrap_or(0);
-            format!("{table}__{rid}")
+            rid.to_string()
         } else {
-            // Use first column (PK) as ID
-            let pk_val: String = row.get::<_, String>(1).unwrap_or_default();
-            format!("{table}__{pk_val}")
+            pk_key(&pk_idx.iter().map(|&i| format_cell_value(row, i)).collect::<Vec<_>>())
         };
+        let safe_id = format!("{}__{row_key}", sanitize_id(&id_table));
 
         // Build YAML-formatted _all_text
         let col_offset: usize = usize::from(rowid_offset);
@@ -345,20 +357,10 @@ fn build_docs(conn: &rusqlite::Connection, table: &str) -> Result<Vec<serde_json
             let idx = i.saturating_add(col_offset);
             let val = format_cell_value(row, idx);
             if !val.is_empty() && val != "NULL" {
-                let capped = if val.len() > VALUE_CAP {
-                    let truncated = val.get(..VALUE_CAP).unwrap_or(&val);
-                    format!("{truncated}…")
-                } else {
-                    val
-                };
-                yaml_parts.push(format!("{col_name}: {capped}"));
+                yaml_parts.push(format!("{col_name}: {}", cap_value(val)));
             }
         }
         let all_text = yaml_parts.join("\n");
-
-        // Sanitize doc ID for Meilisearch: [a-zA-Z0-9_-]
-        let safe_id: String =
-            row_id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect();
 
         docs.push(serde_json::json!({
             "id": safe_id,
@@ -368,6 +370,33 @@ fn build_docs(conn: &rusqlite::Connection, table: &str) -> Result<Vec<serde_json
     }
 
     Ok(docs)
+}
+
+/// Zero-based result indices of the primary-key columns, in key order.
+fn pk_column_indices(conn: &rusqlite::Connection, table: &str) -> Vec<usize> {
+    let query =
+        format!("SELECT cid, pk FROM pragma_table_info('{}') WHERE pk > 0 ORDER BY pk", table.replace('\'', "''"));
+    let Ok(mut stmt) = conn.prepare(&query) else { return Vec::new() };
+    let Ok(rows) = stmt.query_map([], |r| r.get::<_, i64>(0)) else { return Vec::new() };
+    rows.filter_map(Result::ok).filter_map(|cid| usize::try_from(cid).ok()).collect()
+}
+
+/// Meilisearch doc ids allow only `[a-zA-Z0-9_-]` (max 511 bytes).
+fn sanitize_id(raw: &str) -> String {
+    raw.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
+}
+
+/// Row key from primary-key values. Readable (`k…`) when sanitizing loses
+/// nothing; otherwise an FNV-1a hash (`h…`), so distinct keys never collide
+/// after sanitizing (`a b` vs `a_b`).
+fn pk_key(values: &[String]) -> String {
+    let joined = values.join("\u{1f}");
+    let readable = values.join("_");
+    if values.len() == 1 && sanitize_id(&readable) == readable && readable.len() <= 200 {
+        return format!("k{readable}");
+    }
+    let hash = joined.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    format!("h{hash:016x}")
 }
 
 /// Format a single cell value as a string for `_all_text`.
