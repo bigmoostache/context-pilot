@@ -17,7 +17,7 @@ tools:
       group_id: "Group id (G<n>); your human group for the user."
   Group_update:
     description: |
-      Change a group you own (not a human group). before_agent_ids must list
+      Change a custom group you own (not a human or sub-agent group). before_agent_ids must list
       the current members exactly, in any order, or the call fails: check the
       group first. after_agent_ids is the full new list and must include you.
       To leave a group you don't own, ask its owner.
@@ -29,6 +29,6 @@ tools:
       description: "New description (optional)."
   Group_delete:
     description: |
-      Delete a group you own. Human groups can't be deleted.
+      Delete a custom group you own. Human and sub-agent groups can't be deleted.
     parameters:
       group_id: "Group id (G<n>)."
