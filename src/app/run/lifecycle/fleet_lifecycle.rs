@@ -114,11 +114,8 @@ impl App {
     /// the entry is not `Errored` — so at N=1 (focused agent never in the registry)
     /// it never fires.
     pub(crate) fn clear_errored_entry(&mut self, agent_id: &str) {
-        if let Some(entry) = self.fleet.get_mut(agent_id)
-            && entry.exec_state == AgentExecState::Errored
-        {
-            entry.exec_state = AgentExecState::Runnable;
-            entry.waiting_since_ms = Some(cp_base::panels::now_ms());
+        if self.fleet.get(agent_id).is_some_and(|entry| entry.exec_state() == AgentExecState::Errored) {
+            let _known = self.fleet.set_state(agent_id, AgentExecState::Runnable);
         }
     }
 
@@ -276,15 +273,11 @@ impl App {
     /// gives it a slot under the K cap and its step's `check_spine` starts the
     /// stream. Must run after reconcile (which re-derives `Idle` from the turn)
     /// and before the step loop.
-    pub(super) fn poll_idle_agents(&mut self, now_ms: u64) {
+    pub(super) fn poll_idle_agents(&mut self) {
         let paused: std::collections::HashSet<String> =
             AgentsState::get(&self.state).agents.iter().filter(|a| a.paused).map(|a| a.id.clone()).collect();
-        let idle: Vec<String> = self
-            .fleet
-            .iter()
-            .filter(|entry| entry.1.exec_state == AgentExecState::Idle && !paused.contains(entry.0.as_str()))
-            .map(|entry| entry.0.clone())
-            .collect();
+        let mut idle = self.fleet.ids_in(AgentExecState::Idle);
+        idle.retain(|id| !paused.contains(id.as_str()));
         let prev = self.state.executing_agent_id().map(str::to_owned);
         for id in idle {
             if !self.state.agent_store.contains(&id) {
@@ -302,9 +295,8 @@ impl App {
             let wake = cp_mod_spine::types::SpineState::has_unprocessed_notifications(&self.state);
             self.stepping_agent = None;
             self.state.agent_store.set_executing(prev.clone());
-            if wake && let Some(entry) = self.fleet.get_mut(&id) {
-                entry.exec_state = AgentExecState::Runnable;
-                entry.waiting_since_ms = Some(now_ms);
+            if wake {
+                let _known = self.fleet.set_state(&id, AgentExecState::Runnable);
             }
         }
     }

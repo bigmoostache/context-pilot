@@ -475,9 +475,6 @@ dependencies = [
 [[package]]
 name = "cp-fleet"
 version = "0.2.13"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "cp-groups"

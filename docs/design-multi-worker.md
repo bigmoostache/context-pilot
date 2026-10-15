@@ -32,7 +32,7 @@ Goal: let the **same core loop** drive **multiple threads simultaneously**, wher
 | **Thread** | The unit of execution: a conversation with its own message history, context window, open-panel set + view state, context budget, and execution state. Same model and same agent behaviour as every other thread. |
 | **Context** | Everything sent to the LLM for a thread: its panel stack + conversation. **Per-thread.** |
 | **State** | The backing data stores behind the panels. **Shared, single instance.** |
-| **Execution state** | A thread's position in the loop: `Idle / Runnable / Streaming / AwaitingLLM / AwaitingTool / Errored` (§5.2). |
+| **Execution state** | A thread's position in the loop: `Idle / Runnable / Streaming / Errored` (§5.2). |
 | **Active set** | The threads currently being advanced (streaming / stepping). \*\*\` |
 | **Waiting** | A thread that is `Runnable` but has no active slot yet — queued for promotion (§7.3). |
 | **Step** | The smallest unit of thread progress the loop advances in one tick (§5.2). |
@@ -140,8 +140,8 @@ Every step is bounded and non-blocking by construction. This precise definition 
 The loop cooperatively advances the thread state machines, each in one of:
 
 - `Runnable` — has queued work (LLM chunk consumed, tool result to apply, fresh notification). Eligible to be advanced one step this tick **if it holds an active slot** (§7.3).
-- `Streaming` / `AwaitingLLM` — a request/stream is in flight on a background socket; parked until the next chunk arrives. **Holds an active slot** (it is consuming the rate-limited LLM resource).
-- `AwaitingTool` — a blocking tool (console/callback/web/OCR) runs on a background thread; parked until its watcher fires. **Releases its active slot** (the LLM is idle); re-enters the Runnable queue when the result lands.
+- `Streaming` — a request/stream, its tools or a blocking wait are in flight. **Holds an active slot** and is stepped every tick (the step loop is what polls the agent's watchers).
+- *(Implemented: the planned `AwaitingLLM` / `AwaitingTool` split was never produced and was removed from `cp-fleet`; an agent parked on tools stays `Streaming` and keeps its slot.)*
 - `Idle` — no work (its thread is THEIR_TURN or finished). Not in the active set.
 - `Errored` — last turn failed; surfaced in the TUI (§8); re-engaged like the single-thread error path today.
 
@@ -369,7 +369,7 @@ Kept as-is; becomes per-thread under the inbox split:
 
 - Remove the three guardrails (`MaxOutputTokens` / `MaxDuration` / `MaxMessages`): contained to `cp-mod-spine` (`guard_rail.rs`, `types.rs`, `engine.rs`, `tools.rs`) + `yamls/tools/spine.yaml`; `autonomous_start_ms` becomes dead with `MaxDuration`. Keep `MaxAutoRetries`. Serde-safe (old persisted keys ignored on load).
 - Decide whether to generalise the anti-flood cooldown beyond the MY_TURN detector (a per-source cooldown).
-- Confirm the exact rule for whether an `AwaitingTool` thread yields its `K` slot (§5.2) vs holds it; current decision = yields.
+- ~~Confirm whether an `AwaitingTool` thread yields its `K` slot~~ — resolved: no `AwaitingTool` state; a tool-parked agent stays `Streaming` and holds its slot.
 
 ---
 
