@@ -131,10 +131,8 @@ fn max_chars_for(tier: Tier, bound: usize) -> usize {
 /// Truncate `text` on a char boundary so it fits `tier`'s **enforced** bound.
 fn truncate_to_tier(text: &str, tier: Tier) -> String {
     let max = max_chars_for(tier, tier.enforced_bound());
-    if text.chars().count() <= max {
-        return text.to_owned();
-    }
-    let cut = text.floor_char_boundary(max.min(text.len()));
+    // Cut after `max` characters (not bytes), matching the char-based measure.
+    let cut = text.char_indices().nth(max).map_or(text.len(), |(i, _)| i);
     text.get(..cut).unwrap_or("").trim_end().to_owned()
 }
 
@@ -166,25 +164,29 @@ fn title_from(source: &str) -> String {
 // Public API — surgical updates
 // ---------------------------------------------------------------------------
 
-/// Insert or update a slot in the YAML store (occupied slots only).
-pub(crate) fn upsert_slot(slot: &MemorySlot) {
-    if !slot.occupied {
-        remove_slot(&slot.id);
-        return;
-    }
-    let mut entry = YamlSlotEntry {
-        tier: slot.tier,
-        title: slot.title.clone(),
-        contents: slot.contents.clone(),
-        importance: slot.importance,
-        last_edited_ms: 0, // set by YamlSync::upsert
-    };
-    sync().upsert(&slot.id, &mut entry);
-}
+/// Persist a batch of touched slots with at most two file rewrites: one
+/// `upsert_many` for occupied slots, one `remove_where` for freed ones.
+pub(crate) fn persist_slots(slots: &[&MemorySlot]) {
+    let upserts: Vec<(String, YamlSlotEntry)> = slots
+        .iter()
+        .filter(|s| s.occupied)
+        .map(|s| {
+            let entry = YamlSlotEntry {
+                tier: s.tier,
+                title: s.title.clone(),
+                contents: s.contents.clone(),
+                importance: s.importance,
+                last_edited_ms: 0, // set by YamlSync::upsert_many
+            };
+            (s.id.clone(), entry)
+        })
+        .collect();
+    sync().upsert_many(upserts);
 
-/// Remove a slot's entry from the YAML store by slot id.
-pub(crate) fn remove_slot(id: &str) {
-    sync().remove::<YamlSlotEntry>(id);
+    let freed: Vec<&str> = slots.iter().filter(|s| !s.occupied).map(|s| s.id.as_str()).collect();
+    if !freed.is_empty() {
+        let _removed = sync().remove_where::<YamlSlotEntry, _>(|k, _| freed.contains(&k));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -203,30 +205,71 @@ fn is_slot_key(key: &str) -> bool {
 /// If the file holds new slot-keyed entries, they are placed by id. If it holds
 /// legacy entries (old schema), they are **migrated** into the budget and the
 /// file is rewritten in the new format.
+///
+/// The YAML is the **source of truth** whenever it holds slots: every slot
+/// absent from it is cleared, so a slot freed elsewhere (another agent, a git
+/// pull) does not resurrect from the module JSON snapshot. A file that exists
+/// but is empty means every memory was freed. Only when no file exists are the
+/// JSON slots kept, and written back to rebuild it.
 pub(crate) fn load_into(state: &mut MemoryState) {
     // Try the new format first.
     let slot_map = sync().load::<YamlSlotEntry>();
-    let has_slots = slot_map.keys().any(|k| is_slot_key(k));
-
-    if has_slots {
-        for (id, entry) in &slot_map {
-            if let Some(slot) = state.slot_mut(id) {
-                slot.title.clone_from(&entry.title);
-                slot.contents.clone_from(&entry.contents);
-                slot.importance = entry.importance;
-                slot.occupied = true;
-            }
-        }
+    if slot_map.keys().any(|k| is_slot_key(k)) {
+        apply_slot_map(state, &slot_map);
         return;
     }
 
     // No slot-keyed entries — attempt a legacy migration.
     let legacy = sync().load::<LegacyEntry>();
-    if legacy.is_empty() {
+    if !legacy.is_empty() {
+        clear_all(state);
+        migrate_legacy(state, legacy);
+        persist_all(state);
         return;
     }
-    migrate_legacy(state, legacy);
-    persist_all(state);
+
+    match std::fs::read_to_string(SHARED_YAML) {
+        // Present and empty: every memory was freed.
+        Ok(text) if is_empty_yaml(&text) => clear_all(state),
+        // Present but unreadable: leave both sides untouched.
+        Ok(_) => {}
+        // Missing: rebuild the file from the JSON snapshot.
+        Err(_) => persist_all(state),
+    }
+}
+
+/// True when `text` is a YAML document with no entries.
+fn is_empty_yaml(text: &str) -> bool {
+    matches!(text.trim(), "" | "{}" | "---" | "--- {}")
+}
+
+/// Empty every slot in `state`.
+fn clear_all(state: &mut MemoryState) {
+    for slot in &mut state.slots {
+        clear_slot(slot);
+    }
+}
+
+/// Reset one slot to its free shape (renders `**empty**`).
+pub(crate) fn clear_slot(slot: &mut MemorySlot) {
+    slot.title.clear();
+    slot.contents.clear();
+    slot.importance = MemoryImportance::Medium;
+    slot.occupied = false;
+}
+
+/// Make `state` mirror `slot_map` exactly: slots listed there are filled,
+/// every other slot is cleared.
+fn apply_slot_map(state: &mut MemoryState, slot_map: &BTreeMap<String, YamlSlotEntry>) {
+    clear_all(state);
+    for (id, entry) in slot_map {
+        if let Some(slot) = state.slot_mut(id) {
+            slot.title.clone_from(&entry.title);
+            slot.contents.clone_from(&entry.contents);
+            slot.importance = entry.importance;
+            slot.occupied = true;
+        }
+    }
 }
 
 /// Fold legacy entries into the fixed budget (see module docs for the rules).
@@ -259,6 +302,9 @@ fn migrate_legacy(state: &mut MemoryState, legacy: BTreeMap<String, LegacyEntry>
 /// Rewrite the entire YAML store from `state` (occupied slots only). Used after
 /// a migration so the legacy keys are replaced by the new slot-keyed format.
 fn persist_all(state: &MemoryState) {
+    // A real stamp, so a migrated entry is not beaten by any concurrent edit
+    // under the latest-wins merge.
+    let now = cp_base::panels::now_ms();
     let mut entries = BTreeMap::new();
     for slot in state.slots.iter().filter(|s| s.occupied) {
         let _prev = entries.insert(
@@ -268,9 +314,77 @@ fn persist_all(state: &MemoryState) {
                 title: slot.title.clone(),
                 contents: slot.contents.clone(),
                 importance: slot.importance,
-                last_edited_ms: 0,
+                last_edited_ms: now,
             },
         );
     }
     sync().migrate(&entries);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A YAML entry for `tier` with the given title.
+    fn entry(tier: Tier, title: &str) -> YamlSlotEntry {
+        YamlSlotEntry {
+            tier,
+            title: title.to_owned(),
+            contents: "body".to_owned(),
+            importance: MemoryImportance::High,
+            last_edited_ms: 1,
+        }
+    }
+
+    /// Regression: a slot occupied in the JSON snapshot but freed in the YAML
+    /// must come back empty, not resurrect.
+    #[test]
+    fn slot_missing_from_yaml_is_cleared() {
+        let mut state = MemoryState::new();
+        let ghost = state.slot_mut("M-tiny-3").expect("slot");
+        ghost.title = "stale".to_owned();
+        ghost.occupied = true;
+        let mut map = BTreeMap::new();
+        let _prev = map.insert("M-short-1".to_owned(), entry(Tier::Short, "kept"));
+
+        apply_slot_map(&mut state, &map);
+
+        let freed = state.slot("M-tiny-3").expect("slot");
+        assert!(!freed.occupied && freed.title.is_empty());
+        let kept = state.slot("M-short-1").expect("slot");
+        assert!(kept.occupied && kept.title == "kept");
+        assert_eq!(state.occupied_count(), 1);
+    }
+
+    /// Empty YAML documents are recognised; a document with entries is not.
+    #[test]
+    fn empty_yaml_detection() {
+        assert!(["", "{}\n", "---", "--- {}"].iter().all(|t| is_empty_yaml(t)));
+        assert!(!is_empty_yaml("M-tiny-1:\n  tier: tiny\n"));
+    }
+
+    /// Truncation counts characters, so multi-byte text keeps `max` chars.
+    #[test]
+    fn truncate_counts_chars_not_bytes() {
+        let max = max_chars_for(Tier::Safe, Tier::Safe.enforced_bound());
+        let text = "\u{e9}".repeat(max.saturating_add(10));
+        let cut = truncate_to_tier(&text, Tier::Safe);
+        assert_eq!(cut.chars().count(), max);
+        assert_eq!(truncate_to_tier("short", Tier::Safe), "short");
+    }
+
+    /// Titles keep whole words under the cap and hard-cut a single long word.
+    #[test]
+    fn title_from_respects_cap() {
+        let title = title_from("alpha beta gamma delta epsilon zeta eta");
+        assert!(title.chars().count() <= TITLE_MAX_CHARS && title.starts_with("alpha beta"));
+        assert_eq!(title_from(&"x".repeat(40)).chars().count(), TITLE_MAX_CHARS);
+    }
+
+    /// Only well-formed `M-<tier>-<n>` keys count as slot keys.
+    #[test]
+    fn slot_key_shape() {
+        assert!(is_slot_key("M-short-23"));
+        assert!(!is_slot_key("M-huge-1") && !is_slot_key("M-tiny-x") && !is_slot_key("abc123"));
+    }
 }

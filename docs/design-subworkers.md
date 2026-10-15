@@ -1,6 +1,6 @@
 # Sub-workers: single → N cooperative workers
 
-**Status:** design (T710). Ultra-synthetic. No code yet.
+**Status:** historical (T710). Superseded by `docs/design-multi-worker.md` (v8, shipped): workers became agents under a concurrency cap (`cp-fleet`).
 
 ## 1. Goal
 

@@ -19,6 +19,9 @@ pub(crate) fn bootstrap_server(persist: &mut SearchPersistData, project_path: &s
             persist.master_key = info.master_key;
             let _r = meili::server::register_project(project_path, &persist.project_hash);
             meili::server::cleanup_orphan_indexes(persist.port, &persist.master_key);
+            if let Ok(client) = MeiliClient::new(persist.port, &persist.master_key) {
+                meili::tasks::purge_finished_tasks_logged(&client, "boot");
+            }
         }
         Err(e) => {
             log::warn!("Meilisearch server not available: {e}");

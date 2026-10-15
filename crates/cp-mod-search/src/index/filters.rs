@@ -94,30 +94,51 @@ pub(crate) fn is_indexable(
     }
 
     let rel_path = abs_path.strip_prefix(project_root).unwrap_or(abs_path);
+    is_indexable_rel(rel_path) && meta.len() <= MAX_FILE_SIZE
+}
 
-    // Excluded directory in any path component.
-    for component in rel_path.components() {
-        if let std::path::Component::Normal(name) = component
-            && is_excluded_dir(name.to_str().unwrap_or(""))
-        {
-            return false;
-        }
+/// Path-only half of [`is_indexable`]: excluded directory component, extension
+/// allowlist, excluded suffix. Needs no stat, so it also judges paths that no
+/// longer exist (watcher `Remove` events).
+pub(crate) fn is_indexable_rel(rel_path: &std::path::Path) -> bool {
+    let in_excluded_dir = rel_path.components().any(|component| {
+        matches!(component, std::path::Component::Normal(name) if is_excluded_dir(name.to_str().unwrap_or("")))
+    });
+    if in_excluded_dir {
+        return false;
     }
-
-    // Extension allowlist (text files only).
     let ext = rel_path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if !is_allowed_extension(ext) {
-        return false;
-    }
-
-    // Excluded file suffix patterns (.min.js, .lock, …).
     let filename = rel_path.file_name().and_then(std::ffi::OsStr::to_str).unwrap_or("");
-    if is_excluded_file(filename) {
-        return false;
-    }
+    is_allowed_extension(ext) && !is_excluded_file(filename)
+}
 
-    // Size cap.
-    meta.len() <= MAX_FILE_SIZE
+/// Max paths per `file_path IN [...]` delete filter, so one request body stays small.
+pub(crate) const DELETE_BATCH: usize = 200;
+
+/// Single-quoted Meilisearch filter literal for `raw`.
+///
+/// Meilisearch's filter parser only treats `\` as an escape when the next char
+/// is the closing quote; any other backslash is kept verbatim. So `'` becomes
+/// `\'` and backslashes stay as they are. A value ENDING in `\` has no valid
+/// encoding (the backslash would escape the closing quote): `None`.
+pub(crate) fn quote_filter_value(raw: &str) -> Option<String> {
+    if raw.ends_with('\\') {
+        return None;
+    }
+    Some(format!("'{}'", raw.replace('\'', "\\'")))
+}
+
+/// `file_path = '…'` filter for one project-relative path (`None`: unquotable).
+pub(crate) fn file_path_filter(rel_path: &str) -> Option<String> {
+    quote_filter_value(rel_path).map(|quoted| format!("file_path = {quoted}"))
+}
+
+/// `file_path IN [...]` filters covering `rel_paths`, one per [`DELETE_BATCH`]
+/// paths: a batch of N deletions costs ceil(N / 200) Meilisearch tasks, not N.
+/// Unquotable paths (see [`quote_filter_value`]) are skipped.
+pub(crate) fn delete_filters(rel_paths: &[String]) -> Vec<String> {
+    let quoted: Vec<String> = rel_paths.iter().filter_map(|path| quote_filter_value(path)).collect();
+    quoted.chunks(DELETE_BATCH).map(|chunk| format!("file_path IN [{}]", chunk.join(", "))).collect()
 }
 
 /// Visit every regular file under `root` that survives the directory gates:
@@ -296,5 +317,32 @@ mod tests {
             return Err("oversized file accepted".to_owned());
         }
         Ok(())
+    }
+
+    #[test]
+    fn rel_gate_rejects_target_paths_without_stat() {
+        // Deleted files can't be stat'ed: the path-only gate must still drop them.
+        assert!(!is_indexable_rel(std::path::Path::new("target/debug/build/x/out/gen.rs")));
+        assert!(!is_indexable_rel(std::path::Path::new("web/node_modules/a/b.ts")));
+        assert!(!is_indexable_rel(std::path::Path::new("logo.png")));
+        assert!(is_indexable_rel(std::path::Path::new("src/main.rs")));
+    }
+
+    #[test]
+    fn quoting_escapes_quote_keeps_backslash() {
+        assert_eq!(quote_filter_value("it's").as_deref(), Some(r"'it\'s'"));
+        assert_eq!(quote_filter_value(r"a\b.rs").as_deref(), Some(r"'a\b.rs'"));
+        assert_eq!(quote_filter_value(r"trail\"), None);
+        assert_eq!(file_path_filter("src/a.rs").as_deref(), Some("file_path = 'src/a.rs'"));
+    }
+
+    #[test]
+    fn delete_filters_batch_paths() {
+        let paths: Vec<String> = (0..=DELETE_BATCH).map(|i| format!("f{i}.rs")).collect();
+        let filters = delete_filters(&paths);
+        assert_eq!(filters.len(), 2);
+        assert!(filters.first().is_some_and(|f| f.starts_with("file_path IN ['f0.rs', 'f1.rs'")));
+        assert_eq!(filters.get(1).map(String::as_str), Some("file_path IN ['f200.rs']"));
+        assert!(delete_filters(&[r"bad\".to_owned()]).is_empty());
     }
 }
