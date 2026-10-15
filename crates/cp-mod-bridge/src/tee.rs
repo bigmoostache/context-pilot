@@ -129,7 +129,8 @@ impl Tee {
         let degraded = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(false));
 
-        let publisher = Publisher { rx, listener, stop: Arc::clone(&stop) };
+        let losses = Losses { dropped: Arc::clone(&dropped), degraded: Arc::clone(&degraded) };
+        let publisher = Publisher { rx, listener, stop: Arc::clone(&stop), losses };
         let handle = thread::spawn(move || publisher.run());
 
         Self { tx, dropped, degraded, stop, handle: Some(handle) }
@@ -152,7 +153,8 @@ impl Tee {
         }
     }
 
-    /// Total frames dropped so far because the buffer was full.
+    /// Total frames lost so far: dropped on a full buffer, or lost on a
+    /// failed write to the observer.
     #[must_use]
     pub fn dropped(&self) -> u64 {
         self.dropped.load(Ordering::Relaxed)
@@ -162,6 +164,14 @@ impl Tee {
     #[must_use]
     pub fn is_degraded(&self) -> bool {
         self.degraded.load(Ordering::Relaxed)
+    }
+
+    /// Consume the degraded signal: `Some(total dropped)` if frames were lost
+    /// since the last call, `None` otherwise. Each loss episode is reported
+    /// once, so the caller can log it without flooding.
+    #[must_use]
+    pub fn take_degraded(&self) -> Option<u64> {
+        self.degraded.swap(false, Ordering::Relaxed).then(|| self.dropped())
     }
 
     /// Stop the publisher and join its thread.
@@ -200,6 +210,26 @@ struct Publisher {
 
     /// Set by [`Tee`] to request shutdown.
     stop: Arc<AtomicBool>,
+
+    /// Loss counters shared with [`Tee`], so frames lost on a failed write
+    /// count as drops just like a full buffer.
+    losses: Losses,
+}
+
+/// The drop counter and degraded flag, shared by producer and publisher.
+struct Losses {
+    /// Total frames lost, from either side.
+    dropped: Arc<AtomicU64>,
+    /// Set on any loss; cleared by [`Tee::take_degraded`].
+    degraded: Arc<AtomicBool>,
+}
+
+impl Losses {
+    /// Record one lost frame.
+    fn record(&self) {
+        let _prev = self.dropped.fetch_add(1, Ordering::Relaxed);
+        self.degraded.store(true, Ordering::Relaxed);
+    }
 }
 
 impl Publisher {
@@ -234,8 +264,10 @@ impl Publisher {
             };
 
             if !write_frame(stream, &frame) {
-                // Broken pipe / exhausted backoff: drop this observer and fall
+                // Broken pipe / exhausted backoff: the observer missed this
+                // frame, so it counts as a loss. Drop the observer and fall
                 // back to accepting a fresh one.
+                self.losses.record();
                 client = None;
             }
         }
@@ -369,6 +401,28 @@ mod tests {
         let got = read_one_frame(&mut client, deadline).expect("a frame arrives");
         assert_eq!(got, token(0, "hello"), "the delivered frame round-trips");
 
+        tee.shutdown();
+    }
+
+    #[test]
+    fn a_frame_lost_to_a_vanished_observer_raises_degraded() {
+        let (listener, path) = bound_listener();
+        let tee = Tee::spawn(listener);
+        let client = UnixStream::connect(&path).expect("connect");
+        sleep(Duration::from_millis(80)); // let the publisher accept it
+        drop(client);
+
+        // Writing to the closed observer fails: the publisher must count it.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut seq = 0u64;
+        while !tee.is_degraded() && Instant::now() < deadline {
+            let _outcome = tee.publish(token(seq, "x"));
+            seq = seq.saturating_add(1);
+            sleep(Duration::from_millis(10));
+        }
+        let lost = tee.take_degraded().expect("a publisher-side loss is reported");
+        assert!(lost > 0, "the loss is counted");
+        assert_eq!(tee.take_degraded(), None, "each episode is reported once");
         tee.shutdown();
     }
 

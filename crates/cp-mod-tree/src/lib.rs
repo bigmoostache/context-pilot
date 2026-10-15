@@ -5,12 +5,17 @@
 //! panel auto-refreshes on filesystem changes and provides @-autocomplete
 //! with directory entries.
 
+/// Memoized single-read file digests (staleness hash + YAML key).
+mod filehash;
 /// Panel implementation for the directory tree view.
 mod panel;
 /// Read-only tree-string rendering (directory walk), split from tools.rs.
 mod render;
 /// YAML-backed persistent storage for tree descriptions.
 mod storage;
+/// Unit tests for storage merge/refresh/prune and the digest cache.
+#[cfg(test)]
+mod tests;
 /// Tool implementations for tree filtering, toggling, and describing.
 pub mod tools;
 /// Tree state types: `TreeState`, `TreeFileDescription`.
@@ -124,6 +129,7 @@ impl Module for TreeModule {
         let ts = TreeState::get_mut(state);
         storage::migrate_to_yaml(&ts.descriptions);
         storage::populate_from_yaml(&mut std::sync::Arc::make_mut(&mut ts.descriptions).0);
+        storage::prune_yaml(&ts.descriptions);
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {

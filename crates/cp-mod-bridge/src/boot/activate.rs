@@ -15,6 +15,7 @@ use cp_wire::types::stream::{Frame as StreamFrame, Kind as StreamKind};
 use crate::BridgeState;
 use crate::body::Store;
 use crate::command::Intake;
+use crate::command::server::Server;
 use crate::tee::Tee;
 
 use super::Boot;
@@ -66,6 +67,14 @@ where
     }
 }
 
+/// Build the [`Intake`] from the oplog replay and start its [`Server`] thread
+/// on a clone of the boot listener.
+fn spawn_intake(boot: &Boot) -> std::io::Result<Server> {
+    let intake = Intake::new(std::path::Path::new(&boot.entry().oplog_path), boot.cap_token().to_owned())
+        .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+    Server::spawn(boot.listener().try_clone()?, boot.oplog_shared(), intake)
+}
+
 /// Wire the live bridge surfaces around a booted [`Boot`] and install the
 /// assembled [`BridgeState`] on `state` (see the module-level docs).
 pub(crate) fn activate(boot: Boot, state: &mut State) {
@@ -75,14 +84,10 @@ pub(crate) fn activate(boot: Boot, state: &mut State) {
     // command socket in Boot).
     let tee = or_log("tee", setup_tee(boot.entry()));
 
-    // Set the command listener to non-blocking so the main-loop poll never
-    // stalls when no commander is connected.
-    let _nb = boot.listener().set_nonblocking(true);
-
     // Seed the command intake from the oplog replay (populates the SeenSet for
-    // dedup across deadman re-exec).
-    let intake =
-        or_log("intake", Intake::new(std::path::Path::new(&boot.entry().oplog_path), boot.cap_token().to_owned()));
+    // dedup across deadman re-exec), then run it on its own thread so socket
+    // reads, the journal `fdatasync` and query lookups never stall the loop.
+    let intake = or_log("intake", spawn_intake(&boot));
 
     // Open the content-addressed body store under the oplog dir, so the message
     // chokepoint can durably stage bodies before referencing them (I13).
@@ -172,5 +177,11 @@ pub(crate) fn publish_frame(state: &mut State, kind: StreamKind) {
 
     if let Some(tee) = bs.tee.as_ref() {
         let _outcome = tee.publish(frame);
+        // `seq` advances for every frame, published or not, so the backend sees
+        // a lost frame as a gap in `seq`. This logs each loss episode once on
+        // the agent side too, instead of the flag never being read.
+        if let Some(lost) = tee.take_degraded() {
+            log::warn!("bridge: stream tee lost frames (total {lost}); observers will see a seq gap");
+        }
     }
 }

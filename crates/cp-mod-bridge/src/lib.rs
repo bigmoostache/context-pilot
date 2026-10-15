@@ -6,10 +6,12 @@
 //!
 //! - **Oplog** — append-only, `fdatasync`'d WAL for durable command effects,
 //!   `rev` assignment, `seen`-marks, phase transitions, lifecycle, and cost.
-//! - **Stream tee** — lock-free SPSC enqueue of each `StreamEvent`; dedicated
-//!   publisher thread writes `stream.sock`.
-//! - **Command intake** — bearer-auth'd, journal-then-ack, injected via the
-//!   existing user-message entry (never the spine).
+//! - **Stream tee** — one non-blocking `try_send` per frame into a bounded
+//!   channel (dropped and counted when full); a dedicated publisher thread
+//!   writes `tee.sock`.
+//! - **Command intake** — on its own thread: constant-time bearer check,
+//!   journal-then-ack, dedup. The main loop only drains accepted commands and
+//!   injects them via the existing user-message entry (never the spine).
 //! - **Heartbeat** — dedicated thread, aligned in-place write.
 //!
 //! The module does **not** touch `writer.rs` — tier-② persistence is unchanged.
@@ -28,7 +30,6 @@ use cp_wire::types::stream::Kind as StreamKind;
 use crate::body::Store;
 use crate::boot::Boot;
 use crate::boot::seed_state::MemoSeeds;
-use crate::command::Intake;
 use crate::tee::Tee;
 
 /// CLI-driven bridge activation flag — set by `cpilot --bridge` before any
@@ -82,6 +83,11 @@ pub type ContextMemo = (u64, u64, u64, u64, u64);
 /// `save_module_data` / `load_module_data` return `Null`.
 #[derive(Debug, Default)]
 pub struct BridgeState {
+    /// The command intake thread, or `None` when the bridge is OFF. Runs
+    /// bearer-auth, journal-then-ack and dedup off the main loop; declared
+    /// before `boot` so it stops (and drops its oplog handle) first.
+    pub intake: Option<command::server::Server>,
+
     /// The held boot resources, or `None` when the bridge is OFF or boot failed.
     pub boot: Option<Boot>,
 
@@ -89,10 +95,6 @@ pub struct BridgeState {
     /// setup failed. Publishes live [`StreamFrame`]s to an observing backend
     /// (design doc tier ③).
     pub tee: Option<Tee>,
-
-    /// The command intake processor, or `None` when the bridge is OFF.
-    /// Handles bearer-auth, journal-then-ack, and dedup for inbound commands.
-    pub intake: Option<Intake>,
 
     /// Per-stream monotonic frame sequence counter for gap detection.
     pub tee_seq: u64,
