@@ -4,15 +4,30 @@
 //! 1. macOS Keychain (service `"Claude Code-credentials"`)
 //! 2. `~/.claude/.credentials.json` or `~/.claude/credentials.json`
 //!
-//! The token is checked for expiry before returning.
+//! The token is checked for expiry before returning. Token lookups are
+//! memoized for [`TOKEN_TTL`]: each Keychain read spawns the `security` CLI,
+//! and `Vault::list`/`health` resolve every key.
 
 use std::fs;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Deserialize;
+use zeroize::Zeroizing;
 
 use crate::types::SecretString;
+
+/// How long a token lookup (hit or miss) is reused before re-reading.
+/// Short, so a token rotated by the orchestrator's refresh flow is picked up
+/// within seconds.
+const TOKEN_TTL: Duration = Duration::from_secs(30);
+
+/// When a token lookup ran and what it found.
+type CachedLookup = (Instant, Option<SecretString>);
+
+/// Last token lookup.
+static TOKEN_CACHE: Mutex<Option<CachedLookup>> = Mutex::new(None);
 
 /// On-disk credentials file structure for Claude Code OAuth.
 #[derive(Deserialize)]
@@ -35,7 +50,8 @@ struct OAuthCredentials {
 
 /// Load the Claude OAuth token from Keychain (macOS) or credential file.
 ///
-/// Returns `None` if no valid, unexpired token is found.
+/// Returns `None` if no valid, unexpired token is found. Memoized for
+/// [`TOKEN_TTL`]; a cached token is re-checked so it is never served expired.
 ///
 /// `pub(crate)` by design: this is the *mechanism* behind
 /// [`AuthMechanism::KeychainThenFile`](cp_env::specs::secrets::AuthMechanism) and is
@@ -46,19 +62,34 @@ struct OAuthCredentials {
 /// bypassing the vault a compile error rather than a convention.
 #[must_use]
 pub(crate) fn load_claude_oauth_token() -> Option<SecretString> {
+    let now = Instant::now();
+    if let Ok(guard) = TOKEN_CACHE.lock()
+        && let Some(entry) = guard.as_ref()
+        && now.duration_since(entry.0) < TOKEN_TTL
+    {
+        return entry.1.clone();
+    }
+    let fresh = lookup_token();
+    if let Ok(mut guard) = TOKEN_CACHE.lock() {
+        *guard = Some((now, fresh.clone()));
+    }
+    fresh
+}
+
+/// Uncached lookup: Keychain first (macOS), then the credentials file.
+fn lookup_token() -> Option<SecretString> {
     if cfg!(target_os = "macos")
-        && let Some(token) = load_from_keychain()
+        && let Some(token) = keychain_text().and_then(|t| parse_credentials_json(t.trim()))
     {
         return Some(token);
     }
-    load_from_file()
+    let text = file_text()?;
+    parse_credentials_json(&text)
 }
 
-/// Read credentials JSON from the macOS Keychain via the `security` CLI.
-///
-/// The password stored under service `"Claude Code-credentials"` is the same
-/// JSON blob as the on-disk credentials file.
-fn load_from_keychain() -> Option<SecretString> {
+/// Credentials JSON stored under Keychain service `"Claude Code-credentials"`
+/// (same blob as the on-disk file), via the `security` CLI.
+fn keychain_text() -> Option<Zeroizing<String>> {
     let output = Command::new("security")
         .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
         .output()
@@ -66,20 +97,15 @@ fn load_from_keychain() -> Option<SecretString> {
     if !output.status.success() {
         return None;
     }
-    let content = String::from_utf8(output.stdout).ok()?;
-    parse_credentials_json(content.trim())
+    String::from_utf8(output.stdout).ok().map(Zeroizing::new)
 }
 
-/// Read credentials JSON from `~/.claude/.credentials.json` (or fallback path).
-fn load_from_file() -> Option<SecretString> {
-    let home_path = cp_env::env().core.home.clone();
-
-    let primary = home_path.join(".claude").join(".credentials.json");
-    let fallback = home_path.join(".claude").join("credentials.json");
-
-    let path = if primary.exists() { primary } else { fallback };
-    let content = fs::read_to_string(&path).ok()?;
-    parse_credentials_json(&content)
+/// Credentials JSON from `~/.claude/.credentials.json` (or `credentials.json`).
+fn file_text() -> Option<Zeroizing<String>> {
+    let claude_dir = cp_env::env().core.home.join(".claude");
+    let primary = claude_dir.join(".credentials.json");
+    let path = if primary.exists() { primary } else { claude_dir.join("credentials.json") };
+    fs::read_to_string(&path).ok().map(Zeroizing::new)
 }
 
 /// Parse a credentials JSON blob and return the access token if not expired.
@@ -94,44 +120,27 @@ fn parse_credentials_json(content: &str) -> Option<SecretString> {
     Some(SecretString::new(creds.claude_ai_oauth.access_token))
 }
 
-/// Load the full Claude OAuth credentials JSON from Keychain or file.
-///
-/// Returns the raw `claudeAiOauth` object (with `accessToken`, `refreshToken`,
-/// `expiresAt`, etc.) without expiry filtering.  Used by the orchestrator for
-/// token-status inspection and refresh flows.
-#[must_use]
-pub fn load_claude_oauth_raw() -> Option<serde_json::Value> {
-    if cfg!(target_os = "macos")
-        && let Some(val) = raw_from_keychain()
-    {
-        return Some(val);
-    }
-    raw_from_file()
-}
-
-/// Read raw credentials JSON from macOS Keychain.
-fn raw_from_keychain() -> Option<serde_json::Value> {
-    let output = Command::new("security")
-        .args(["find-generic-password", "-s", "Claude Code-credentials", "-w"])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let content = String::from_utf8(output.stdout).ok()?;
+/// The `claudeAiOauth` object of a credentials JSON blob.
+fn raw_section(content: &str) -> Option<serde_json::Value> {
     let val: serde_json::Value = serde_json::from_str(content.trim()).ok()?;
     val.get("claudeAiOauth").cloned()
 }
 
-/// Read raw credentials JSON from `~/.claude/.credentials.json`.
-fn raw_from_file() -> Option<serde_json::Value> {
-    let home_path = cp_env::env().core.home.clone();
-    let primary = home_path.join(".claude").join(".credentials.json");
-    let fallback = home_path.join(".claude").join("credentials.json");
-    let path = if primary.exists() { primary } else { fallback };
-    let content = fs::read_to_string(&path).ok()?;
-    let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    val.get("claudeAiOauth").cloned()
+/// Load the full Claude OAuth credentials JSON from Keychain or file.
+///
+/// Returns the raw `claudeAiOauth` object (with `accessToken`, `refreshToken`,
+/// `expiresAt`, etc.) without expiry filtering.  Used by the orchestrator for
+/// token-status inspection and refresh flows, so it is never memoized: a
+/// refresh must see the token it just wrote.
+#[must_use]
+pub fn load_claude_oauth_raw() -> Option<serde_json::Value> {
+    if cfg!(target_os = "macos")
+        && let Some(val) = keychain_text().and_then(|t| raw_section(&t))
+    {
+        return Some(val);
+    }
+    let text = file_text()?;
+    raw_section(&text)
 }
 
 #[cfg(test)]
@@ -157,5 +166,12 @@ mod tests {
     #[test]
     fn parse_invalid_json_returns_none() {
         assert!(parse_credentials_json("not json").is_none());
+    }
+
+    #[test]
+    fn raw_section_extracts_object() {
+        let raw = raw_section(r#" {"claudeAiOauth":{"refreshToken":"r"}} "#).unwrap();
+        assert_eq!(raw.get("refreshToken").and_then(|v| v.as_str()), Some("r"));
+        assert!(raw_section("{}").is_none());
     }
 }

@@ -7,6 +7,44 @@ use std::time::{Duration, Instant};
 
 use super::api::MeiliClient;
 
+/// Finished tasks younger than this are kept (recent history for the overlay).
+const TASK_RETENTION_SECS: i64 = 3600;
+
+/// `DELETE /tasks` query purging finished tasks enqueued before `cutoff_rfc3339`.
+fn purge_url(base_url: &str, cutoff_rfc3339: &str) -> String {
+    format!("{base_url}/tasks?statuses=succeeded,failed,canceled&beforeEnqueuedAt={cutoff_rfc3339}")
+}
+
+/// Delete finished Meilisearch tasks older than [`TASK_RETENTION_SECS`].
+///
+/// Meilisearch keeps every task forever (it only self-prunes near its 1M-task
+/// cap), and each indexed file costs 1-2 tasks: unpurged, the tasks DB reached
+/// 20 GB. Called at boot and from the hourly tick. Enqueues one
+/// `taskDeletion` task; not awaited.
+///
+/// # Errors
+///
+/// Returns an error if the request fails or the response carries no task uid.
+pub(crate) fn purge_finished_tasks(client: &MeiliClient) -> Result<u64, String> {
+    let now_secs = cp_mod_utilities::time::now_epoch_ms().wrapping_div(1000);
+    let cutoff = cp_mod_utilities::time::epoch_secs_to_rfc3339_secs(now_secs.saturating_sub(TASK_RETENTION_SECS))
+        .ok_or_else(|| "purge_finished_tasks: clock before epoch".to_owned())?;
+    let resp = client
+        .client()
+        .delete(purge_url(client.url(), &cutoff))
+        .header("Authorization", format!("Bearer {}", client.key()))
+        .send()
+        .map_err(|e| format!("purge_finished_tasks request failed: {e}"))?;
+    extract_task_uid(resp, "purge_finished_tasks")
+}
+
+/// [`purge_finished_tasks`] with failures logged (`when` labels the caller).
+pub(crate) fn purge_finished_tasks_logged(client: &MeiliClient, when: &str) {
+    if let Err(e) = purge_finished_tasks(client) {
+        log::warn!("Meilisearch task purge ({when}) failed: {e}");
+    }
+}
+
 /// Poll a task until it reaches a terminal state (`succeeded` or `failed`).
 ///
 /// Polls every 200ms for up to 30 seconds.
@@ -165,4 +203,17 @@ pub(crate) fn fetch_all_with_vectors(client: &MeiliClient, uid: &str) -> Result<
     }
 
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn purge_url_targets_only_finished_tasks_before_cutoff() {
+        assert_eq!(
+            purge_url("http://127.0.0.1:7700", "2026-10-15T08:00:00Z"),
+            "http://127.0.0.1:7700/tasks?statuses=succeeded,failed,canceled&beforeEnqueuedAt=2026-10-15T08:00:00Z"
+        );
+    }
 }

@@ -43,6 +43,10 @@ const CACHE_FILENAME: &str = "vault-cache.json";
 pub struct Backend {
     /// Key→value cache populated from orchestrator snapshot.
     cache: Arc<RwLock<HashMap<String, SecretString>>>,
+    /// Local edits the orchestrator has not taken: `Some` = a `set` whose push
+    /// failed, `None` = a `delete` (no orchestrator route). Consulted before
+    /// `cache`, so a refresh (which rebuilds `cache`) cannot revert them.
+    local_edits: RwLock<HashMap<String, Option<SecretString>>>,
     /// Fallback backend for keys not in the orchestrator.
     local: LocalVault,
     /// Orchestrator base URL (e.g. `http://192.168.1.5:7878`).
@@ -77,7 +81,7 @@ impl Backend {
         let local = LocalVault::new();
         let cache = Arc::new(RwLock::new(HashMap::new()));
 
-        let vault = Self { cache, local, orch_url };
+        let vault = Self { cache, local_edits: RwLock::new(HashMap::new()), local, orch_url };
 
         // Boot: try orchestrator first, fall back to disk cache.
         if !vault.refresh_from_orchestrator() {
@@ -163,7 +167,16 @@ impl Vault for Backend {
     fn get(&self, key: &str) -> Option<SecretString> {
         let def = resolve_definition(key)?;
 
-        // 1. Orchestrator cache (highest priority in bridge mode).
+        // 1. Local edits not reflected by the orchestrator. A tombstone skips
+        //    the cache so a refreshed snapshot cannot resurrect the key.
+        let edit = self.local_edits.read().ok()?.get(def.canonical).cloned();
+        match edit {
+            Some(Some(val)) => return Some(val),
+            Some(None) => return self.local.get(key),
+            None => {}
+        }
+
+        // 2. Orchestrator cache.
         {
             let guard = self.cache.read().ok()?;
             if let Some(val) = guard.get(def.canonical) {
@@ -171,7 +184,7 @@ impl Vault for Backend {
             }
         }
 
-        // 2. Local fallback (env vars, Keychain).
+        // 3. Local fallback (env vars, Keychain).
         self.local.get(key)
     }
 
@@ -181,26 +194,20 @@ impl Vault for Backend {
 
     fn set(&self, key: &str, value: &str) -> Result<(), VaultError> {
         let def = resolve_definition(key).ok_or_else(|| VaultError::MissingKey(format!("unknown key: {key}")))?;
+        let push_ok = push_to_orchestrator(&self.orch_url, def.canonical, value);
+        let secret = SecretString::new(value.to_owned());
 
-        // Try pushing to orchestrator.
-        let url = format!("{}/api/env-keys/{}", self.orch_url, def.canonical);
-        let body = serde_json::json!({ "value": value });
-
-        let push_ok = reqwest::blocking::Client::builder()
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(REQUEST_TIMEOUT)
-            .build()
-            .ok()
-            .and_then(|c| c.put(&url).json(&body).send().ok())
-            .is_some_and(|r| r.status().is_success());
-
-        if !push_ok {
-            log::warn!("vault set: could not push {key} to orchestrator, storing locally");
-        }
-
-        // Always store in local cache for immediate availability.
         if let Ok(mut guard) = self.cache.write() {
-            drop(guard.insert(def.canonical.to_owned(), SecretString::new(value.to_owned())));
+            drop(guard.insert(def.canonical.to_owned(), secret.clone()));
+        }
+        if let Ok(mut edits) = self.local_edits.write() {
+            if push_ok {
+                // The next snapshot carries it; any older local edit is moot.
+                drop(edits.remove(def.canonical));
+            } else {
+                log::warn!("vault set: could not push {key} to orchestrator, keeping it locally");
+                drop(edits.insert(def.canonical.to_owned(), Some(secret)));
+            }
         }
 
         // Also persist locally.
@@ -212,6 +219,10 @@ impl Vault for Backend {
 
         if let Ok(mut guard) = self.cache.write() {
             drop(guard.remove(def.canonical));
+        }
+        // The orchestrator has no delete route: tombstone so refresh can't undo it.
+        if let Ok(mut edits) = self.local_edits.write() {
+            drop(edits.insert(def.canonical.to_owned(), None));
         }
 
         self.local.delete(key)
@@ -245,11 +256,15 @@ impl Vault for Backend {
 /// to the disk cache. Factored out of [`Backend::refresh_from_orchestrator`]
 /// and the background refresh thread, which share this exact fetch.
 fn fetch_snapshot(orch_url: &str) -> Option<BTreeMap<String, String>> {
+    let Some(token) = crate::token::read() else {
+        log::warn!("vault snapshot: no bridge token file, using disk cache");
+        return None;
+    };
     let url = format!("{orch_url}/api/vault/snapshot");
     let client =
         reqwest::blocking::Client::builder().connect_timeout(CONNECT_TIMEOUT).timeout(REQUEST_TIMEOUT).build().ok()?;
 
-    let response = match client.get(&url).send() {
+    let response = match client.get(&url).bearer_auth(token.expose()).send() {
         Ok(r) if r.status().is_success() => r,
         Ok(r) => {
             log::warn!("vault snapshot: HTTP {}", r.status());
@@ -270,15 +285,25 @@ fn fetch_snapshot(orch_url: &str) -> Option<BTreeMap<String, String>> {
     }
 }
 
-/// Write the snapshot to disk with restrictive permissions.
+/// `PUT /api/env-keys/{canonical}` on the orchestrator; `true` on 2xx.
+fn push_to_orchestrator(orch_url: &str, canonical: &str, value: &str) -> bool {
+    let url = format!("{orch_url}/api/env-keys/{canonical}");
+    let body = serde_json::json!({ "value": value });
+    reqwest::blocking::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .ok()
+        .and_then(|c| c.put(&url).json(&body).send().ok())
+        .is_some_and(|r| r.status().is_success())
+}
+
+/// Write the snapshot to disk: owner-only from creation, atomic replace.
 fn save_disk_cache(snapshot: &BTreeMap<String, String>) {
-    let path = cache_path();
-    if let Some(parent) = path.parent() {
-        let _created = std::fs::create_dir_all(parent);
-    }
-    let Ok(json) = serde_json::to_string_pretty(snapshot) else { return };
-    if std::fs::write(&path, &json).is_ok() {
-        secure_file(&path);
+    let Ok(text) = serde_json::to_string_pretty(snapshot) else { return };
+    let json = zeroize::Zeroizing::new(text);
+    if let Err(e) = crate::secure_fs::write_private_atomic(&cache_path(), json.as_bytes()) {
+        log::warn!("vault cache not saved: {e}");
     }
 }
 
@@ -286,14 +311,3 @@ fn save_disk_cache(snapshot: &BTreeMap<String, String>) {
 fn cache_path() -> std::path::PathBuf {
     cp_env::env().core.home.join(".context-pilot").join(CACHE_FILENAME)
 }
-
-/// Set file permissions to 0600 (owner read/write only).
-#[cfg(unix)]
-fn secure_file(path: &std::path::Path) {
-    use std::os::unix::fs::PermissionsExt as _;
-    let _set = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-}
-
-/// No-op on non-unix platforms.
-#[cfg(not(unix))]
-fn secure_file(_path: &std::path::Path) {}

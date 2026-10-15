@@ -117,6 +117,10 @@ where
     };
 
     let mut removed: u64 = 0;
+    // The cut segment's leading checkpoint becomes the only replay base once
+    // the older segments are gone. A live writer may have just rolled and not
+    // yet synced it, so make it durable here before deleting anything.
+    fs::File::open(segment::path(dir, cut))?.sync_data()?;
     for &index in &indices {
         if index < cut {
             fs::remove_file(segment::path(dir, index))?;
@@ -134,8 +138,9 @@ where
 /// `None` when no segment opens with a checkpoint.
 fn newest_checkpoint_index(dir: &Path, indices: &[u64]) -> OplogResult<Option<u64>> {
     for &index in indices.iter().rev() {
-        let scan = segment::read(&segment::path(dir, index))?;
-        if let Some(first) = scan.entries.first()
+        // Probe only the first record: decoding whole 64 MiB segments just to
+        // classify them was the dominant compaction cost.
+        if let Some(first) = segment::read_first(&segment::path(dir, index))?
             && matches!(first.kind, OpEntryKind::Checkpoint { .. })
         {
             return Ok(Some(index));

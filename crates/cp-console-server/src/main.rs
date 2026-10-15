@@ -6,9 +6,11 @@
 //!
 //! # Process cleanup
 //!
-//! On SIGTERM/SIGINT, the server kills all children and exits cleanly.
-//! On abnormal death (SIGKILL), children become orphans — the TUI's
-//! orphan cleanup handles them on next startup.
+//! Every child runs in its own process group, so killing a session reaches
+//! its whole tree (pipelines, `&&` chains, `npm run dev` grandchildren).
+//! On SIGTERM/SIGINT/SIGHUP the server kills every session group, removes its
+//! socket and pid files, and exits. On abnormal death (SIGKILL), children
+//! become orphans — the TUI's orphan cleanup handles them on next startup.
 //!
 //! # Rebuilding after changes
 //!
@@ -19,11 +21,9 @@
 //! # 1. Build the new binary
 //! cargo build --release -p cp-console-server
 //!
-//! # 2. Kill the running server (TUI auto-restarts it on next launch)
+//! # 2. Stop the running server (SIGTERM: kills its children, removes
+//! #    server.sock and server.pid). The TUI respawns it on next launch.
 //! kill $(cat .context-pilot/console/server.pid)
-//!
-//! # 3. Clean stale socket/pid files
-//! rm -f .context-pilot/console/server.sock .context-pilot/console/server.pid
 //! ```
 //!
 //! The TUI's `find_or_create_server()` will spawn the new binary automatically
@@ -33,7 +33,6 @@ use std::collections::BTreeMap;
 use std::io::{BufRead as _, BufReader, Write as _};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 
@@ -41,75 +40,14 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 mod cleanup;
 /// JSON protocol types and escape-sequence helpers shared with the TUI client.
 mod protocol;
+/// Child sessions: process-group spawn, waiter-owned exit status, tree kill.
+mod session;
 use protocol::{Request, Response, SessionInfo, interpret_escapes};
+pub(crate) use session::Session;
 
 /// Global flag set by signal handler to trigger graceful shutdown.
 /// Wrapped in `Arc` so `signal-hook` can register it directly.
 static SHUTDOWN_REQUESTED: LazyLock<Arc<AtomicBool>> = LazyLock::new(|| Arc::new(AtomicBool::new(false)));
-
-// ---------------------------------------------------------------------------
-// Session management
-// ---------------------------------------------------------------------------
-
-/// State of a single managed child process.
-pub(crate) struct Session {
-    /// PID of the child process.
-    pub pid: u32,
-    /// Handle to the child's stdin pipe, used by `"send"` commands.
-    pub stdin: Option<std::process::ChildStdin>,
-    /// Current lifecycle status of the child process.
-    pub status: SessionStatus,
-}
-
-/// Lifecycle status of a managed session.
-#[derive(Clone, Copy)]
-pub(crate) enum SessionStatus {
-    /// The child process is still running.
-    Running,
-    /// The child process has exited with the given exit code.
-    Exited(i32),
-}
-
-impl Session {
-    /// Check if the process has exited (non-blocking).
-    pub(crate) fn poll_status(&mut self) {
-        if matches!(self.status, SessionStatus::Running) && !is_pid_alive(self.pid) {
-            // Try to get exit code from /proc/{pid}/status or fall back to -1
-            self.status = SessionStatus::Exited(-1);
-        }
-    }
-
-    /// Return a human-readable status string for use in responses.
-    fn status_str(&self) -> String {
-        match self.status {
-            SessionStatus::Running => "running".to_owned(),
-            SessionStatus::Exited(code) => format!("exited({code})"),
-        }
-    }
-
-    /// Return the exit code if the session has terminated, otherwise `None`.
-    const fn exit_code(&self) -> Option<i32> {
-        match self.status {
-            SessionStatus::Running => None,
-            SessionStatus::Exited(c) => Some(c),
-        }
-    }
-
-    /// Return `true` if the session has reached a terminal (exited) state.
-    pub(crate) const fn is_terminal(&self) -> bool {
-        matches!(self.status, SessionStatus::Exited(_))
-    }
-}
-
-/// Return `true` if the process with the given PID is still alive (non-blocking signal-0 probe).
-pub(crate) fn is_pid_alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
-}
 
 /// Shared, thread-safe map from session key to [`Session`].
 type Sessions = Arc<Mutex<BTreeMap<String, Session>>>;
@@ -131,152 +69,98 @@ struct CreateParams<'req> {
 }
 
 /// Spawn a new child process and register it under `key`, redirecting output to `log_path`.
+///
+/// Refuses a key whose session is still running: silently replacing it would
+/// orphan the old process (no longer reachable by `kill`).
 fn handle_create(sessions: &Sessions, params: &CreateParams<'_>) -> Response {
     let &CreateParams { key, command, cwd, log_path } = params;
-    let log = PathBuf::from(log_path);
+    if sessions.lock().unwrap_or_else(PoisonError::into_inner).get(key).is_some_and(|s| !s.is_terminal()) {
+        return Response::err(format!("Session '{key}' is already running"));
+    }
 
-    // Create/truncate log file
+    let log = PathBuf::from(log_path);
     if let Some(parent) = log.parent() {
         let _: Option<()> = std::fs::create_dir_all(parent).ok();
     }
-
     let log_file = match std::fs::File::create(&log) {
         Ok(f) => f,
         Err(e) => return Response::err(format!("Failed to create log: {e}")),
     };
-    let log_err = match log_file.try_clone() {
-        Ok(f) => f,
-        Err(e) => return Response::err(format!("Failed to clone log fd: {e}")),
-    };
 
-    let mut cmd = Command::new("sh");
-    let _: &mut Command = cmd.args(["-c", command]);
-    let _: &mut Command = cmd.stdin(Stdio::piped()).stdout(log_file).stderr(log_err);
-
-    if let Some(dir) = cwd {
-        let _: &mut Command = cmd.current_dir(dir);
+    match session::spawn(command, cwd, &log_file) {
+        Ok(new_session) => {
+            let pid = new_session.pid;
+            let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
+            drop(map.insert(key.to_owned(), new_session));
+            drop(map);
+            Response::ok_pid(pid)
+        }
+        Err(e) => Response::err(e),
     }
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => return Response::err(format!("Spawn failed: {e}")),
-    };
-
-    let pid = child.id();
-    let stdin = child.stdin.take();
-
-    // Spawn a thread to wait for the child so we get proper exit status
-    {
-        let task_sessions = Arc::clone(sessions);
-        let task_key = key.to_owned();
-        drop(std::thread::spawn(move || {
-            let code = child.wait().map_or(-1i32, |status| status.code().unwrap_or(-1i32));
-            if let Ok(mut map) = task_sessions.lock()
-                && let Some(session) = map.get_mut(&task_key)
-            {
-                session.status = SessionStatus::Exited(code);
-            }
-        }));
-    }
-
-    let session = Session { pid, stdin, status: SessionStatus::Running };
-    drop(sessions.lock().unwrap_or_else(PoisonError::into_inner).insert(key.to_owned(), session));
-
-    Response::ok_pid(pid)
 }
 
 /// Write `input` (with escape sequences interpreted) to the stdin of session `key`.
 fn handle_send(sessions: &Sessions, key: &str, input: &str) -> Response {
     let bytes = interpret_escapes(input);
 
-    // Take stdin out of session (lock held briefly — released before I/O)
-    let mut stdin = match sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
+    // Clone the stdin handle under the lock, write outside it.
+    let stdin = match sessions.lock().unwrap_or_else(PoisonError::into_inner).get(key) {
         None => return Response::err(format!("Session '{key}' not found")),
-        Some(session) if session.is_terminal() => {
-            return Response::err(format!("Session '{key}' already exited"));
-        }
-        Some(session) => match session.stdin.take() {
-            Some(s) => s,
+        Some(s) if s.is_terminal() => return Response::err(format!("Session '{key}' already exited")),
+        Some(s) => match s.stdin.as_ref() {
+            Some(pipe) => Arc::clone(pipe),
             None => return Response::err("No stdin available".to_owned()),
         },
     };
 
-    // Perform I/O without holding the session lock
-    let result = stdin.write_all(&bytes).and_then(|()| stdin.flush());
-
-    // Put stdin back
-    if let Some(session) = sessions.lock().unwrap_or_else(PoisonError::into_inner).get_mut(key) {
-        session.stdin = Some(stdin);
-    }
-
-    result.map_or_else(|e| Response::err(format!("Write failed: {e}")), |()| Response::ok())
+    session::write_with_timeout(stdin, bytes).map_or_else(Response::err, |()| Response::ok())
 }
 
-/// Terminate the child process for session `key` (SIGTERM then SIGKILL if needed).
+/// Terminate the process tree of session `key` (SIGTERM, then SIGKILL) and
+/// remove the session, freeing its stdin pipe FD.
 ///
-/// Also removes the session from the map to free pipe FDs.  Without
-/// this cleanup, sessions accumulate forever — each holding a pipe FD
-/// — until the 256-FD ulimit is exhausted and new spawns fail.
+/// The group is signalled even when the `sh` leader already exited: background
+/// grandchildren it left behind still belong to the group.
 fn handle_kill(sessions: &Sessions, key: &str) -> Response {
-    // Extract pid + remove session atomically (frees pipe FDs immediately).
     let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
-
-    let Some(mut session) = removed else {
+    let Some(mut killed) = removed else {
         return Response::err(format!("Session '{key}' not found"));
     };
-
-    // Drop stdin pipe FD.
-    drop(session.stdin.take());
-
-    // If still running, kill the process.
-    if !session.is_terminal() {
-        cleanup::terminate(session.pid, 100);
-    }
-
+    drop(killed.stdin.take());
+    session::terminate(killed.pid, 100);
     Response::ok()
 }
 
-/// Kill (if still running) and remove the session for `key` from the session map.
+/// Like [`handle_kill`], but succeeds when the key is unknown.
 fn handle_remove(sessions: &Sessions, key: &str) -> Response {
     let removed = sessions.lock().unwrap_or_else(PoisonError::into_inner).remove(key);
-    if let Some(mut session) = removed {
-        if !session.is_terminal() {
-            cleanup::terminate(session.pid, 100);
-        }
-        drop(session.stdin.take());
+    if let Some(mut gone) = removed {
+        drop(gone.stdin.take());
+        session::terminate(gone.pid, 100);
     }
     Response::ok()
 }
 
 /// Query the current status and exit code of session `key`.
 fn handle_status(sessions: &Sessions, key: &str) -> Response {
-    let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-    let Some(session) = map.get_mut(key) else {
+    let map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
+    let Some(found) = map.get(key) else {
         return Response::err(format!("Session '{key}' not found"));
     };
-    session.poll_status();
-    let status = session.status_str();
-    let exit_code = session.exit_code();
+    let status = found.status_str();
+    let exit_code = found.exit_code();
     drop(map);
     Response::ok_status(status, exit_code)
 }
 
 /// Return a snapshot of all currently registered sessions and their statuses.
 fn handle_list(sessions: &Sessions) -> Response {
-    let infos: Vec<SessionInfo> = {
-        let mut map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
-        map.iter_mut()
-            .map(|(key, session)| {
-                session.poll_status();
-                SessionInfo {
-                    key: key.clone(),
-                    pid: session.pid,
-                    status: session.status_str(),
-                    exit_code: session.exit_code(),
-                }
-            })
-            .collect()
-    };
+    let infos: Vec<SessionInfo> = sessions
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .map(|(key, s)| SessionInfo { key: key.clone(), pid: s.pid, status: s.status_str(), exit_code: s.exit_code() })
+        .collect();
     Response::ok_sessions(infos)
 }
 
@@ -284,7 +168,7 @@ fn handle_list(sessions: &Sessions) -> Response {
 fn handle_stats(sessions: &Sessions) -> Response {
     let map = sessions.lock().unwrap_or_else(PoisonError::into_inner);
     let total = map.len();
-    let running = map.values().filter(|s| matches!(s.status, SessionStatus::Running)).count();
+    let running = map.values().filter(|s| !s.is_terminal()).count();
     let exited = total.saturating_sub(running);
     let stdin_fds = map.values().filter(|s| s.stdin.is_some()).count();
     drop(map);
@@ -322,9 +206,9 @@ struct ConnectionHandler {
 /// Covers every command except `"shutdown"` (which needs to break the connection
 /// loop and is handled inline by [`ConnectionHandler::run`]).
 fn dispatch_command(req: &Request, sessions: &Sessions) -> Response {
+    let key = req.key.as_deref().unwrap_or("");
     match req.cmd.as_str() {
         "create" => {
-            let key = req.key.as_deref().unwrap_or("");
             let command = req.command.as_deref().unwrap_or("");
             let log_path = req.log_path.as_deref().unwrap_or("");
             if key.is_empty() || command.is_empty() || log_path.is_empty() {
@@ -333,26 +217,14 @@ fn dispatch_command(req: &Request, sessions: &Sessions) -> Response {
                 handle_create(sessions, &CreateParams { key, command, cwd: req.cwd.as_deref(), log_path })
             }
         }
-        "send" => {
-            let key = req.key.as_deref().unwrap_or("");
-            let input = req.input.as_deref().unwrap_or("");
-            if key.is_empty() { Response::err("Missing key") } else { handle_send(sessions, key, input) }
-        }
-        "kill" => {
-            let key = req.key.as_deref().unwrap_or("");
-            if key.is_empty() { Response::err("Missing key") } else { handle_kill(sessions, key) }
-        }
-        "remove" => {
-            let key = req.key.as_deref().unwrap_or("");
-            if key.is_empty() { Response::err("Missing key") } else { handle_remove(sessions, key) }
-        }
-        "status" => {
-            let key = req.key.as_deref().unwrap_or("");
-            if key.is_empty() { Response::err("Missing key") } else { handle_status(sessions, key) }
-        }
         "list" => handle_list(sessions),
         "stats" => handle_stats(sessions),
         "ping" => Response::ok(),
+        _ if key.is_empty() => Response::err("Missing key"),
+        "send" => handle_send(sessions, key, req.input.as_deref().unwrap_or("")),
+        "kill" => handle_kill(sessions, key),
+        "remove" => handle_remove(sessions, key),
+        "status" => handle_status(sessions, key),
         other => Response::err(format!("Unknown command: {other}")),
     }
 }
@@ -405,10 +277,10 @@ impl ConnectionHandler {
 // Main: daemonize and listen
 // ---------------------------------------------------------------------------
 
-/// Entry point: parse arguments, bind the Unix socket, and start the accept loop.
 /// Session logs older than this (by mtime) are deleted at server boot.
 const LOG_MAX_AGE: std::time::Duration = std::time::Duration::from_hours(168);
 
+/// Entry point: parse arguments, bind the Unix socket, and start the accept loop.
 fn main() {
     cleanup::raise_fd_limit();
     let Some(socket_path) = std::env::args().nth(1) else {
@@ -417,14 +289,18 @@ fn main() {
     };
     let pid_path = format!("{}.pid", socket_path.trim_end_matches(".sock"));
 
-    // Remove stale socket
+    // A socket that still accepts belongs to a live server: unlinking it would
+    // strand that server (and its children) unreachable. Only remove it stale.
+    if UnixStream::connect(&socket_path).is_ok() {
+        drop(writeln!(std::io::stderr(), "A console server is already listening on {socket_path}"));
+        return;
+    }
     let _: Option<()> = std::fs::remove_file(&socket_path).ok();
 
-    // Become a session leader so children get SIGHUP when the server dies.
-    #[cfg(unix)]
-    {
-        let _r = nix::unistd::setsid();
-    }
+    // Detach from the launching TUI's session and terminal, so its exit or
+    // Ctrl+C does not reach us. Children do NOT die with the server: without
+    // a controlling terminal no SIGHUP is ever sent to them.
+    let _r = nix::unistd::setsid();
 
     // Write PID file
     let _: Option<()> = std::fs::write(&pid_path, format!("{}", std::process::id())).ok();
@@ -454,7 +330,7 @@ fn main() {
         }));
     }
 
-    // Install SIGTERM/SIGINT handlers — set flag, main loop polls it
+    // SIGTERM/SIGINT/SIGHUP set the shutdown flag; the waker unblocks accept.
     cleanup::install_signal_handlers();
 
     // Spawn a background thread to auto-reap exited sessions.
