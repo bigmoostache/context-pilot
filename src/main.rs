@@ -350,7 +350,7 @@ fn boot_app_state(terminal: &mut ui::perf::tty::Tty, steps: &mut [BootStep]) -> 
 
     // Phase 4 continued: Initialize modules
     state.highlight_ir_fn = Some(ui::helpers::highlight_file_ir);
-    modules::validate_dependencies(&state.active_modules);
+    modules::validate_dependencies(&mut state.active_modules);
     modules::init_registry();
 
     // Remove orphaned context elements whose module no longer exists
