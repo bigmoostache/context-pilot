@@ -33,18 +33,9 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         return ToolResult::new(tool.id.clone(), "Missing required 'content' parameter".to_owned(), true);
     }
 
-    let prompt_type = match type_str {
-        // "agent" kept as a legacy alias (pre-T860 name).
-        "system" | "agent" => PromptType::System,
-        "skill" => PromptType::Skill,
-        "command" => PromptType::Command,
-        _ => {
-            return ToolResult::new(
-                tool.id.clone(),
-                format!("Invalid type '{type_str}' — must be 'system', 'skill', or 'command'"),
-                true,
-            );
-        }
+    let prompt_type = match PromptType::from_arg(type_str) {
+        Ok(pt) => pt,
+        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
     };
 
     let id = storage::slugify(&name);
@@ -67,8 +58,13 @@ fn behaviour_create(tool: &ToolUse, state: &mut State) -> ToolResult {
         );
     }
 
+    let file_content = match storage::frontmatter::format(&name, &description, &content)
+        .and_then(|fc| storage::validate_frontmatter(&fc).map(|()| fc))
+    {
+        Ok(fc) => fc,
+        Err(e) => return ToolResult::new(tool.id.clone(), e, true),
+    };
     drop(fs::create_dir_all(&dir));
-    let file_content = storage::format_prompt_file(&name, &description, &content);
     if let Err(e) = fs::write(&path, &file_content) {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file: {e}"), true);
     }

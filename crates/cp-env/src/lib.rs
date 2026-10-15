@@ -25,6 +25,7 @@
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // Dev-dependency used by the integration tests only; acknowledge it for the
 // unit-test target, which links it too.
@@ -46,6 +47,10 @@ use spec::Target;
 
 /// The configuration installed by `main` (or lazily resolved on first read).
 static INSTALLED: OnceLock<Env> = OnceLock::new();
+
+/// Set when [`env`] resolved the lenient fallback itself, so a later losing
+/// [`install`] can name the early read as the cause.
+static LAZY: AtomicBool = AtomicBool::new(false);
 
 /// A successful strict load: the typed configuration plus the report `main`
 /// logs so the journal shows the effective values.
@@ -72,10 +77,18 @@ pub fn load(target: Target) -> Result<Loaded, Report> {
 ///
 /// Returns `false` when a configuration was already installed (or already
 /// lazily resolved) - the first one wins, so `main` must call this before any
-/// library code reads [`env`].
+/// library code reads [`env`]. The losing case writes its cause to stderr:
+/// a lazy read means the strict configuration was dropped for the lenient
+/// one, which the caller's generic "installed twice" would otherwise hide.
 #[must_use]
 pub fn install(env: Env) -> bool {
-    INSTALLED.set(env).is_ok()
+    let installed = INSTALLED.set(env).is_ok();
+    if !installed && LAZY.load(Ordering::Acquire) {
+        let text = "cp-env: install lost - cp_env::env() was read before main installed the validated \
+                    configuration, so the lenient fallback is in effect; move that read after install\n";
+        drop(std::io::stderr().write_all(text.as_bytes()));
+    }
+    installed
 }
 
 /// The installed configuration.
@@ -86,6 +99,7 @@ pub fn install(env: Env) -> bool {
 /// anything useful with an invalid environment.
 pub fn env() -> &'static Env {
     INSTALLED.get_or_init(|| {
+        LAZY.store(true, Ordering::Release);
         resolve::resolve(Target::Any, &ProcessEnv, Strictness::Lenient)
             .map_or_else(|report| fatal(&report), |raw| Env::from_raw(&raw, &cwd()))
     })

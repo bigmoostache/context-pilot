@@ -125,18 +125,35 @@ pub const NEXT_SYNTAX: &str = "expected one of: STILL_MY_TURN | GIVE_TALKING_STI
 /// hold spaces and punctuation the generic id splitter would mangle.
 const RECURRING: &str = "GIVE_RECURRING_TASK";
 
-/// Parse `(<id>, <cron>, <message>)` (parentheses optional).
+/// Parse `(<id>, <cron>, <message>)` (parentheses optional). The cron is the
+/// 5 whitespace-separated fields after the id's comma, so list fields like
+/// `9,17` keep their commas; the next comma starts the message.
 fn parse_recurring(args: &str) -> Result<Next, String> {
     let trimmed = args.trim();
     let inner = trimmed.strip_prefix('(').and_then(|s| s.strip_suffix(')')).unwrap_or(trimmed);
-    let mut parts = inner.splitn(3, ',').map(str::trim);
-    let (Some(id), Some(cron), Some(message)) = (parts.next(), parts.next(), parts.next()) else {
-        return Err(format!("{RECURRING} takes (<id>, <cron>, <message>); {NEXT_SYNTAX}"));
-    };
-    if id.is_empty() || message.is_empty() || cron.split_whitespace().count() != 5 {
-        return Err(format!("{RECURRING} needs an id, a 5-field cron and a message; {NEXT_SYNTAX}"));
+    let usage = || format!("{RECURRING} needs (<id>, <5-field cron>, <message>); {NEXT_SYNTAX}");
+    let (raw_id, mut rest) = inner.split_once(',').ok_or_else(usage)?;
+    let mut fields: Vec<&str> = Vec::with_capacity(5);
+    while fields.len() < 5 {
+        rest = rest.trim_start();
+        let (field, tail) = rest.split_at(rest.find(char::is_whitespace).unwrap_or(rest.len()));
+        if field.is_empty() {
+            return Err(usage());
+        }
+        fields.push(field);
+        rest = tail;
     }
-    Ok(Next::GiveRecurringTask { agent_id: id.to_owned(), cron: cron.to_owned(), message: message.to_owned() })
+    let last = fields.pop().unwrap_or_default();
+    let (weekday, after_cron) = match last.rsplit_once(',').filter(|&(_, after)| after.is_empty()) {
+        Some((w, _)) => (w, rest),
+        None => (last, rest.trim_start().strip_prefix(',').ok_or_else(usage)?),
+    };
+    fields.push(weekday);
+    let (agent, message) = (raw_id.trim(), after_cron.trim());
+    if agent.is_empty() || message.is_empty() || weekday.is_empty() {
+        return Err(usage());
+    }
+    Ok(Next::GiveRecurringTask { agent_id: agent.to_owned(), cron: fields.join(" "), message: message.to_owned() })
 }
 
 /// Parse the `next` DSL. Keyword is case-insensitive; ids may be separated by
@@ -192,6 +209,19 @@ pub fn validate(group: &Group, sender: &str, next: &Next) -> Result<(), String> 
     let targets = next.targets();
     if matches!(*next, Next::GiveRecurringTask { .. }) && targets.iter().any(|t| t == HUMAN) {
         return Err(format!("{RECURRING} cannot target HUMAN"));
+    }
+    let fan_out = match *next {
+        Next::Gather(_) => Some("GATHER"),
+        Next::Dispatch(_) => Some("DISPATCH"),
+        Next::StillMyTurn | Next::OwnerDone | Next::GiveTalkingStickTo(_) | Next::GiveRecurringTask { .. } => None,
+    };
+    if let Some(kw) = fan_out {
+        if targets.iter().any(|t| t == HUMAN) {
+            return Err(format!("{kw} cannot target HUMAN: use GIVE_TALKING_STICK_TO HUMAN"));
+        }
+        if kw == "DISPATCH" && targets.iter().all(|t| t == sender) {
+            return Err("DISPATCH needs at least one member other than you: use STILL_MY_TURN".to_owned());
+        }
     }
     for t in targets {
         if !is_member(t) {
@@ -384,31 +414,28 @@ pub fn remove_recurrent(groups: &mut [Group], id: &str) -> Option<(String, Subst
 }
 
 /// Hand each `Dispatch` to its first idle, not-yet-runnable candidate.
+/// The runnable set is built once and grown with each pick, so one tick never
+/// hands two dispatches to the same agent.
 fn resolve_dispatch<Idle>(groups: &mut [Group], is_idle: &Idle)
 where
     Idle: Fn(&str) -> bool,
 {
-    for gi in 0..groups.len() {
-        let pending: Vec<(usize, Vec<String>)> = groups.get(gi).map_or_else(Vec::new, |g| {
-            g.social
-                .iter()
-                .enumerate()
-                .filter_map(|(k, s)| {
-                    cp_macros::deref_match!(s, {
-                        Substate::Dispatch { ref candidates } => Some((k, candidates.clone())),
-                        Substate::SimpleTurn { .. }
-                        | Substate::ComingBack { .. }
-                        | Substate::Gather { .. }
-                        | Substate::Recurrent { .. } => None,
-                    })
-                })
-                .collect()
-        });
-        for (k, candidates) in pending {
-            let Some(pick) = candidates.into_iter().find(|c| is_idle(c) && !runnable(groups, c)) else { continue };
-            if let Some(slot) = groups.get_mut(gi).and_then(|g| g.social.get_mut(k)) {
-                *slot = Substate::SimpleTurn { agent_id: pick };
-            }
+    let mut busy: std::collections::HashSet<String> =
+        index::runnable_set(groups).into_iter().map(str::to_owned).collect();
+    for g in groups.iter_mut() {
+        for slot in &mut g.social {
+            let found = cp_macros::deref_match!(slot, {
+                Substate::Dispatch { ref candidates } => {
+                    candidates.iter().find(|c| is_idle(c) && !busy.contains(c.as_str())).cloned()
+                }
+                Substate::SimpleTurn { .. }
+                | Substate::ComingBack { .. }
+                | Substate::Gather { .. }
+                | Substate::Recurrent { .. } => None,
+            });
+            let Some(pick) = found else { continue };
+            let _new = busy.insert(pick.clone());
+            *slot = Substate::SimpleTurn { agent_id: pick };
         }
     }
 }

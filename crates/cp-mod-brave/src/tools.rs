@@ -5,7 +5,7 @@ use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use crate::api::{BraveClient, LLMContextParams, SearchParams};
-use cp_base::cast::Safe as _;
+use std::ops::RangeInclusive;
 
 /// Dispatch brave tool calls.
 pub fn dispatch(tool: &ToolUse, state: &mut State) -> Option<ToolResult> {
@@ -44,32 +44,59 @@ const PANEL_WARNING: &str = "\n\nIMPORTANT: Results live in this panel. Act on t
     IRREVERSIBLY erases all content from your context \u{2014} you cannot recall it from memory afterward. \
     Never close-then-act; always act-then-close.";
 
-/// Async timeout for Brave API calls (seconds).
-/// The HTTP client has a 10s per-request timeout, but retries on 5xx (up to 3 attempts).
-const ASYNC_TIMEOUT_SECS: u64 = 35;
+/// Async timeout for Brave API calls (seconds). Kept above [`crate::api::TOTAL_BUDGET`]
+/// so the client's own budget always fires first with a specific error.
+pub(crate) const ASYNC_TIMEOUT_SECS: u64 = 35;
 
-/// Execute the `brave_search` tool: web search with snippet results.
-///
-/// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
+/// Smallest `maximum_number_of_tokens` the LLM context API accepts.
+const MIN_TOKENS: u32 = 1024;
+/// Largest `maximum_number_of_tokens` the LLM context API accepts (32768).
+const MAX_TOKENS: u32 = 0x8000;
+
+/// Read an optional string parameter.
+fn opt_str(tool: &ToolUse, key: &str) -> Option<String> {
+    tool.input.get(key).and_then(|v| v.as_str()).map(String::from)
+}
+
+/// Read a string parameter with a default.
+fn str_or(tool: &ToolUse, key: &str, default: &str) -> String {
+    opt_str(tool, key).unwrap_or_else(|| default.to_owned())
+}
+
+/// Read an integer parameter, clamped to the range the Brave API accepts.
+/// Out-of-range values would otherwise come back as an opaque HTTP 422.
+pub(crate) fn clamped(input: &serde_json::Value, key: &str, default: u32, range: RangeInclusive<u32>) -> u32 {
+    input
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .map_or(default, cp_base::cast::Safe::to_u32)
+        .clamp(*range.start(), *range.end())
+}
+
+/// Wrap rendered content in a persisted dynamic panel.
+fn result_panel(title: String, content: String) -> DynPanel {
+    // `metadata` is the only copy that survives a reload (panel.rs restores from it).
+    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), title)
+        .metadata(vec![("result_content".to_owned(), content.clone())])
+        .content(content)
+}
+
+/// Execute the `brave_search` tool: web search with snippet results, off the main loop.
 fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("brave_search");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
-
-    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
+    let Some(query) = opt_str(tool, "query") else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
-
-    // Extract all params to owned types for the closure
-    let query = query_ref.to_owned();
-    let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(5).to_u32();
-    let freshness = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
-    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_owned();
-    let search_lang = tool.input.get("search_lang").and_then(|v| v.as_str()).unwrap_or("en").to_owned();
-    let safe_search = tool.input.get("safe_search").and_then(|v| v.as_str()).unwrap_or("moderate").to_owned();
-    let goggles_id = tool.input.get("goggles_id").and_then(|v| v.as_str()).map(String::from);
+    let count = clamped(&tool.input, "count", 5, 1..=20);
+    let freshness = opt_str(tool, "freshness");
+    let country = str_or(tool, "country", "US");
+    let search_lang = str_or(tool, "search_lang", "en");
+    let safe_search = str_or(tool, "safe_search", "moderate");
+    let goggles_id = opt_str(tool, "goggles_id");
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
         let params = SearchParams {
@@ -81,68 +108,39 @@ fn exec_search(tool: &ToolUse, state: &mut State) -> ToolResult {
             safe_search: &safe_search,
             goggles_id: goggles_id.as_deref(),
         };
-
-        match client.search(&params) {
-            Ok((search_resp, rich_data)) => {
-                let result_count = search_resp.web.as_ref().map_or(0, |w| w.results.len());
-
-                if result_count == 0 && rich_data.is_none() {
-                    return ToolOutput::ok(format!("No results found for '{query}'"));
-                }
-
-                // Build panel content as YAML
-                let mut panel_content = String::new();
-                if let Some(rich) = rich_data.as_ref() {
-                    panel_content.push_str("# Rich Results\n\n");
-                    if let Ok(yaml) = serde_yaml::to_string(rich) {
-                        panel_content.push_str(&yaml);
-                    }
-                    panel_content.push_str("\n---\n\n");
-                }
-                panel_content.push_str("# Web Results\n\n");
-                if let Ok(yaml) = serde_yaml::to_string(&search_resp) {
-                    panel_content.push_str(&yaml);
-                }
-
-                let dyn_panel =
-                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_search: {query}"))
-                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
-                        .content(panel_content);
-
-                ToolOutput::ok(format!(
-                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{PANEL_WARNING}",
-                ))
-                .with_panel(dyn_panel)
-            }
-            Err(e) => ToolOutput::error(e),
+        let outcome = match client.search(&params) {
+            Ok(o) => o,
+            Err(e) => return ToolOutput::error(e),
+        };
+        let note = outcome.rich_error.map(|e| format!("\nRich results unavailable: {e}")).unwrap_or_default();
+        let result_count = outcome.response.web.as_ref().map_or(0, |w| w.results.len());
+        if result_count == 0 && outcome.rich.is_none() {
+            return ToolOutput::ok(format!("No results found for '{query}'{note}"));
         }
+        let content = crate::render::search(&outcome.response, outcome.rich.as_ref());
+        ToolOutput::ok(format!(
+            "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {result_count} results for '{query}'{note}{PANEL_WARNING}",
+        ))
+        .with_panel(result_panel(format!("brave_search: {query}"), content))
     })
 }
 
-/// Execute the `brave_llm_context` tool: LLM-optimized content extraction.
-///
-/// Runs the HTTP call on a worker thread to avoid blocking the main event loop.
+/// Execute the `brave_llm_context` tool: LLM-optimized content extraction, off the main loop.
 fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
     let _fg = cp_base::flame!("brave_llm_context");
     let client = match get_client() {
         Ok(c) => c,
         Err(e) => return err_result(tool, e),
     };
-
-    let Some(query_ref) = tool.input.get("query").and_then(|v| v.as_str()) else {
+    let Some(query) = opt_str(tool, "query") else {
         return err_result(tool, "Missing required parameter 'query'".to_owned());
     };
-
-    // Extract all params to owned types for the closure
-    let query = query_ref.to_owned();
-    let max_tokens =
-        tool.input.get("maximum_number_of_tokens").and_then(serde_json::Value::as_u64).unwrap_or(8192).to_u32();
-    let count = tool.input.get("count").and_then(serde_json::Value::as_u64).unwrap_or(20).to_u32();
-    let threshold_mode =
-        tool.input.get("context_threshold_mode").and_then(|v| v.as_str()).unwrap_or("balanced").to_owned();
-    let freshness = tool.input.get("freshness").and_then(|v| v.as_str()).map(String::from);
-    let country = tool.input.get("country").and_then(|v| v.as_str()).unwrap_or("US").to_owned();
-    let goggles = tool.input.get("goggles").and_then(|v| v.as_str()).map(String::from);
+    let max_tokens = clamped(&tool.input, "maximum_number_of_tokens", 8192, MIN_TOKENS..=MAX_TOKENS);
+    let count = clamped(&tool.input, "count", 20, 1..=50);
+    let threshold_mode = str_or(tool, "context_threshold_mode", "balanced");
+    let freshness = opt_str(tool, "freshness");
+    let country = str_or(tool, "country", "US");
+    let goggles = opt_str(tool, "goggles");
 
     spawn_async_tool(state, tool, ASYNC_TIMEOUT_SECS, move || {
         let params = LLMContextParams {
@@ -154,33 +152,32 @@ fn exec_llm_context(tool: &ToolUse, state: &mut State) -> ToolResult {
             country: &country,
             goggles: goggles.as_deref(),
         };
-
-        match client.llm_context(&params) {
-            Ok(resp) => {
-                let url_count = resp.grounding.as_ref().and_then(|g| g.generic.as_ref()).map_or(0, Vec::len);
-
-                if url_count == 0 {
-                    return ToolOutput::ok(format!("No context found for '{query}'"));
-                }
-
-                let panel_content = match serde_yaml::to_string(&resp) {
-                    Ok(yaml) => yaml,
-                    Err(e) => {
-                        return ToolOutput::error(format!("Failed to serialize response: {e}"));
-                    }
-                };
-
-                let dyn_panel =
-                    DynPanel::new(crate::panel::BRAVE_PANEL_TYPE.to_owned(), format!("brave_llm_context: {query}"))
-                        .metadata(vec![("result_content".to_owned(), panel_content.clone())])
-                        .content(panel_content);
-
-                ToolOutput::ok(format!(
-                    "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
-                ))
-                .with_panel(dyn_panel)
-            }
-            Err(e) => ToolOutput::error(e),
+        let resp = match client.llm_context(&params) {
+            Ok(r) => r,
+            Err(e) => return ToolOutput::error(e),
+        };
+        let url_count = resp.grounding.as_ref().and_then(|g| g.generic.as_ref()).map_or(0, Vec::len);
+        if url_count == 0 {
+            return ToolOutput::ok(format!("No context found for '{query}'"));
         }
+        let content = crate::render::llm_context(&resp);
+        ToolOutput::ok(format!(
+            "Created panel {DYN_PANEL_ID_PLACEHOLDER}: {url_count} URLs, ~{max_tokens} tokens for '{query}'{PANEL_WARNING}",
+        ))
+        .with_panel(result_panel(format!("brave_llm_context: {query}"), content))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_TOKENS, MIN_TOKENS, clamped};
+
+    #[test]
+    fn numeric_params_are_clamped() {
+        let input = serde_json::json!({"count": 500i32, "low": 0i32, "neg": -3i32});
+        assert_eq!(clamped(&input, "count", 5, 1..=20), 20);
+        assert_eq!(clamped(&input, "low", 5, 1..=20), 1);
+        assert_eq!(clamped(&input, "neg", 5, 1..=20), 5);
+        assert_eq!(clamped(&input, "missing", 8192, MIN_TOKENS..=MAX_TOKENS), 8192);
+    }
 }

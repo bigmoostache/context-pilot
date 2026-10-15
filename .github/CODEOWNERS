@@ -1,80 +1,57 @@
 # CODEOWNERS - Automatic reviewer assignment for Pull Requests
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 #
+# Every path below must exist: a stale entry silently stops matching and the
+# area falls back to `*`. When the tree moves, update this file in the same PR.
 # When you grow the team, replace @bigmoostache with specific reviewers per area.
-# When you move to a GitHub Organization, you can use team syntax: @org-name/team-name
 
-# =============================================================================
-# DEFAULT OWNERS - All PRs require review from these people
-# =============================================================================
+# Default owner
 * @bigmoostache
 
-# =============================================================================
-# CORE APPLICATION
-# =============================================================================
-/src/core/                    @bigmoostache
-/src/state.rs                 @bigmoostache
-/src/actions.rs               @bigmoostache
+# Main binary (src/): event loop, infra, LLM providers, modules, state, TUI
+/src/app/                     @bigmoostache
+/src/infra/                   @bigmoostache
+/src/llms/                    @bigmoostache
+/src/modules/                 @bigmoostache
+/src/state/                   @bigmoostache
+/src/ui/                      @bigmoostache
 /src/main.rs                  @bigmoostache
 
-# =============================================================================
-# LLM INTEGRATIONS
-# =============================================================================
-/src/llms/                    @bigmoostache
-/src/api.rs                   @bigmoostache
-/src/background.rs            @bigmoostache
+# Workspace crates. cp-wire is the agent/orchestrator wire contract and
+# cp-vault holds the credential chokepoint: review both with extra care.
+/crates/                      @bigmoostache
+/crates/cp-wire/              @bigmoostache
+/crates/cp-vault/             @bigmoostache
+/crates/cp-orchestrator/      @bigmoostache
 
-# =============================================================================
-# TOOLS
-# =============================================================================
-/src/tools/                   @bigmoostache
-/src/tool_defs.rs             @bigmoostache
+# Web frontend and its generated API contract
+/web/                         @bigmoostache
+/openapi.json                 @bigmoostache
 
-# =============================================================================
-# UI / FRONTEND
-# =============================================================================
-/src/ui/                      @bigmoostache
-/src/panels/                  @bigmoostache
-/src/help/                    @bigmoostache
-/src/events.rs                @bigmoostache
-
-# =============================================================================
-# PERSISTENCE / BACKEND
-# =============================================================================
-/src/persistence/             @bigmoostache
-/src/cache.rs                 @bigmoostache
-/src/watcher.rs               @bigmoostache
-
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-/src/config.rs                @bigmoostache
-/src/constants.rs             @bigmoostache
+# Tool and prompt definitions (LLM-facing text)
 /yamls/                       @bigmoostache
 
-# =============================================================================
-# DOCUMENTATION
-# =============================================================================
+# Deployment
+/deploy/                      @bigmoostache
+/deploy_local.sh              @bigmoostache
+/run.sh                       @bigmoostache
+
+# Quality machinery: CI, checks, lint config, hash chain
+/.github/                     @bigmoostache
+/chain.sh                     @bigmoostache
+/clippy.toml                  @bigmoostache
+/rustfmt.toml                 @bigmoostache
+/rust-toolchain.toml          @bigmoostache
+/Cargo.toml                   @bigmoostache
+/Cargo.lock                   @bigmoostache
+
+# Documentation
 *.md                          @bigmoostache
 /docs/                        @bigmoostache
 
-# =============================================================================
-# SECURITY-SENSITIVE
-# =============================================================================
-SECURITY.md                   @bigmoostache
+# Security-sensitive / community
+/SECURITY.md                  @bigmoostache
 .env*                         @bigmoostache
-
-# =============================================================================
-# CI/CD & PROJECT CONFIG
-# =============================================================================
-/.github/                     @bigmoostache
-Cargo.toml                    @bigmoostache
-Cargo.lock                    @bigmoostache
-run.sh                        @bigmoostache
-
-# =============================================================================
-# OPEN SOURCE / COMMUNITY
-# =============================================================================
-CODE_OF_CONDUCT.md            @bigmoostache
-CONTRIBUTING.md               @bigmoostache
-LICENSE                       @bigmoostache
+/CODE_OF_CONDUCT.md           @bigmoostache
+/CONTRIBUTING.md              @bigmoostache
+/LICENSE                      @bigmoostache

@@ -32,8 +32,31 @@ mod tests {
     ];
 
     /// The call shapes that read the environment (with or without the `std::`
-    /// prefix - the bare forms are substrings of the qualified ones).
-    const NEEDLES: [&str; 4] = ["env::var(", "env::var_os(", "env::vars(", "env::vars_os("];
+    /// prefix - the bare forms are substrings of the qualified ones), plus
+    /// compile-time reads.
+    const NEEDLES: [&str; 5] = ["env::var(", "env::var_os(", "env::vars(", "env::vars_os(", "option_env!("];
+
+    /// The reader functions; importing one (`use std::env::var;`,
+    /// `use std::env::{var, …}`) lets a later bare `var(…)` slip past the
+    /// call needles, so the import itself is the offence.
+    const READERS: [&str; 4] = ["var", "var_os", "vars", "vars_os"];
+
+    /// Whether `line` imports a reader function or aliases `std::env` (an
+    /// alias turns `env::var(` into `e::var(`).
+    fn imports_reader(line: &str) -> bool {
+        let compact: String = line.chars().filter(|ch| !ch.is_whitespace()).collect();
+        if compact.contains("std::envas") {
+            return true;
+        }
+        let Some(rest) = compact.split_once("env::").map(|(_head, tail)| tail) else { return false };
+        if !compact.starts_with("use") && !compact.starts_with("pubuse") {
+            return false;
+        }
+        let list = rest.strip_prefix('{').map_or(rest, |inner| inner.split('}').next().unwrap_or_default());
+        list.split([',', ';'])
+            .map(|item| item.split("as").next().unwrap_or_default())
+            .any(|item| READERS.contains(&item))
+    }
 
     /// The workspace root (two levels above this crate).
     fn workspace_root() -> PathBuf {
@@ -62,9 +85,29 @@ mod tests {
     fn raw_reads(text: &str) -> Vec<String> {
         text.lines()
             .filter(|line| !line.trim_start().starts_with("//"))
-            .filter(|line| NEEDLES.iter().any(|needle| line.contains(needle)))
+            .filter(|line| NEEDLES.iter().any(|needle| line.contains(needle)) || imports_reader(line))
             .map(str::to_owned)
             .collect()
+    }
+
+    /// Every evasion shape the guard must see, and shapes it must not flag.
+    #[test]
+    fn guard_catches_imported_and_aliased_reads() {
+        let caught = [
+            "use std::env::var;",
+            "use std::env::{current_dir, var_os};",
+            "use std::env::vars as all;",
+            "use std::env as e;",
+            "let key = option_env!(\"KEY\");",
+            "let v = std::env::var(\"X\");",
+        ];
+        for line in caught {
+            assert_eq!(raw_reads(line).len(), 1, "missed: {line}");
+        }
+        let clean = ["use std::env::current_dir;", "use std::env;", "let variant = 1;", "// env::var(\"X\")"];
+        for line in clean {
+            assert!(raw_reads(line).is_empty(), "false positive: {line}");
+        }
     }
 
     /// Every direct environment read outside the allow-list is a table escape.

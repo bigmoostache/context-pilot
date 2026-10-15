@@ -224,9 +224,10 @@ fn distribute_remaining(new_widths: &mut [usize], orig_widths: &[usize], num_col
 }
 
 /// Shrink columns proportionally to fit `max_width` when the natural table is
-/// too wide. Returns the (possibly unchanged) column widths.
+/// too wide. Returns the (possibly unchanged) column widths. The budget counts
+/// the 3-column inner separators AND the 2-column outer borders on each side.
 fn fit_col_widths(col_widths: Vec<usize>, num_cols: usize, max_width: usize) -> Vec<usize> {
-    let separator_width = if num_cols > 1 { num_cols.saturating_sub(1).saturating_mul(3) } else { 0 };
+    let separator_width = num_cols.saturating_sub(1).saturating_mul(3).saturating_add(4);
     let total_content_width: usize = col_widths.iter().sum();
     let total_width = total_content_width.saturating_add(separator_width);
 
@@ -272,7 +273,7 @@ fn render_cell(spans: &mut Vec<Span>, cell_text: &str, width: usize, is_header: 
     } else if cell_text.is_empty() {
         spans.push(Span::new(" ".repeat(width)));
     } else {
-        spans.extend(parse_inline_markdown(cell_text));
+        spans.extend(cp_render::markdown::parse_inline(cell_text));
         if !padding.is_empty() {
             spans.push(Span::new(padding));
         }
@@ -335,104 +336,42 @@ pub(crate) fn render_markdown_table(table_lines: &[&str], max_width: usize) -> V
     result
 }
 
-/// Flush the pending plain-text buffer into `spans` (no-op when empty).
-fn flush_plain(spans: &mut Vec<Span>, current: &mut String) {
-    if !current.is_empty() {
-        spans.push(Span::new(std::mem::take(current)));
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::{markdown_display_width, render_markdown_table, wrap_cell_text};
+    use unicode_width::UnicodeWidthStr as _;
 
-/// Emit an inline-code span (cursor already past the opening backtick).
-fn parse_code_span(spans: &mut Vec<Span>, current: &mut String, chars: &mut CharCursor<'_>) {
-    flush_plain(spans, current);
-    let mut code = String::new();
-    while let Some(&next) = chars.peek() {
-        if next == '`' {
-            let _r1 = chars.next();
-            break;
-        }
-        if let Some(ch) = chars.next() {
-            code.push(ch);
-        }
-    }
-    if !code.is_empty() {
-        spans.push(Span::styled(code, Semantic::Warning));
-    }
-}
-
-/// Handle a `*`/`_`: emit a bold span when doubled, else buffer the literal.
-fn parse_emphasis(spans: &mut Vec<Span>, current: &mut String, chars: &mut CharCursor<'_>, c: char) {
-    if chars.peek() != Some(&c) {
-        current.push(c); // single marker — literal
-        return;
-    }
-    let _r1 = chars.next(); // consume second */_
-    flush_plain(spans, current);
-    let mut bold_text = String::new();
-    while let Some(next) = chars.next() {
-        if next == c && chars.peek() == Some(&c) {
-            let _r2 = chars.next(); // consume closing **
-            break;
-        }
-        bold_text.push(next);
-    }
-    if !bold_text.is_empty() {
-        spans.push(Span::new(bold_text).bold());
-    }
-}
-
-/// Handle a `[`: emit an accent link-text span for a valid `[text](url)`, else
-/// buffer the literal `[`+text(+`]`) back into `current`.
-fn parse_link(spans: &mut Vec<Span>, current: &mut String, chars: &mut CharCursor<'_>) {
-    let mut link_text = String::new();
-    let mut found_bracket = false;
-    for next in chars.by_ref() {
-        if next == ']' {
-            found_bracket = true;
-            break;
-        }
-        link_text.push(next);
-    }
-    if found_bracket && chars.peek() == Some(&'(') {
-        let _r1 = chars.next(); // consume (
-        for next in chars.by_ref() {
-            if next == ')' {
-                break;
-            }
-        }
-        flush_plain(spans, current);
-        spans.push(Span::styled(link_text, Semantic::Accent));
-    } else {
-        current.push('[');
-        current.push_str(&link_text);
-        if found_bracket {
-            current.push(']');
-        }
-    }
-}
-
-/// Parse inline markdown (bold, italic, code) and return IR spans.
-pub(crate) fn parse_inline_markdown(text: &str) -> Vec<Span> {
-    let mut spans = Vec::new();
-    let mut chars = text.chars().peekable();
-    let mut current = String::new();
-
-    while let Some(c) = chars.next() {
-        match c {
-            '`' => parse_code_span(&mut spans, &mut current, &mut chars),
-            '*' | '_' => parse_emphasis(&mut spans, &mut current, &mut chars, c),
-            '[' => parse_link(&mut spans, &mut current, &mut chars),
-            _ => current.push(c),
-        }
+    /// Markers are not counted; code, bold and link text are.
+    #[test]
+    fn display_width_strips_markers() {
+        assert_eq!(markdown_display_width("**ab** `c` [d](http://x)"), 6);
+        assert_eq!(markdown_display_width("a*b"), 3);
+        assert_eq!(markdown_display_width("[open"), 5);
     }
 
-    if !current.is_empty() {
-        spans.push(Span::new(current));
+    /// Every wrapped line fits and no word is lost.
+    #[test]
+    fn wrap_respects_width() {
+        let lines = wrap_cell_text("aaa bbb ccc dd", 7);
+        assert!(lines.iter().all(|l| l.width() <= 7), "{lines:?}");
+        assert_eq!(lines.join(" "), "aaa bbb ccc dd");
     }
 
-    if spans.is_empty() {
-        spans.push(Span::new(String::new()));
+    /// All rendered rows share one display width, so separators line up.
+    #[test]
+    fn table_rows_are_aligned() {
+        let rows = render_markdown_table(&["| a | b |", "|---|---|", "| x | **long cell** |"], 80);
+        let widths: Vec<usize> = rows.iter().map(|r| r.iter().map(|s| s.text.width()).sum()).collect();
+        assert!(widths.len() >= 4);
+        assert!(widths.iter().all(|&w| Some(&w) == widths.first()), "{widths:?}");
     }
 
-    spans
+    /// A table wider than `max_width` is shrunk to fit.
+    #[test]
+    fn wide_table_fits() {
+        let long = "word ".repeat(30);
+        let row = format!("| {long} | {long} |");
+        let rows = render_markdown_table(&["| h1 | h2 |", "|---|---|", &row], 40);
+        assert!(rows.iter().all(|r| r.iter().map(|s| s.text.width()).sum::<usize>() <= 40));
+    }
 }

@@ -244,8 +244,6 @@ const fn exec_label(s: AgentExecState) -> &'static str {
         AgentExecState::Idle => "idle",
         AgentExecState::Runnable => "runnable",
         AgentExecState::Streaming => "streaming",
-        AgentExecState::AwaitingLlm => "awaiting_llm",
-        AgentExecState::AwaitingTool => "awaiting_tool",
         AgentExecState::Errored => "errored",
     }
 }

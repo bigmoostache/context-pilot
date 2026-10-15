@@ -1,31 +1,12 @@
 //! Frame-level IR types: sidebar, status bar, panel content.
 //!
-//! These types compose the outer shell of a [`Frame`] snapshot —
-//! everything except the conversation region and modal overlays.
+//! These types describe the screen chrome around the conversation: the
+//! sidebar, the status bar, and the active panel's content. The adapter
+//! builds each region on its own, and only when it paints it.
 
 use serde::Serialize;
 
 use crate::{Block, ProgressSegment, Semantic};
-
-// ── Frame ────────────────────────────────────────────────────────────
-
-/// Top-level frame — one complete screen snapshot per render tick.
-///
-/// Built by the centralized frame builder and consumed by the platform
-/// adapter.
-#[derive(Debug, Clone, Serialize)]
-pub struct Frame {
-    /// Left sidebar region.
-    pub sidebar: Sidebar,
-    /// Active panel content (right pane).
-    pub active_panel: PanelContent,
-    /// Bottom status bar.
-    pub status_bar: StatusBar,
-    /// Conversation region (chat messages + input).
-    pub conversation: crate::conversation::Conversation,
-    /// Modal overlays (question form, autocomplete, etc.).
-    pub overlays: Vec<crate::conversation::Overlay>,
-}
 
 // ── Sidebar ──────────────────────────────────────────────────────────
 

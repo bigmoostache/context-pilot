@@ -5,6 +5,7 @@
 //! Run: `cargo test -p cp-orchestrator --test openapi generate_openapi -- --ignored`
 //! Writes `openapi.json` at workspace root.
 
+mod derived;
 mod exhaustive;
 mod paths;
 mod schemas;
@@ -150,9 +151,13 @@ pub(crate) fn with_agent(mut path_item: Value) -> Value {
 
 // ── Build ───────────────────────────────────────────────────────────
 
+/// Hand-written schema maps (everything not yet derived).
+fn hand_written_schemas() -> Value {
+    merge(merge(merge(schemas::core(), schemas_ext::transport()), schemas_ext2::deploy()), schemas_net::network())
+}
+
 fn build_spec() -> Value {
-    let all_schemas =
-        merge(merge(merge(schemas::core(), schemas_ext::transport()), schemas_ext2::deploy()), schemas_net::network());
+    let all_schemas = merge(hand_written_schemas(), derived::derived());
     json!({
         "openapi": "3.0.3",
         "info": { "title": "Context Pilot Orchestrator", "version": "1.0.0" },
@@ -165,6 +170,17 @@ fn build_spec() -> Value {
 #[cfg(test)]
 mod spec_gen {
     use super::*;
+
+    /// A derived schema must not also be hand-written: `merge` would silently
+    /// let one shadow the other.
+    #[test]
+    fn derived_schemas_are_not_hand_written() {
+        let hand = hand_written_schemas();
+        for name in derived::NAMES {
+            assert!(hand.get(name).is_none(), "schema '{name}' is both derived and hand-written");
+            assert!(derived::derived().get(name).is_some(), "derived::NAMES lists missing schema '{name}'");
+        }
+    }
 
     #[test]
     #[ignore = "spec generator; run explicitly with --ignored to (re)write openapi.json"]

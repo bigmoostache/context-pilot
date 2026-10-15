@@ -25,35 +25,34 @@ set -uo pipefail
 
 MODE="${1:---ci}"   # --ci | --callback (behaviourally identical today)
 ROOT="$(git rev-parse --show-toplevel)"
-fail=0
+# shellcheck source=lib-failures.sh
+. "$ROOT/.github/checks/lib-failures.sh"
+ledger_init check-ts-lints
 
-cd "$ROOT/web"
+cd "$ROOT/web" || exit 1
 
 echo "=== eslint (--max-warnings 0) ==="
-npx eslint . --max-warnings 0 || fail=1
+npx eslint . --max-warnings 0 || ledger_fail eslint
 
 echo "=== prettier (--check) ==="
-npx prettier --check . || fail=1
+npx prettier --check . || ledger_fail prettier
 
 echo "=== stylelint ==="
-npx stylelint "src/**/*.css" || fail=1
+npx stylelint "src/**/*.css" || ledger_fail stylelint
 
 echo "=== tsc -b ==="
-npx tsc -b || fail=1
+npx tsc -b || ledger_fail tsc
 
 echo "=== type-coverage ==="
-npx type-coverage --project tsconfig.app.json || fail=1
+npx type-coverage --project tsconfig.app.json || ledger_fail type-coverage
 
 echo "=== frontend suppressions (ts lint exceptions) ==="
-bash "$ROOT/.github/checks/check-frontend-suppressions.sh" || fail=1
+bash "$ROOT/.github/checks/check-frontend-suppressions.sh" || ledger_fail suppressions
 
 echo "=== frontend rule census (ruleset drift) ==="
-bash "$ROOT/.github/checks/check-frontend-rule-census.sh" || fail=1
+bash "$ROOT/.github/checks/check-frontend-rule-census.sh" || ledger_fail rule-census
 
 echo "=== dead code (knip) ==="
-bash "$ROOT/.github/checks/check-web-deadcode.sh" || fail=1
+bash "$ROOT/.github/checks/check-web-deadcode.sh" || ledger_fail knip
 
-if [ "$fail" -eq 0 ]; then
-  echo "check-ts-lints OK ($MODE): eslint · prettier · stylelint · tsc · type-coverage · suppressions · census · knip ✓"
-fi
-exit "$fail"
+ledger_finish "eslint · prettier · stylelint · tsc · type-coverage · suppressions · census · knip ✓"

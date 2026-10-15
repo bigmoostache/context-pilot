@@ -14,8 +14,8 @@ tools:
       IMPORTANT: Before calling this tool, carefully review ALL human messages in each panel. Extract and preserve:
       - **Logs**: Short, atomic entries for mid-conversation context — decisions made, actions taken, bugs found, user preferences expressed, task context. Logs are medium-lifecycle: they maintain conversation flow across reloads.
 
-      Every substantive piece of information from human messages should be captured in a log. When in doubt, preserve it. Log timestamps are set to each panel's last message time, not the current time.
+      Every substantive piece of information from human messages should be captured in a log. When in doubt, preserve it. Give each log an importance (low/medium/high/critical, default medium) so decisions and mandates stand out. Log timestamps are set to each panel's last message time, not the current time.
     parameters:
       panels: "Array of panels to close"
       panel_id: "ID of the conversation history panel to close (e.g., 'P12')"
-      logs: "Log entries to create — simple strings, one per entry"
+      logs: "Log entries to create, one per fact"

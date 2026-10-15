@@ -93,3 +93,45 @@ fn scalar(s: &str) -> String {
         || s.starts_with(['-', '?', '&', '*', '!', '|', '>', '%', '@', '`', '[', ']', '{', '}', ',']);
     if needs_quote { format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")) } else { s.to_owned() }
 }
+
+#[cfg(test)]
+mod tests {
+    use cp_base::state::runtime::State;
+
+    use super::{render, scalar};
+    use crate::types::{TodoItem, TodoState, TodoStatus};
+
+    #[test]
+    fn renders_canonical_yaml_with_cancelled_last() {
+        let mk = |id: &str, parent: Option<&str>, order: i32, status: TodoStatus, desc: &str| TodoItem {
+            id: id.to_owned(),
+            agent_id: "A1".to_owned(),
+            parent_id: parent.map(str::to_owned),
+            name: format!("t{id}"),
+            description: desc.to_owned(),
+            status,
+            order,
+        };
+        let mut ts = TodoState::new();
+        ts.todos = vec![
+            mk("X1", None, 0i32, TodoStatus::Cancelled, ""),
+            mk("X2", None, 1i32, TodoStatus::InProgress, "line1\nline2"),
+            mk("X3", Some("X2"), 0i32, TodoStatus::Done, ""),
+        ];
+        let mut state = State::default();
+        state.set_ext(ts);
+        let expected = "- X2: in_progress\n  title: tX2\n  description: |\n    line1\n    line2\n  children:\n\
+                        \x20 - X3: done\n    title: tX3\n- X1: cancelled\n  title: tX1\n";
+        assert_eq!(render(&state, "A1"), expected);
+    }
+
+    #[test]
+    fn scalar_quotes_only_when_needed() {
+        assert_eq!(scalar("plain title"), "plain title");
+        assert_eq!(scalar("key: value"), "\"key: value\"");
+        assert_eq!(scalar("- dash"), "\"- dash\"");
+        assert_eq!(scalar(" pad"), "\" pad\"");
+        assert_eq!(scalar(""), "\"\"");
+        assert_eq!(scalar("say \"hi\""), "\"say \\\"hi\\\"\"");
+    }
+}

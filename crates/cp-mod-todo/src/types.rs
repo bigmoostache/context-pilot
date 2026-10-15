@@ -14,7 +14,8 @@ use std::str::FromStr;
 #[serde(rename_all = "snake_case")]
 pub enum TodoStatus {
     #[default]
-    /// Not started.
+    /// Not started. Accepts the legacy `pending` wire name so old saves load.
+    #[serde(alias = "pending")]
     Planned, // ' '
     /// Work in progress.
     InProgress, // '~'
@@ -73,16 +74,15 @@ pub struct TodoItem {
     /// Detailed description
     #[serde(default)]
     pub description: String,
-    /// Status: pending, `in_progress`, done
+    /// Lifecycle status (planned / in progress / done / cancelled).
     #[serde(default)]
     pub status: TodoStatus,
-    /// Sibling sort key within the same parent group (YAML-diff rework).
+    /// Sibling sort key within the same parent group.
     ///
-    /// **Pure backend** — never written in the virtual YAML the `Todo` tool
-    /// edits; it is *reconstructed* from each item's position among its
-    /// siblings when the edited YAML is de-serialized (see [`crate::yaml`]).
-    /// A cancelled (soft-deleted) item is renumbered to sort **last** in its
-    /// parent group. Defaults to `0` so pre-rework persisted items load.
+    /// **Pure backend** — never exposed in the `Todo` tool payload. New tasks
+    /// append at the end of their group; [`crate::upsert::renumber_orders`]
+    /// re-packs every group to `0..n` with cancelled (soft-deleted) items
+    /// last. Defaults to `0` so pre-rework persisted items load.
     #[serde(default)]
     pub order: i32,
 }
@@ -146,5 +146,54 @@ impl TodoState {
         let ts = state.ext_mut::<Self>();
         ts.revision = REVISION_SOURCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         ts
+    }
+
+    /// Open tasks (planned or in progress) owned by `agent_id`. Done and
+    /// cancelled items never count. `None` agent = no focus = zero.
+    #[must_use]
+    pub fn open_count(&self, agent_id: Option<&str>) -> usize {
+        let Some(agent) = agent_id else {
+            return 0;
+        };
+        self.todos
+            .iter()
+            .filter(|t| t.agent_id == agent && matches!(t.status, TodoStatus::Planned | TodoStatus::InProgress))
+            .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TodoItem, TodoState, TodoStatus};
+
+    #[test]
+    fn open_count_scopes_to_agent_and_skips_done_and_cancelled() {
+        let mk = |id: &str, agent: &str, status: TodoStatus| TodoItem {
+            id: id.to_owned(),
+            agent_id: agent.to_owned(),
+            parent_id: None,
+            name: id.to_owned(),
+            description: String::new(),
+            status,
+            order: 0,
+        };
+        let mut ts = TodoState::new();
+        ts.todos = vec![
+            mk("X1", "A1", TodoStatus::Planned),
+            mk("X2", "A1", TodoStatus::InProgress),
+            mk("X3", "A1", TodoStatus::Done),
+            mk("X4", "A1", TodoStatus::Cancelled),
+            mk("X5", "A2", TodoStatus::Planned),
+        ];
+        assert_eq!(ts.open_count(Some("A1")), 2);
+        assert_eq!(ts.open_count(Some("A2")), 1);
+        assert_eq!(ts.open_count(None), 0);
+    }
+
+    #[test]
+    fn legacy_items_still_load() {
+        let item: TodoItem =
+            serde_json::from_str(r#"{"id":"X1","thread_id":"T1","name":"n","status":"pending"}"#).unwrap();
+        assert_eq!((item.agent_id.as_str(), item.status, item.order), ("T1", TodoStatus::Planned, 0i32));
     }
 }

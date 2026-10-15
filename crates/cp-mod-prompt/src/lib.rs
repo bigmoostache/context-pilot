@@ -158,6 +158,7 @@ impl Module for PromptModule {
             "system_load" => Some(preflight_system_load(tool)),
             "skill_load" => Some(preflight_skill_load(tool, state)),
             "Edit" => preflight_edit_prompt_file(tool),
+            "Write" => preflight_write_prompt_file(tool),
             _ => None,
         }
     }
@@ -287,13 +288,10 @@ impl Module for PromptModule {
 fn preflight_behaviour_create(tool: &ToolUse) -> Verdict {
     let mut pf = Verdict::new();
     let type_str = tool.input.get("type").and_then(|v| v.as_str()).unwrap_or("");
-    let pt_opt = match type_str {
-        // "agent" kept as a legacy alias (pre-T860 name).
-        "system" | "agent" => Some(PromptType::System),
-        "skill" => Some(PromptType::Skill),
-        "command" => Some(PromptType::Command),
-        _ => {
-            pf.errors.push(format!("Invalid type '{type_str}' — must be 'system', 'skill', or 'command'"));
+    let pt_opt = match PromptType::from_arg(type_str) {
+        Ok(pt) => Some(pt),
+        Err(e) => {
+            pf.errors.push(e);
             None
         }
     };
@@ -342,19 +340,39 @@ fn preflight_skill_load(tool: &ToolUse, state: &State) -> Verdict {
 }
 
 /// Check if a file path is inside one of the three prompt directories.
-/// Handles both absolute and relative paths by canonicalizing comparison.
+///
+/// Both sides are canonicalized. A path that does not exist yet (a `Write`
+/// creating a new behaviour) is resolved through its canonical parent, so a
+/// relative path into the behaviour dir is still recognized.
 fn is_prompt_file(path: &str) -> bool {
     let p = std::path::Path::new(path);
+    let resolved = p.canonicalize().ok().or_else(|| {
+        let parent = p.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or_else(|| std::path::Path::new("."));
+        Some(parent.canonicalize().ok()?.join(p.file_name()?))
+    });
     [PromptType::System, PromptType::Skill, PromptType::Command].iter().any(|pt| {
         let dir = storage::dir_for(*pt);
-        // Try canonical comparison first (handles absolute vs relative)
-        if let (Ok(canon_path), Ok(canon_dir)) = (p.canonicalize(), dir.canonicalize()) {
-            canon_path.starts_with(canon_dir)
-        } else {
-            // Fallback: check if path contains the relative dir segment
-            p.starts_with(&dir)
+        match (resolved.as_ref(), dir.canonicalize()) {
+            (Some(rp), Ok(canon_dir)) => rp.starts_with(canon_dir),
+            _ => p.starts_with(&dir),
         }
     })
+}
+
+/// Pre-flight for `Write` on a prompt `.md` file: the new contents must carry
+/// valid frontmatter, or the behaviour would load with an empty name.
+fn preflight_write_prompt_file(tool: &ToolUse) -> Option<Verdict> {
+    let file_path = tool.input.get("file_path").and_then(|v| v.as_str())?;
+    let is_md = std::path::Path::new(file_path).extension().is_some_and(|e| e == "md");
+    if !is_md || !is_prompt_file(file_path) {
+        return None;
+    }
+    let mut pf = Verdict::new();
+    let contents = tool.input.get("contents").and_then(|v| v.as_str()).unwrap_or("");
+    if let Err(reason) = storage::validate_frontmatter(contents) {
+        pf.errors.push(format!("Write would produce an invalid prompt file: {reason}"));
+    }
+    Some(pf)
 }
 
 /// Pre-flight check for the `Edit` tool when targeting a prompt `.md` file.

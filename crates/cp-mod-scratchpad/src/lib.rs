@@ -1,11 +1,16 @@
 //! Scratchpad module — temporary cells for notes, code snippets, and working data.
 //!
 //! Three tools: `scratchpad_create_cell`, `scratchpad_edit_cell`, `scratchpad_wipe`.
-//! Cells are stored per-worker and shown in a fixed panel. Useful for the AI to
-//! maintain intermediate state during multi-step tasks.
+//! Cells are owned by an agent (scoped to `State::executing_agent_id`), persist
+//! across reloads until wiped or the agent is deleted, and render in a fixed
+//! panel plus the web Notes aside. Capped per cell and per agent because the
+//! panel lands verbatim in the agent's prompt.
 
 /// Panel rendering for scratchpad cells.
 mod panel;
+/// Regression tests (isolation, per-agent ids, legacy load, stamps, caps).
+#[cfg(test)]
+mod tests;
 /// Tool implementations + focus-scoping / purge ops (the latter called by the
 /// main crate, mirroring `cp-mod-todo::tools`).
 pub mod tools;
@@ -25,7 +30,6 @@ use cp_base::tools::{ParamType, ToolDefinition, ToolTexts};
 use cp_base::tools::{ToolResult, ToolUse};
 
 use self::panel::ScratchpadPanel;
-use cp_base::cast::Safe as _;
 use cp_base::modules::Module;
 
 /// Lazily-parsed tool descriptions loaded from the scratchpad YAML definition.
@@ -74,7 +78,7 @@ impl Module for ScratchpadModule {
         let ss = ScratchpadState::get(state);
         json!({
             "scratchpad_cells": ss.scratchpad_cells,
-            "next_scratchpad_id": ss.next_scratchpad_id,
+            "next_cell_ids": ss.next_ids,
         })
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
@@ -84,11 +88,16 @@ impl Module for ScratchpadModule {
         {
             ss.scratchpad_cells = v;
         }
-        if let Some(v) = data.get("next_scratchpad_id").and_then(serde_json::Value::as_u64) {
-            ss.next_scratchpad_id = v.to_usize();
+        if let Some(map) = data.get("next_cell_ids")
+            && let Ok(v) = serde_json::from_value(map.clone())
+        {
+            ss.next_ids = v;
         }
-        // Thread-owned rework: forever-purge legacy cells lacking an agent_id
-        // (old schema), mirroring the todo migration's agentless purge.
+        // The legacy fleet-wide `next_scratchpad_id` is ignored: counters are
+        // re-derived from the loaded cells, so no existing id is ever reissued.
+        ss.reseed_counters();
+        // Forever-purge legacy cells lacking an agent_id (old schema),
+        // mirroring the todo migration's agentless purge.
         tools::purge_agentless(state);
     }
 
@@ -147,7 +156,7 @@ impl Module for ScratchpadModule {
             "scratchpad_edit_cell" => {
                 let mut pf = Verdict::new();
                 if let (Some(f), Some(cell_id)) = (focus, tool.input.get("cell_id").and_then(|v| v.as_str()))
-                    && !ss.scratchpad_cells.iter().any(|c| c.id == cell_id && c.agent_id == f)
+                    && !ss.has_cell(f, cell_id)
                 {
                     pf.errors.push(format!("Cell '{cell_id}' not found"));
                 }
@@ -160,7 +169,7 @@ impl Module for ScratchpadModule {
                 {
                     for id_val in ids {
                         if let Some(id) = id_val.as_str()
-                            && !ss.scratchpad_cells.iter().any(|c| c.id == id && c.agent_id == f)
+                            && !ss.has_cell(f, id)
                         {
                             pf.warnings.push(format!("Cell '{id}' not found \u{2014} will be skipped"));
                         }
@@ -268,14 +277,15 @@ impl Module for ScratchpadModule {
 /// Classify a scratchpad output line into a display semantic.
 fn scratchpad_line_semantic(line: &str) -> cp_render::Semantic {
     use cp_render::Semantic;
-    if line.starts_with("Error:") {
+    const ERROR_PREFIXES: [&str; 6] = ["Missing", "No ", "Cell not found", "Cell too large", "Too many", "Error"];
+    if ERROR_PREFIXES.iter().any(|p| line.starts_with(p)) {
         Semantic::Error
     } else if line.starts_with("Created cell") {
         Semantic::Success
     } else if line.starts_with("Updated") {
         Semantic::Info
-    } else if line.starts_with("Deleted") {
-        Semantic::Error
+    } else if line.starts_with("Deleted") || line.starts_with("Wiped") {
+        Semantic::Warning
     } else if line.starts_with('C') && line.chars().nth(1).is_some_and(|c| c.is_ascii_digit()) {
         Semantic::Info
     } else if line.contains(':') {

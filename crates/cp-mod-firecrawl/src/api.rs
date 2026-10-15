@@ -1,12 +1,12 @@
-use reqwest::blocking::Client;
-use std::time::Duration;
+use reqwest::Method;
+use std::time::{Duration, Instant};
+
+use crate::http::{Call, Policy, Transport};
 
 use crate::types::{CrawlStartResponse, CrawlStatusResponse, MapResponse, ScrapeResponse, SearchResponse};
 
 /// Base URL for the Firecrawl v2 REST API.
 const FIRECRAWL_BASE_URL: &str = "https://api.firecrawl.dev/v2";
-/// HTTP request timeout in seconds.
-const TIMEOUT_SECS: u64 = 30;
 
 /// Parameters for `firecrawl_scrape`.
 #[derive(Debug)]
@@ -75,53 +75,73 @@ pub struct CrawlParams<'req> {
 /// HTTP client for the Firecrawl API (v2).
 #[derive(Debug)]
 pub struct FirecrawlClient {
-    /// Reusable reqwest HTTP client with 30s timeout.
-    client: Client,
-    /// Firecrawl API key for Bearer auth.
-    api_key: String,
+    /// Retrying, deadline-aware HTTP transport.
+    http: Transport,
+}
+
+/// Timeout of the best-effort `DELETE` that cancels an abandoned crawl.
+const CANCEL_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// `location` body object from whichever of `country` / `languages` is set;
+/// `None` when neither is.
+pub(crate) fn location_json(country: Option<&str>, languages: Option<&[&str]>) -> Option<serde_json::Value> {
+    let mut loc = serde_json::Map::new();
+    if let Some(c) = country {
+        drop(loc.insert("country".into(), serde_json::json!(c)));
+    }
+    if let Some(langs) = languages.filter(|l| !l.is_empty()) {
+        drop(loc.insert("languages".into(), serde_json::json!(langs)));
+    }
+    (!loc.is_empty()).then_some(serde_json::Value::Object(loc))
+}
+
+/// Insert `key: value` into a JSON object body.
+fn put(body: &mut serde_json::Value, key: &str, value: serde_json::Value) {
+    if let Some(obj) = body.as_object_mut() {
+        drop(obj.insert(key.into(), value));
+    }
 }
 
 impl FirecrawlClient {
-    /// Create a new client with the given API key.
+    /// Create a client against the public Firecrawl v2 API.
     ///
     /// # Errors
     ///
     /// Returns `Err` if the HTTP client fails to build.
     pub fn new(api_key: String) -> Result<Self, String> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(TIMEOUT_SECS))
-            .build()
-            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
-        Ok(Self { client, api_key })
+        Self::with_base_url(api_key, FIRECRAWL_BASE_URL)
     }
 
-    /// Scrape a single URL for full content extraction.
+    /// Create a client against another API root (tests, self-hosted Firecrawl).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the HTTP client fails to build.
+    pub fn with_base_url(api_key: String, base_url: &str) -> Result<Self, String> {
+        Ok(Self { http: Transport::new(api_key, base_url)? })
+    }
+
+    /// Bound every later request (retries and waits included) by `deadline`.
+    pub const fn set_deadline(&mut self, deadline: Instant) {
+        self.http.set_deadline(deadline);
+    }
+
+    /// Scrape a single URL for full content extraction. Billed: never retried
+    /// once the server may have acted on it.
     ///
     /// # Errors
     ///
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn scrape(&self, p: &ScrapeParams<'_>) -> Result<ScrapeResponse, String> {
-        let mut body = serde_json::json!({
-            "url": p.url,
-            "formats": p.formats,
-        });
-
-        if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref())
-            && let Some(obj) = body.as_object_mut()
-        {
-            drop(obj.insert(
-                "location".into(),
-                serde_json::json!({
-                    "country": country,
-                    "languages": langs,
-                }),
-            ));
+        let mut body = serde_json::json!({ "url": p.url, "formats": p.formats });
+        if let Some(loc) = location_json(p.country, p.languages.as_deref()) {
+            put(&mut body, "location", loc);
         }
-
-        self.post_json("/scrape", &body)
+        self.post("/scrape", &body)
     }
 
-    /// Search and scrape in one API call.
+    /// Search and scrape in one API call. Billed: never retried once the server
+    /// may have acted on it.
     ///
     /// # Errors
     ///
@@ -130,27 +150,21 @@ impl FirecrawlClient {
         let mut body = serde_json::json!({
             "query": p.query,
             "limit": p.limit,
-            "scrapeOptions": {
-                "formats": ["markdown", "links"],
-            },
+            "scrapeOptions": { "formats": ["markdown", "links"] },
         });
-
-        if let Some(obj) = body.as_object_mut() {
-            if !p.sources.is_empty() {
-                drop(obj.insert("sources".into(), serde_json::json!(p.sources)));
-            }
-            if let Some(cats) = p.categories.as_ref() {
-                drop(obj.insert("categories".into(), serde_json::json!(cats)));
-            }
-            if let Some(tbs) = p.tbs {
-                drop(obj.insert("tbs".into(), serde_json::json!(tbs)));
-            }
-            if let Some(loc) = p.location {
-                drop(obj.insert("location".into(), serde_json::json!(loc)));
-            }
+        if !p.sources.is_empty() {
+            put(&mut body, "sources", serde_json::json!(p.sources));
         }
-
-        self.post_json("/search", &body)
+        if let Some(cats) = p.categories.as_ref() {
+            put(&mut body, "categories", serde_json::json!(cats));
+        }
+        if let Some(tbs) = p.tbs {
+            put(&mut body, "tbs", serde_json::json!(tbs));
+        }
+        if let Some(loc) = p.location {
+            put(&mut body, "location", serde_json::json!(loc));
+        }
+        self.post("/search", &body)
     }
 
     /// Map a domain to discover all URLs.
@@ -164,26 +178,18 @@ impl FirecrawlClient {
             "limit": p.limit,
             "includeSubdomains": p.include_subdomains,
         });
-
-        if let Some(obj) = body.as_object_mut() {
-            if let Some(search) = p.search {
-                drop(obj.insert("search".into(), serde_json::json!(search)));
-            }
-            if let (Some(country), Some(langs)) = (p.country.as_ref(), p.languages.as_ref()) {
-                drop(obj.insert(
-                    "location".into(),
-                    serde_json::json!({
-                        "country": country,
-                        "languages": langs,
-                    }),
-                ));
-            }
+        if let Some(search) = p.search {
+            put(&mut body, "search", serde_json::json!(search));
         }
-
-        self.post_json("/map", &body)
+        if let Some(loc) = location_json(p.country, p.languages.as_deref()) {
+            put(&mut body, "location", loc);
+        }
+        self.post("/map", &body)
     }
 
-    /// Start a recursive crawl job. Returns a job ID for polling.
+    /// Start a recursive crawl job. Returns a job ID for polling. A retry after
+    /// the server may have accepted the job would start (and bill) a second one,
+    /// so only refused requests are retried.
     ///
     /// # Errors
     ///
@@ -193,117 +199,60 @@ impl FirecrawlClient {
             "url": p.url,
             "limit": p.limit,
             "allowSubdomains": p.allow_subdomains,
-            "scrapeOptions": {
-                "formats": ["markdown"],
-            },
+            "scrapeOptions": { "formats": ["markdown"] },
         });
-
-        if let Some(obj) = body.as_object_mut() {
-            if let Some(depth) = p.max_depth {
-                drop(obj.insert("maxDepth".into(), serde_json::json!(depth)));
-            }
-            if let Some(paths) = p.include_paths.as_ref() {
-                drop(obj.insert("includePaths".into(), serde_json::json!(paths)));
-            }
-            if let Some(paths) = p.exclude_paths.as_ref() {
-                drop(obj.insert("excludePaths".into(), serde_json::json!(paths)));
-            }
+        if let Some(depth) = p.max_depth {
+            put(&mut body, "maxDepth", serde_json::json!(depth));
         }
-
-        self.post_json("/crawl", &body)
+        if let Some(paths) = p.include_paths.as_ref() {
+            put(&mut body, "includePaths", serde_json::json!(paths));
+        }
+        if let Some(paths) = p.exclude_paths.as_ref() {
+            put(&mut body, "excludePaths", serde_json::json!(paths));
+        }
+        self.post("/crawl", &body)
     }
 
-    /// Poll crawl job status by its ID.
+    /// Poll crawl job status by its ID (first page of results).
     ///
     /// # Errors
     ///
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn poll_crawl(&self, job_id: &str) -> Result<CrawlStatusResponse, String> {
-        self.get_json(&format!("/crawl/{job_id}"))
+        let url = self.http.url(&format!("/crawl/{job_id}"));
+        self.http.send(&Call { method: Method::GET, url: &url, body: None }, Policy::Idempotent)
     }
 
-    /// GET JSON with 5xx retry (2 attempts, 1s delay).
-    fn get_json<T>(&self, path: &str) -> Result<T, String>
+    /// Fetch a further result page from a status response's `next` URL.
+    ///
+    /// # Errors
+    ///
+    /// `next` points outside the API root (the bearer token is never sent
+    /// elsewhere), or the request fails.
+    pub fn crawl_page(&self, next: &str) -> Result<CrawlStatusResponse, String> {
+        if !self.http.owns(next) {
+            return Err(format!("refusing to follow pagination URL outside the Firecrawl API: {next}"));
+        }
+        self.http.send(&Call { method: Method::GET, url: next, body: None }, Policy::Idempotent)
+    }
+
+    /// Cancel a running crawl job so it stops consuming credits. One attempt,
+    /// with its own timeout: it runs after the operation's deadline is spent.
+    ///
+    /// # Errors
+    ///
+    /// Network failure or non-2xx status.
+    pub fn cancel_crawl(&self, job_id: &str) -> Result<(), String> {
+        let url = self.http.url(&format!("/crawl/{job_id}"));
+        self.http.send_once(&Call { method: Method::DELETE, url: &url, body: None }, CANCEL_TIMEOUT)
+    }
+
+    /// Billed `POST`: retried only when the server certainly did not act.
+    fn post<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String>
     where
         T: serde::de::DeserializeOwned,
     {
-        let url = format!("{FIRECRAWL_BASE_URL}{path}");
-
-        for attempt in 0i32..3i32 {
-            let resp = self
-                .client
-                .get(&url)
-                .header("Authorization", format!("Bearer {}", self.api_key))
-                .send()
-                .map_err(|e| format!("Request failed: {e}"))?;
-
-            let status = resp.status().as_u16();
-            let resp_body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
-
-            match status {
-                200..=299 => {
-                    return serde_json::from_str(&resp_body).map_err(|e| format!("Failed to parse response: {e}"));
-                }
-                429 => {
-                    return Err(format!("Rate limited (429). Response: {}", truncate(&resp_body, 200)));
-                }
-                500..=599 if attempt < 2i32 => {
-                    std::thread::sleep(Duration::from_secs(1));
-                }
-                _ => {
-                    return Err(format!("HTTP {} error: {}", status, truncate(&resp_body, 200)));
-                }
-            }
-        }
-        Err("Max retries exceeded".to_owned())
+        let url = self.http.url(path);
+        self.http.send(&Call { method: Method::POST, url: &url, body: Some(body) }, Policy::Billable)
     }
-
-    /// POST JSON with 5xx retry (2 attempts, 1s delay).
-    fn post_json<T>(&self, path: &str, body: &serde_json::Value) -> Result<T, String>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        let url = format!("{FIRECRAWL_BASE_URL}{path}");
-
-        for attempt in 0i32..3i32 {
-            let resp = self
-                .client
-                .post(&url)
-                .header("Authorization", format!("Bearer {}", self.api_key))
-                .header("Content-Type", "application/json")
-                .json(body)
-                .send()
-                .map_err(|e| format!("Request failed: {e}"))?;
-
-            let status = resp.status().as_u16();
-            let resp_body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
-
-            match status {
-                200..=299 => {
-                    return serde_json::from_str(&resp_body).map_err(|e| format!("Failed to parse response: {e}"));
-                }
-                429 => {
-                    return Err(format!("Rate limited (429). Response: {}", truncate(&resp_body, 200)));
-                }
-                403 => {
-                    return Err(format!(
-                        "Forbidden (403). Check FIRECRAWL_API_KEY. Response: {}",
-                        truncate(&resp_body, 200)
-                    ));
-                }
-                500..=599 if attempt < 2i32 => {
-                    std::thread::sleep(Duration::from_secs(1));
-                }
-                _ => {
-                    return Err(format!("HTTP {} error: {}", status, truncate(&resp_body, 200)));
-                }
-            }
-        }
-        Err("Max retries exceeded".to_owned())
-    }
-}
-
-/// Truncate a string to at most `max` bytes on a char boundary.
-fn truncate(s: &str, max: usize) -> &str {
-    if s.len() <= max { s } else { s.get(..s.floor_char_boundary(max)).unwrap_or("") }
 }

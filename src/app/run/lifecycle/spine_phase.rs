@@ -24,7 +24,7 @@ impl App {
         // roster + promotion decision.
         {
             let _g = crate::profile!("sp_reconcile_fleet");
-            self.reconcile_fleet_registry(current_ms);
+            self.reconcile_fleet_registry();
         }
         {
             let _g = crate::profile!("sp_tick_social");
@@ -36,7 +36,7 @@ impl App {
         }
         {
             let _g = crate::profile!("sp_poll_idle_bg");
-            self.poll_idle_agents(current_ms);
+            self.poll_idle_agents();
         }
         {
             let _g = crate::profile!("sp_advance_bg");

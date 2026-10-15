@@ -153,3 +153,52 @@ fn legacy_coming_back_without_from_still_loads() {
     let sub: Substate = serde_json::from_str(json).expect("back-compat");
     assert_eq!(sub, Substate::ComingBack { agent_id: "A2".into(), at_ms: 5u64, message: "m".into(), from: None });
 }
+
+#[test]
+fn recurring_cron_keeps_commas_inside_fields() {
+    assert_eq!(
+        parse_next("GIVE_RECURRING_TASK(A2, 0 9,17 * * 1,3,5, standup, then notes)"),
+        Ok(Next::GiveRecurringTask {
+            agent_id: "A2".into(),
+            cron: "0 9,17 * * 1,3,5".into(),
+            message: "standup, then notes".into()
+        })
+    );
+    assert_eq!(
+        parse_next("GIVE_RECURRING_TASK(A2, 0 9 * * 1,5,report)"),
+        Err(format!("{RECURRING} needs (<id>, <5-field cron>, <message>); {NEXT_SYNTAX}")),
+        "a comma glued to the weekday list is ambiguous"
+    );
+    assert!(parse_next("GIVE_RECURRING_TASK(A2, 0 9 * * *,)").is_err(), "empty message");
+}
+
+#[test]
+fn dispatch_and_gather_without_real_targets_are_refused() {
+    let mut g = group();
+    let self_only = apply_send(&mut g, "A1", Next::Dispatch(vec!["A1".into()])).expect_err("self only");
+    assert!(self_only.contains("STILL_MY_TURN"), "{self_only}");
+    let human_dispatch = apply_send(&mut g, "A1", Next::Dispatch(vec![HUMAN.into()])).expect_err("human");
+    assert!(human_dispatch.contains("HUMAN"), "{human_dispatch}");
+    let human_gather = apply_send(&mut g, "A1", Next::Gather(vec!["A2".into(), HUMAN.into()])).expect_err("human");
+    assert!(human_gather.contains("HUMAN"), "{human_gather}");
+    assert!(g.social.is_empty(), "refused sends leave the group untouched");
+}
+
+#[test]
+fn one_tick_never_dispatches_two_tasks_to_one_agent() {
+    let mut a = group();
+    let mut b = group();
+    b.id = "G2".into();
+    apply_send(&mut a, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
+    apply_send(&mut b, "A1", Next::Dispatch(vec!["A2".into(), "A3".into()])).expect("ok");
+    let mut groups = vec![a, b];
+    let _fired = tick(&mut groups, (0u64, 0i32), &|_: &str| true);
+    let picks: Vec<Vec<Substate>> = groups.iter().map(|g| g.social.clone()).collect();
+    assert_eq!(
+        picks,
+        vec![
+            vec![Substate::SimpleTurn { agent_id: "A2".into() }],
+            vec![Substate::SimpleTurn { agent_id: "A3".into() }]
+        ]
+    );
+}

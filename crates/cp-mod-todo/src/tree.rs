@@ -140,3 +140,65 @@ fn has_in_progress_descendant(items: &[&TodoItem], id: &str) -> bool {
         .iter()
         .any(|child| child.status == TodoStatus::InProgress || has_in_progress_descendant(items, child.id.as_str()))
 }
+
+#[cfg(test)]
+mod tests {
+    use cp_base::state::runtime::State;
+
+    use super::{RECAP_CLOSE, RECAP_OPEN, in_progress_leaf_warning, render, result_annex};
+    use crate::types::{TodoItem, TodoState, TodoStatus};
+
+    /// A task owned by `A1`.
+    fn item(id: &str, parent: Option<&str>, order: i32, status: TodoStatus) -> TodoItem {
+        TodoItem {
+            id: id.to_owned(),
+            agent_id: "A1".to_owned(),
+            parent_id: parent.map(str::to_owned),
+            name: format!("t{id}"),
+            description: "hidden".to_owned(),
+            status,
+            order,
+        }
+    }
+
+    /// State holding `todos`.
+    fn with(todos: Vec<TodoItem>) -> State {
+        let mut state = State::default();
+        let mut ts = TodoState::new();
+        ts.todos = todos;
+        state.set_ext(ts);
+        state
+    }
+
+    #[test]
+    fn renders_box_tree_in_order_without_cancelled_or_descriptions() {
+        let state = with(vec![
+            item("X2", None, 1, TodoStatus::Done),
+            item("X1", None, 0, TodoStatus::InProgress),
+            item("X3", Some("X1"), 0, TodoStatus::Planned),
+            item("X4", Some("X1"), 1, TodoStatus::Cancelled),
+        ]);
+        let expected = "\u{251c}\u{2500}\u{2500} [~] X1 tX1\n\
+                        \u{2502}   \u{2514}\u{2500}\u{2500} [ ] X3 tX3\n\
+                        \u{2514}\u{2500}\u{2500} [x] X2 tX2\n";
+        assert_eq!(render(&state, "A1"), expected);
+        assert_eq!(render(&state, "A2"), "");
+    }
+
+    #[test]
+    fn leaf_warning_ignores_in_progress_parents() {
+        let one_leaf =
+            with(vec![item("X1", None, 0, TodoStatus::InProgress), item("X2", Some("X1"), 0, TodoStatus::InProgress)]);
+        assert_eq!(in_progress_leaf_warning(&one_leaf, "A1"), None);
+        let two = with(vec![item("X1", None, 0, TodoStatus::InProgress), item("X2", None, 1, TodoStatus::InProgress)]);
+        let warning = in_progress_leaf_warning(&two, "A1").unwrap();
+        assert!(warning.contains("X1, X2"), "{warning}");
+    }
+
+    #[test]
+    fn annex_is_framed_and_handles_empty() {
+        let annex = result_annex(&with(vec![]), "A1");
+        assert!(annex.starts_with(RECAP_OPEN) && annex.ends_with(RECAP_CLOSE), "{annex}");
+        assert!(annex.contains("(no tasks on this agent)"));
+    }
+}

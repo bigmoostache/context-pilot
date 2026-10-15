@@ -117,7 +117,7 @@ jobs:
 
       # Playwright e2e — documented stub (exit 0) until a dedicated ephemeral
       # stack is provisioned (see TODO(playwright) in the script).
-      - name: TS tests
+      - name: TS tests (STUB, not wired)
         run: .github/checks/check-ts-tests.sh --ci
 
       # mobile-components EXACT structural mirror of components: path parity +
