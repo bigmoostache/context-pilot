@@ -76,10 +76,10 @@ pub(crate) const RENDER_THROTTLE_MS: u64 = 10;
 /// a full truecolor screen through the pty every second.
 pub(crate) const FULL_REDRAW_MS: u64 = 30_000;
 
-/// Redraw + snapshot interval of the F12 perf overlay while open (ms) - 2 Hz.
-/// At 30 fps the overlay forced a repaint every 33 ms and cost 5.3% of busy
-/// time measuring itself; real changes still render at once via `dirty`.
-pub(crate) const PERF_OVERLAY_FRAME_MS: u64 = 500;
+/// Redraw + snapshot interval of the F12 perf overlay while open (ms) - 40 Hz.
+/// User-chosen cap: smooth enough to watch live, while the snapshot cache
+/// still keeps `PERF.snapshot()` off every frame.
+pub(crate) const PERF_OVERLAY_FRAME_MS: u64 = 25;
 
 /// Interval for CPU/RAM stats refresh in perf overlay (ms)
 pub(crate) const PERF_STATS_REFRESH_MS: u64 = 500;
