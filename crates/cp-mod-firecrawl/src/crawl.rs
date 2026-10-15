@@ -92,14 +92,16 @@ pub(crate) fn run_crawl(mut client: FirecrawlClient, job: &CrawlJob, timing: Tim
     };
 
     let mut completed = 0u32;
+    let timed_out = |n: u32| format!("timed out after {}s ({n} pages scraped)", timing.budget.as_secs());
     loop {
         if Instant::now().checked_add(timing.interval).is_none_or(|t| t >= deadline) {
-            let why = format!("timed out after {}s ({completed} pages scraped)", timing.budget.as_secs());
-            return abandon(&client, &job_id, &why);
+            return abandon(&client, &job_id, &timed_out(completed));
         }
         std::thread::sleep(timing.interval);
         let status = match client.poll_crawl(&job_id) {
             Ok(s) => s,
+            // A poll cut short by the deadline is a timeout, not a poll failure.
+            Err(_) if Instant::now() >= deadline => return abandon(&client, &job_id, &timed_out(completed)),
             Err(e) => return abandon(&client, &job_id, &format!("poll failed: {e}")),
         };
         completed = status.completed.unwrap_or(completed);
