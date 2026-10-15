@@ -79,9 +79,11 @@ pub(crate) fn host_zone() -> Arc<Zone> {
 
 /// Read the host zone from its sources (see module docs).
 fn load() -> Zone {
-    std::env::var_os("TZ")
-        .and_then(|raw| raw.into_string().ok())
-        .and_then(|tz| from_tz_var(&tz))
+    cp_env::env()
+        .core
+        .tz
+        .as_deref()
+        .and_then(from_tz_var)
         .or_else(|| read_tzif("/etc/localtime"))
         .or_else(from_date_cmd)
         .unwrap_or_default()

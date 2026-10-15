@@ -24,6 +24,15 @@ pub(super) static CORE: &[Spec] = &[
         ..Spec::BASE
     },
     Spec {
+        name: "TZ",
+        kind: Kind::Str,
+        fallback: Fallback::None,
+        scope: Scope::Both,
+        group: Group::Core,
+        doc: "Host time zone for local timestamps and cron schedules: `:path`, a zoneinfo name (`Europe/Paris`) or a POSIX rule (`CET-1CEST,M3.5.0,M10.5.0/3`). Unset means `/etc/localtime`.",
+        ..Spec::BASE
+    },
+    Spec {
         name: "CP_AGENTS_DIR",
         kind: Kind::Path(Exist::No),
         fallback: Fallback::Derived("$HOME/.context-pilot/agents"),

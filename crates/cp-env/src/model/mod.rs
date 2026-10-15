@@ -25,6 +25,8 @@ pub struct Core {
     pub agents_dir: PathBuf,
     /// `$XDG_CONFIG_HOME`, or `$HOME/.config`.
     pub xdg_config_home: PathBuf,
+    /// `$TZ` (host time zone spec), if set.
+    pub tz: Option<String>,
 }
 
 /// Orchestrator topology.
@@ -118,6 +120,7 @@ impl Env {
         let agents_dir = raw.path("CP_AGENTS_DIR").unwrap_or_else(|| home.join(".context-pilot/agents"));
         let core = Core {
             xdg_config_home: raw.path("XDG_CONFIG_HOME").unwrap_or_else(|| home.join(".config")),
+            tz: raw.text("TZ").map(str::to_owned),
             agents_dir: agents_dir.clone(),
             home: home.clone(),
         };

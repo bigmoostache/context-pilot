@@ -34,6 +34,7 @@ Read by both binaries.
 |---|---|---|---|---|---|
 | `HOME` | path (existing directory) | - | both | yes | Home of the process. `~/.context-pilot` (global `.env`, registry, `auth.db`, releases, Meilisearch), the Claude credentials file and the default agent code root all live under it. |
 | `XDG_CONFIG_HOME` | path | `$HOME/.config` | both |  | Parent of the central `context-pilot/config.json` store (Linux only). |
+| `TZ` | text | - | both |  | Host time zone for local timestamps and cron schedules: `:path`, a zoneinfo name (`Europe/Paris`) or a POSIX rule (`CET-1CEST,M3.5.0,M10.5.0/3`). Unset means `/etc/localtime`. |
 | `CP_AGENTS_DIR` | path | `$HOME/.context-pilot/agents` | both |  | Registry directory shared by the orchestrator and its agents (created on demand). The orchestrator passes its own value to every agent it spawns. |
 
 ## Orchestrator
