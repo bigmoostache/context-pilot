@@ -97,6 +97,10 @@ pub struct Agent {
     /// `activity/<id>.json`, never in `config.json` (see [`activity`]).
     #[serde(skip)]
     pub activity: Vec<AgentMessage>,
+    /// Bumped on every [`Self::activity`] change (only [`activity`]'s fns
+    /// mutate it), so the saver spots dirty files without hashing traces.
+    #[serde(skip)]
+    pub activity_rev: u64,
 }
 
 impl Agent {
@@ -115,6 +119,7 @@ impl Agent {
             parent_agent_id: None,
             description: String::new(),
             activity: Vec::new(),
+            activity_rev: 0,
         }
     }
 }
