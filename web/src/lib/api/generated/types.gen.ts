@@ -178,12 +178,37 @@ export type CommandReceipt = {
     status: string;
 };
 
+/**
+ * One conversation-search hit returned to the backend.
+ *
+ * A flattened, transport-ready view of a Meilisearch conversation document:
+ * enough to render a palette result row (agent name + author + snippet) and
+ * to navigate to the source agent (`agent_id`).
+ */
 export type ConvHit = {
+    /**
+     * Owning agent id — the navigation target.
+     */
     agent_id: string;
+    /**
+     * Owning agent's display name.
+     */
     agent_name: string;
+    /**
+     * `"user"` or `"assistant"`.
+     */
     author: string;
+    /**
+     * Meilisearch ranking score (0.0–1.0) — higher is a better match.
+     */
     score: number;
+    /**
+     * The matched message body.
+     */
     text: string;
+    /**
+     * Message timestamp, ms since epoch.
+     */
     ts_ms: number;
 };
 
