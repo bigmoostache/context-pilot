@@ -9361,3 +9361,127 @@ index 60fa8afa..51d73089 100755
  
  if [ $exit_code -ne 0 ]; then
 # --- End entry #116 ---
+117:6babe9ad89a882af2bcfd74f10855bb31fbab7b47f95fb6f70a0bd65636f1866:9198030a4fed4ec847af806d77f2c6a2f1848a8a10e3ed8fc46c8c3d5b6542f8:2f04d578e49d8d97e8f0aafe69fa20ee930ec2d08d68d97dab8d9cbb437d703e
+# --- Diff for entry #117 ---
+diff --git a/deploy_local.sh b/deploy_local.sh
+index 29ba377d..009ad6ab 100755
+--- a/deploy_local.sh
++++ b/deploy_local.sh
+@@ -5,9 +5,11 @@
+ #
+ # What it does:
+ #   1. Builds the release binary (as current user — uses YOUR rustup toolchain)
+-#   2. Copies it to /usr/local/bin/cpilot (elevates to sudo only for this step)
++#   2. Copies it to /usr/local/bin/cpilot (elevates to sudo only for this step),
++#      refreshes the active release slot, and sha256-verifies every copy
+ #   3. Sets up global gitignore for .context-pilot/
+-#   4. Exports API keys from .env to ~/.bashrc (if not already there)
++#   4. Checks for a .env (loaded by cpilot itself; secrets are never written
++#      into ~/.bashrc)
+ #
+ # NOTE: Do NOT run this script with sudo. It will request elevation only
+ #       for the install step. Building under sudo uses root's toolchain,
+@@ -58,8 +60,57 @@ INSTALL_DIR="$(dirname "$INSTALL_PATH")"
+ sudo rm -f "$INSTALL_DIR/cp-console-server"
+ sudo cp "$SCRIPT_DIR/target/release/cp-console-server" "$INSTALL_DIR/cp-console-server"
+ sudo chmod +x "$INSTALL_DIR/cp-console-server"
++
++# sha256 of a file (macOS ships shasum, Linux sha256sum).
++file_sha256() {
++    if command -v sha256sum >/dev/null 2>&1; then
++        sha256sum "$1" | cut -d' ' -f1
++    else
++        shasum -a 256 "$1" | cut -d' ' -f1
++    fi
++}
++
++# Fail unless $2 is byte-identical to $1. A stale install looks like a working
++# fix that "didn't take", so never report success without this check.
++verify_copy() {
++    local want got
++    want="$(file_sha256 "$1")"
++    got="$(file_sha256 "$2")"
++    if [ "$want" != "$got" ]; then
++        echo "ERROR: $2 does not match $1 (got $got, want $want)" >&2
++        exit 1
++    fi
++    echo "      verified $2 (sha256 ${got:0:12})"
++}
++
++verify_copy "$SCRIPT_DIR/target/release/tui" "$INSTALL_PATH"
++verify_copy "$SCRIPT_DIR/target/release/cp-console-server" "$INSTALL_DIR/cp-console-server"
+ echo "      Installed. ($(du -h "$INSTALL_PATH" | cut -f1))"
+ 
++# Refresh the active release slot too: system_reload re-execs the agent from
++# ~/.context-pilot/releases/<active_tag>/cpilot, not from $INSTALL_PATH, so
++# skipping it leaves reloaded agents on the old build.
++RELEASES_DIR="$HOME/.context-pilot/releases"
++ACTIVE_TAG="$(sed -nE 's/.*"active_tag"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$RELEASES_DIR/config.json" 2>/dev/null | head -n1)"
++SLOT_DIR="$RELEASES_DIR/$ACTIVE_TAG"
++if [ -n "$ACTIVE_TAG" ] && [ -d "$SLOT_DIR" ]; then
++    echo "      Refreshing release slot $ACTIVE_TAG..."
++    for pair in "tui:cpilot" "cp-console-server:cp-console-server"; do
++        src="$SCRIPT_DIR/target/release/${pair%%:*}"
++        dst="$SLOT_DIR/${pair##*:}"
++        # Keep the previous binary for rollback; rm before cp avoids "Text file busy".
++        if [ -f "$dst" ]; then
++            cp -p "$dst" "$dst.bak"
++            rm -f "$dst"
++        fi
++        cp "$src" "$dst"
++        chmod +x "$dst"
++        verify_copy "$src" "$dst"
++    done
++else
++    echo "      No active release slot found under $RELEASES_DIR — slot refresh skipped."
++fi
++
+ # 3. Global gitignore
+ echo "[3/4] Setting up global gitignore..."
+ touch "$GITIGNORE_GLOBAL"
+@@ -93,26 +144,19 @@ else
+ fi
+ git config --global core.excludesFile "$GITIGNORE_GLOBAL"
+ 
+-# 4. Export API keys from .env
+-echo "[4/4] Checking API keys in ~/.bashrc..."
+-if [ -f "$SCRIPT_DIR/.env" ]; then
+-    KEYS_ADDED=0
+-    while IFS= read -r line; do
+-        # Skip comments and empty lines
+-        [[ -z "$line" || "$line" == \#* ]] && continue
+-        KEY_NAME="${line%%=*}"
+-        if ! grep -q "export $KEY_NAME=" "$HOME/.bashrc" 2>/dev/null; then
+-            echo "export $line" >> "$HOME/.bashrc"
+-            echo "      Added $KEY_NAME to ~/.bashrc"
+-            KEYS_ADDED=$((KEYS_ADDED + 1))
+-        fi
+-    done < "$SCRIPT_DIR/.env"
+-    if [ "$KEYS_ADDED" -eq 0 ]; then
+-        echo "      All API keys already in ~/.bashrc — skipping."
+-    fi
++# 4. API keys: never copy .env secrets into shell rc files (plaintext, sourced
++# by every shell, readable by every child process). cpilot loads .env itself
++# via dotenvy, with ~/.context-pilot/.env as the global fallback.
++echo "[4/4] Checking API keys..."
++if [ -f "$SCRIPT_DIR/.env" ] || [ -f "$HOME/.context-pilot/.env" ]; then
++    echo "      .env found — cpilot loads it at startup, nothing to export."
+ else
+-    echo "      No .env file found — skipping API key export."
+-    echo "      You'll need to set API keys manually (e.g., ANTHROPIC_API_KEY)."
++    echo "      No .env found. Put API keys (e.g. ANTHROPIC_API_KEY) in"
++    echo "      ~/.context-pilot/.env (chmod 600); cpilot loads it at startup."
++fi
++if grep -qE '^export [A-Z0-9_]*(KEY|TOKEN|SECRET)[A-Z0-9_]*=' "$HOME/.bashrc" 2>/dev/null; then
++    echo "      WARNING: ~/.bashrc exports secrets (older deploy_local.sh wrote them)."
++    echo "      Consider removing those lines; they are no longer needed."
+ fi
+ 
+ echo ""
+@@ -121,5 +165,3 @@ echo ""
+ echo "Usage:"
+ echo "  cd /path/to/any/project"
+ echo "  cpilot"
+-echo ""
+-echo "If this is a new shell session, run: source ~/.bashrc"
+# --- End entry #117 ---
