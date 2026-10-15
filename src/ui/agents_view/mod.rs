@@ -10,6 +10,9 @@
 
 /// Message area rendering: messages, input, question form.
 pub(super) mod messages;
+/// Virtualized agent-list entries.
+mod visible;
+use visible::push_visible_entries;
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
@@ -89,6 +92,18 @@ fn push_archived_header(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
         ]));
         blocks.push(IrBlock::Empty);
     }
+}
+
+/// Per-frame row facts for [`push_visible_entries`].
+struct Rows {
+    /// Selected position in the visible slice.
+    selected: usize,
+    /// Archive confirm armed (bubble under the selected entry).
+    confirming: bool,
+    /// Archived view is shown.
+    viewing_archived: bool,
+    /// Pane height: the pane has no scroll offset and clips here.
+    height: usize,
 }
 
 /// Mutable accumulator threaded through the thread-list block builders:
@@ -395,6 +410,7 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, visible: &[usize], ar
     push_archived_header(&mut ir_blocks, viewing_archived);
 
     let on_virtual = show_new && selected >= visible.len();
+    let index_guard = crate::profile!("tv_list_index");
     let mut lb = ListBuild {
         blocks: &mut ir_blocks,
         sel: &mut sel,
@@ -405,21 +421,12 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, visible: &[usize], ar
         msgs_of_group: groups.iter().map(|g| (g.id.as_str(), g.messages.as_slice())).collect(),
         guide_of: guide_map(ts, visible),
     };
+    drop(index_guard);
     if show_new {
         push_new_agent_entry(&mut lb, state, on_virtual);
     }
-
-    // `i` is the position in the visible slice; `real` indexes `ts.agents`.
-    for (i, &real) in visible.iter().enumerate() {
-        let Some(agent) = ts.agents.get(real) else {
-            continue;
-        };
-        let worktree = worktree_line(state, agent);
-        push_agent_entry(&mut lb, agent, i == selected, worktree.as_ref());
-        if confirming && i == selected {
-            push_archive_confirm_bubble(lb.blocks, viewing_archived);
-        }
-    }
+    let rows = Rows { selected, confirming, viewing_archived, height: inner.height.to_usize() };
+    push_visible_entries(&mut lb, state, visible, &rows);
 
     // Empty-state hint when the archived list has nothing in it.
     if viewing_archived && visible.is_empty() {
