@@ -1,7 +1,7 @@
 tools:
   scratchpad_create_cell:
     description: |
-      Creates a new scratchpad cell for storing temporary notes, code snippets, or data during the conversation.
+      Creates a new scratchpad cell for working notes, code snippets, or data. Cells belong to you, persist across reloads, and are shown in your context every turn until wiped, so keep them short (max 16 KiB per cell, 50 cells).
     parameters:
       cell_title: "Title for the cell"
       cell_contents: "Content to store in the cell"
@@ -16,6 +16,6 @@ tools:
 
   scratchpad_wipe:
     description: |
-      Deletes scratchpad cells by their IDs. Pass an empty array to wipe all cells.
+      Deletes your scratchpad cells by their IDs. Pass an empty array to wipe all your cells.
     parameters:
       cell_ids: "Cell IDs to delete (e.g., ['C1', 'C2']). Empty array deletes all cells."
