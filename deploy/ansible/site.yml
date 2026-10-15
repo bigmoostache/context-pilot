@@ -51,7 +51,11 @@
     # tasks/fetch.yml with the pinned, sha256-verified artifact from the manifest.
     appliance_bundle_url: >-
       https://github.com/{{ gh_repo }}/releases/{{ 'latest/download' if cp_release == 'latest' else 'download/' + cp_release }}/cpilot-linux-aarch64-musl.tar.gz
-    caddy_url: "https://caddyserver.com/api/download?os=linux&arch=arm64"
+    # Pinned Caddy release tarball + sha512 (caddy_<v>_checksums.txt). Keep in
+    # step with CADDY_VERSION / CADDY_SHA512 in deploy/photonicat/build.sh.
+    caddy_version: "2.11.7"
+    caddy_sha512: "3db36ba90c7a6e8dda40ee3dd71fa08844c76b5fb08f61b31e5e78d2ed38e71c51dc7baed875e50d1ca1279196e84302967237386ae87c91ae9f2aaceada682e"
+    caddy_url: "https://github.com/caddyserver/caddy/releases/download/v{{ caddy_version }}/caddy_{{ caddy_version }}_linux_arm64.tar.gz"
     # ── box bring-up (hostname + maintenance user); tailscale added later ──
     box_hostname_prefix: "{{ hostname_prefix | default('dh') }}"
     box_username: "{{ box_user | default('dh') }}"

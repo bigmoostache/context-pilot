@@ -1,68 +1,16 @@
 use std::fs;
 
-use cp_base::state::context::{Kind, estimate_tokens};
+use cp_base::state::context::Kind;
 use cp_base::state::runtime::State;
 use cp_base::tools::{ToolResult, ToolUse};
 
 use super::diff::generate_unified_diff;
+use super::matcher::{MatchError, apply};
 use std::fmt::Write as _;
 
 /// Normalize a string for matching: trim trailing whitespace per line, normalize line endings.
 fn normalize_for_match(s: &str) -> String {
     s.replace("\r\n", "\n").lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
-}
-
-/// Find the best match for `needle` in `haystack` using normalized comparison.
-/// Returns the actual substring from haystack that matches (preserving original whitespace).
-pub(crate) fn find_normalized_match<'haystack>(haystack: &'haystack str, needle: &str) -> Option<&'haystack str> {
-    let norm_needle = normalize_for_match(needle);
-    let needle_lines: Vec<&str> = norm_needle.lines().collect();
-
-    if needle_lines.is_empty() {
-        return None;
-    }
-
-    // Split haystack into lines while tracking byte positions
-    let mut line_positions: Vec<(usize, usize)> = vec![]; // (start, end) for each line
-    let mut pos: usize = 0;
-    for line in haystack.lines() {
-        let start = pos;
-        let end = pos.saturating_add(line.len());
-        line_positions.push((start, end));
-        pos = end.saturating_add(1); // +1 for newline (might overshoot at EOF, that's ok)
-    }
-
-    let haystack_lines: Vec<&str> = haystack.lines().collect();
-    let haystack_lines_normalized: Vec<String> = haystack_lines.iter().map(|l| l.trim_end().to_owned()).collect();
-
-    // Try to find needle_lines sequence in haystack_lines_normalized
-    'outer: for start_idx in 0..haystack_lines.len() {
-        if start_idx.saturating_add(needle_lines.len()) > haystack_lines.len() {
-            break;
-        }
-
-        for (i, needle_line) in needle_lines.iter().enumerate() {
-            let Some(hay_line) = haystack_lines_normalized.get(start_idx.saturating_add(i)) else {
-                continue 'outer;
-            };
-            if *hay_line != *needle_line {
-                continue 'outer;
-            }
-        }
-
-        // Found a match! Return the original substring from haystack
-        let Some(&(match_start, _)) = line_positions.get(start_idx) else {
-            continue;
-        };
-        let match_end_idx = start_idx.saturating_add(needle_lines.len()).saturating_sub(1);
-        let Some(&(_, match_end)) = line_positions.get(match_end_idx) else {
-            continue;
-        };
-
-        return Some(haystack.get(match_start..match_end).unwrap_or(""));
-    }
-
-    None
 }
 
 /// Find closest match for error reporting (returns line number and preview)
@@ -210,32 +158,32 @@ pub(crate) fn execute_edit(tool: &ToolUse, state: &mut State) -> ToolResult {
         .any(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical));
 
     // Read file
-    let mut content = match fs::read_to_string(path) {
+    let original = match fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => return ToolResult::new(tool.id.clone(), format!("Failed to read file: {e}"), true),
     };
 
-    // Try normalized matching (handles trailing whitespace differences).
-    // Clone the match to break the borrow on `content`, allowing mutation below.
-    let actual_match_opt = find_normalized_match(&content, old_string).map(str::to_owned);
-    let Some(actual_match) = actual_match_opt else {
-        return no_match_result(tool, &content, old_string);
+    // Splice at the single matched span (literal first, whitespace-tolerant
+    // fallback). Ambiguous or missing matches are refused, never guessed.
+    let content = match apply(&original, old_string, new_string) {
+        Ok(updated) => updated,
+        Err(MatchError::NotFound) => return no_match_result(tool, &original, old_string),
+        Err(other) => return ToolResult::new(tool.id.clone(), other.describe(), true),
     };
-    content = content.replacen(actual_match.as_str(), new_string, 1);
 
     // Write file
     if let Err(e) = fs::write(path, &content) {
         return ToolResult::new(tool.id.clone(), format!("Failed to write file: {e}"), true);
     }
 
-    // Update the context element's token count
+    // Reload the panel: it recomputes paginated token counts itself.
     if let Some(ctx) = state
         .agent_mut()
         .context
         .iter_mut()
         .find(|c| c.context_type.as_str() == Kind::FILE && c.get_meta_str("file_path") == Some(&canonical))
     {
-        ctx.token_count = estimate_tokens(&content);
+        ctx.cache_deprecated = true;
     }
 
     // Count approximate lines changed
