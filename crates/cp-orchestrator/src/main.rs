@@ -87,6 +87,7 @@ fn main() -> ExitCode {
     cp_orchestrator::oerr!("agent binary: {}", config.agent_binary.display());
 
     let runtime = Runtime::new(config);
+    ensure_vault_bridge_token();
     let _driver = runtime.start_driver();
 
     // Keep every Claude OAuth account (active + stored) auto-refreshed, so a
@@ -115,6 +116,14 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+/// Mint (or reuse) the bridge token gating `/api/vault/snapshot`: spawned
+/// agents read the same owner-only file. On failure the snapshot stays closed.
+fn ensure_vault_bridge_token() {
+    if let Err(e) = cp_vault::token::ensure() {
+        cp_orchestrator::oerr!("vault bridge token unavailable, snapshot closed: {e}");
+    }
 }
 
 /// Arguments must be handled before ANYTHING boots: a silently-ignored

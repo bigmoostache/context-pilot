@@ -2,7 +2,7 @@
 
 **An AI coding agent that lives in your terminal — and a fleet orchestrator and web cockpit to run many of them at once.**
 
-Context Pilot is a \~47,000-line Rust project (18 module crates + a main binary + an orchestration backend) plus a React web client. It started as a single self-hosting TUI in which an AI agent develops the very tool it runs inside, and grew an orchestration layer so that a *fleet* of such agents can be discovered, observed, commanded, and supervised — from the terminal or from a browser.
+Context Pilot is a \~137,000-line Rust workspace (34 crates: 21 `cp-mod-*` feature modules and 13 infrastructure crates including the orchestration backend, plus the `tui` binary) and a React web client. It started as a single self-hosting TUI in which an AI agent develops the very tool it runs inside, and grew an orchestration layer so that a *fleet* of such agents can be discovered, observed, commanded, and supervised — from the terminal or from a browser.
 
 This document describes how the whole thing fits together: the agent's main loop, the module system, the three-tier durability model, the orchestrator, the bridge that joins an agent to a fleet, the web frontend, and the sidecar services (console server, Meilisearch, SQLite entities).
 
@@ -45,7 +45,7 @@ Context Pilot is not one process. It is a small constellation of cooperating sur
 | --- | --- | --- |
 | **Agent (TUI)** | `src/` (`tui` binary) | The interactive coding agent: event loop, tools, LLM streaming, panels, persistence. |
 | **Orchestrator** | `crates/cp-orchestrator` | Fleet control plane: discover, observe, command, supervise; serves REST + SSE on `:7878` (loopback — on the appliance Caddy fronts it on `:80`/`:443`). |
-| **Web frontend** | `web/` | Browser cockpit: fleet dashboard, per-agent threads / panels / file manager. |
+| **Web frontend** | `web/` | Browser cockpit: fleet dashboard, agent tree, group conversations, panels, file manager. |
 | **Console server** | `crates/cp-console-server` | Per-realm daemon running child processes that survive TUI restarts. |
 | **Meilisearch** | external process | Full-text index of project files + logs. |
 
@@ -78,11 +78,13 @@ A detached monitor thread polls every 2 s and, on a trip, dumps `.context-pilot/
 
 ### Modules — the plugin system
 
-Functionality is a set of **modules** implementing a common `Module` trait (defined in `cp-base/src/modules.rs`): each can hold state, declare and execute tools, create panels, and hook into lifecycle events (`on_user_message`, `on_stream_chunk`, `on_tool_complete`, …). Twenty-one modules are registered via `all_modules()` (`src/modules/mod.rs`), one crate each:
+Functionality is a set of **modules** implementing a common `Module` trait (defined in `cp-base/src/modules.rs`): each can hold state, declare and execute tools, create panels, and hook into lifecycle events (`on_user_message`, `on_stream_chunk`, `on_tool_complete`, …). Twenty-eight modules are registered via `all_modules()` (`src/modules/mod.rs`). Most live in their own crate; overview, conversation, conversation history and questions live in `src/modules/`:
 
-`core`/overview · `threads` · `memory` · `todo` · `queue` · `spine` · `scratchpad` · `callback` · `console` · `git` · `github` · `search` · `entities` · `tree` · `files` · `logs` · `brave` · `firecrawl` · `ocr` · `prompt` · `questions` · `bridge`.
+overview · conversation · conversation_history · questions · `prompt` · `files` · `tree` · `git` · `github` · `console` · `callback` · `todo` · `memory` · `ocr` · `scratchpad` · `groups` · `agents` · `management` · `coordination` · `spine` · `coucou` · `logs` · `brave` · `firecrawl` · `queue` · `search` · `entities` · `bridge`.
 
-Modules are either **global** (shared across all workers in a realm — files, memory, tree, logs, entities, callbacks, …) or **per-worker** (queue, git, spine, scratchpad, todo, console, github, search). A single realm can run several **workers** (independent agent loops sharing model + theme); the orchestrated world typically runs one worker per realm and scales out by running many realms.
+**Agents and groups.** An *agent* (`cp-mod-agents`, ids `A<n>`) is the unit of execution, with its own conversation, panels and todos. Agents form a tree (`parent_agent_id`) and talk through *groups* (`cp-groups`, ids `G<n>`). Each agent has a human group (its chat with the user) and may join coordination groups. `Send` posts into a group and names who acts next. `cp-management` (the `Agent` tool) creates and deletes sub-agents, and `cp-coordination` provides the `Group_*` tools. The old `threads` module became `agents` in T860 (`docs/design-orchestration.md`).
+
+Modules are either **global** (shared across all agents in a realm — files, memory, tree, logs, entities, callbacks, …) or **per-agent** (queue, git, spine, scratchpad, todo, console, github, search). A realm runs many **agents** in one process, sharing model and behaviour; at most `K` execute at once (`cp-fleet`, `docs/design-multi-worker.md`). The orchestrator scales out further by running many realms.
 
 ### Panels & context
 
@@ -96,8 +98,9 @@ Everything the agent "sees" is a **panel** (`cp-base/src/panels.rs`): files, too
 
 All agent state lives under `<folder>/.context-pilot/`:
 
-- `config.json` — global module data (the full thread list + message logs, memory, tree descriptions, logs), theme, view mode.
-- `states/<worker>.json` — per-worker module data (todo, queue, scratchpad, spine, git, console, search, …) + cost counters.
+- `config.json` — global module data (memory, tree descriptions, logs, module settings), theme, view mode.
+- `agents/A<n>.json` — agent metadata; `groups/G<n>.json` — group membership + messages.
+- `states/A<n>.json` — per-agent module data (todo, queue, scratchpad, spine, git, console, search, …) + cost counters.
 - `shared/` — `memories.yaml`, `callbacks.yaml`, `tree-descriptions.yaml`, `entities/entities.db`.
 - `messages/*.yaml`, `panels/*.json` — conversation messages and panel snapshots.
 
@@ -127,11 +130,11 @@ A single resource is owned by exactly one plane, so the two never fight over fre
 `crates/cp-orchestrator` is a standalone binary that controls a fleet. It uses **no async runtime**: a blocking, thread-per-connection HTTP server (`tiny_http`) mirrors the rest of the codebase.
 
 - **Registry** (`registry/`) — `AgentRegistry` poll-scans the agents directory (`~/.context-pilot/agents/<id>.json`) and diffs it into events (Appeared / Disappeared / StatusChanged / Stale). Liveness is a three-factor verdict (registry record + heartbeat freshness + lock ownership). `Tailer` is the incremental, gap-free oplog consumer; `AgentChannel` hydrates and sends; `TeeReader` taps an agent's stream plane.
-- **Services** (`services/`) — `MaterializedView` is the in-memory fleet projection: one `AgentView` per agent (rev, heads, thread roster, focused thread, phase, lifecycle, cost), folded purely from `OpEntry`. `StreamHub` fans an agent's stream out to N bounded subscribers. `RetiredStore` records stopped-but-kept agents.
+- **Services** (`services/`) — `MaterializedView` is the in-memory fleet projection: one `AgentView` per agent (rev, heads, agent roster, focused agent, phase, lifecycle, cost), folded purely from `OpEntry`. `StreamHub` fans an agent's stream out to N bounded subscribers. `RetiredStore` records stopped-but-kept agents.
 - **Supervisor** (`supervisor/`) — `AgentSupervisor` owns process lifecycle: spawn an agent on a real **pty** (the TUI needs a tty), stop (SIGTERM → grace → SIGKILL → reap), restart, and adopt externally-launched agents. Spawns are gated by a binary allow-list.
 - **Transport** (`transport/`) — REST + SSE. The driver loop runs two cadences: a slow scan (\~2 s: registry diff + a `config.json` mtime backstop) and a fast tail (\~100 ms: poll each Tailer → fold into the view → observe cost). Notable routes:
   - `GET /api/fleet/meta`, `/api/fleet/retired`, `/api/metrics`
-  - `GET /api/agent/{id}/{meta,threads,panels,memory,todos,tree,callbacks,tools,radar,entities,conversation,metrics,vitals}`
+  - `GET /api/fleet/{id}/{meta,agents,conversation,metrics,vitals,usage,library,fs/…}` (full list in `openapi.json`)
   - `GET /api/agent/{id}/fs[...]` — the realm file manager (`fs`, `fs/preview`, `fs/download`)
   - `POST /api/agent/{id}/{command,fs/upload,fs/move,restart,retire,unretire}`
   - `POST /api/fleet/create` — spawn a new agent
@@ -166,7 +169,7 @@ Thereafter it **emits a durable oplog delta** for every user-visible mutation (s
 - `lib/live.ts` / `lib/api.ts` — the typed hooks (`useFleet`, `useThreads`, `useAgentMeta`, `usePanels`, `useFs`, …) and the REST client.
 - `lib/markdown.tsx` — a themed GFM renderer for conversation messages.
 
-Four top-level views: **fleet** (the mission-control dashboard — the only place agents are created/managed), **threads** (the thread-centered conversation surface), **cockpit** (a panel-centered view mirroring the TUI's panels), and **finder** (a per-realm macOS-style file manager with live preview, upload, and internal drag-and-drop). Live assistant tokens are painted with a `requestAnimationFrame`-batched buffer so streaming never thrashes React.
+Four top-level views (`ViewMode` in `web/src/lib/types.ts`): **fleet** (the mission-control dashboard), **agents** (the agent tree and group conversations), **costs**, and **finder** (a per-realm macOS-style file manager with live preview, upload, and internal drag-and-drop). Live assistant tokens are painted with a `requestAnimationFrame`-batched buffer so streaming never thrashes React.
 
 ---
 
@@ -190,11 +193,11 @@ The `entities` module gives each agent a private SQLite database (`shared/entiti
 
 `cp-wire` is the I/O-free, transport-agnostic contract shared by the agent, the oplog, and the orchestrator. It carries `PROTOCOL_VERSION` with N-1 compatibility and tolerant decoding (unknown variants degrade gracefully). Core types:
 
-- `Command` — `SendMessage`, `CreateThread`, `ArchiveThread`, `RestoreThread`, `InterruptStream`, `Stop`, `Configure`.
-- `OpEntry` **/** `OpEntryKind` — the oplog deltas: `CommandEffect`, `MessageCreated`, `ThreadCreated` / `Archived` / `Restored` / `StatusChanged`, `ThreadFocusChanged`, `PhaseTransition`, `CostAggregate`, `Lifecycle`, `Checkpoint`.
+- `Command` — `SendMessage`, `CreateAgent`, `BranchAgent`, `ArchiveAgent` / `RestoreAgent` / `PauseAgent` / `ResumeAgent` / `DeleteAgent`, `DeleteMessage`, `InterruptStream`, `Stop`, `Configure`, `LoadBehaviour`.
+- `OpEntry` **/** `OpEntryKind` — the oplog deltas: `CommandEffect`, `MessageCreated` / `MessageDeleted`, `AgentCreated` / `Archived` / `Restored` / `Paused` / `Resumed` / `Deleted` / `StatusChanged`, `AgentFocusChanged`, `PhaseTransition`, `CostAggregate`, `Lifecycle`, `Checkpoint`.
 - `StreamFrame` — ephemeral hints: `MessageStartHint`, `Token`, `ToolArgs`, `PhaseHint`.
 - `Heartbeat` — the fixed 60-byte liveness record.
-- `Snapshot` **/** `RosterThread`, `Entry` (registry record), `ContentHash` (SHA-256, for content-addressed message bodies).
+- `Snapshot` **/** `RosterAgent`, `Entry` (registry record), `ContentHash` (SHA-256, for content-addressed message bodies).
 
 ---
 
@@ -215,11 +218,18 @@ crates/
   cp-mod-bridge/         Agent-side orchestration bridge (oplog, intake, tee, heartbeat)
   cp-orchestrator/       The fleet backend (registry, services, supervisor, transport)
   cp-console-server/     Long-running-process daemon
-  cp-mod-*/              The 20+ feature modules (threads, memory, search, git, …)
+  cp-mod-*/              21 feature modules (agents, memory, search, git, spine, …)
+  cp-groups/             Groups: membership, messages, turn-taking
+  cp-management/         `Agent` tool: create/read/update/delete sub-agents
+  cp-coordination/       Group_* tools
+  cp-fleet/              Concurrency cap + runnable scheduling across agents
+  cp-env/                Typed env-var specs (source of docs/ENV.md)
+  cp-vault/              Secret lookup (overrides → Keychain → file)
+  cp-macros/             `deref_match!` and other lint-friendly macros
   cp-render/             IR-based rendering primitives
 
-web/                     React web cockpit (Vite + TanStack Query + SSE)
-docs/                    Design docs (notably design-orchestration-backend.md)
+web/                     React web cockpit (Vite + TanStack Query + SSE), desktop + mobile trees
+docs/                    Design docs, indexed by status in docs/README.md
 ```
 
 ---

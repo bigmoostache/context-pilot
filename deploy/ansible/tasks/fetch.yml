@@ -72,9 +72,24 @@
     dest: "{{ artifacts_dir }}/bundle"
     remote_src: true # the tarball is on the control node (this play is local)
 
-- name: Download the Caddy arm64 binary (static Go; supports tls internal)
+- name: Check for an already-provided Caddy binary (build.sh / prior run)
+  ansible.builtin.stat:
+    path: "{{ artifacts_dir }}/caddy"
+  register: _caddy_stat
+
+- name: Download the pinned Caddy arm64 tarball (static Go; supports tls internal)
   ansible.builtin.get_url:
     url: "{{ caddy_url }}"
-    dest: "{{ artifacts_dir }}/caddy"
+    dest: "{{ artifacts_dir }}/caddy.tar.gz"
+    mode: "0644"
+    checksum: "sha512:{{ caddy_sha512 }}"
+  when: not _caddy_stat.stat.exists
+
+- name: Extract the Caddy binary from the verified tarball
+  ansible.builtin.unarchive:
+    src: "{{ artifacts_dir }}/caddy.tar.gz"
+    dest: "{{ artifacts_dir }}"
+    include: [caddy]
     mode: "0755"
-    force: false # build.sh / a prior run may have already provided it
+    remote_src: true # the tarball is on the control node (this play is local)
+  when: not _caddy_stat.stat.exists

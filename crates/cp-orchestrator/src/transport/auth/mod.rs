@@ -95,6 +95,7 @@ fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
         ["api", "health" | "stream" | "features"]
+            | ["api", "vault", "snapshot"] // gated by the bridge token in its handler
             | ["api", "auth", "login" | "register" | "status"]
             | ["api", "fleet", _, "avatar"]
     )
