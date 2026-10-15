@@ -334,7 +334,7 @@ type TimedSnapshot = (std::time::Instant, std::sync::Arc<crate::ui::perf::PerfSn
 /// every op (~730); rebuilding it every frame made `ir_overlays` spike to 55 ms.
 static SNAPSHOT_CACHE: std::sync::Mutex<Option<TimedSnapshot>> = std::sync::Mutex::new(None);
 
-/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (30 per second).
+/// The perf snapshot, rebuilt at most every [`SNAPSHOT_TTL`] (2 per second).
 fn cached_snapshot() -> std::sync::Arc<crate::ui::perf::PerfSnapshot> {
     let mut slot = SNAPSHOT_CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(entry) = slot.as_ref()
