@@ -52,13 +52,14 @@ pub(crate) fn optimize_context_tool_definition() -> ToolDefinition {
 ///
 /// Returns the `ToolResult`. The caller (event loop) is responsible for actually
 /// destroying the reverie state after processing this result.
-pub(crate) fn execute_report(tool: &ToolUse, state: &State) -> ToolResult {
-    // Block report if queue has unflushed actions
-    let qs = cp_mod_queue::types::QueueState::get(state);
-    if !qs.queued_calls.is_empty() {
+pub(crate) fn execute_report(tool: &ToolUse, state: &State, owner: &str) -> ToolResult {
+    // Block report if this reverie has unflushed actions (the main agent's
+    // queued calls are not its concern)
+    let pending = cp_mod_queue::types::QueueState::get(state).count_owned(Some(owner));
+    if pending > 0 {
         return ToolResult {
             tool_use_id: tool.id.clone(),
-            content: REVERIE.errors.queue_not_empty.replace("{count}", &qs.queued_calls.len().to_string()),
+            content: REVERIE.errors.queue_not_empty.replace("{count}", &pending.to_string()),
             display: None,
             tldr: None,
             is_error: true,
@@ -147,9 +148,9 @@ pub(crate) fn execute_optimize_context(tool: &ToolUse, state: &State) -> ToolRes
 ///
 /// Routes Report to our handler, everything else to the normal module dispatch.
 /// Returns None if the tool should be dispatched to modules (caller handles it).
-pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State) -> Option<ToolResult> {
+pub(crate) fn dispatch_reverie_tool(tool: &ToolUse, state: &State, owner: &str) -> Option<ToolResult> {
     match tool.name.as_str() {
-        "reverie_report" => Some(execute_report(tool, state)),
+        "reverie_report" => Some(execute_report(tool, state, owner)),
         _ => {
             // Verify tool is allowed for reveries via the reverie_allowed flag
             if state.tools.iter().any(|t| t.id == tool.name && t.reverie_allowed) {

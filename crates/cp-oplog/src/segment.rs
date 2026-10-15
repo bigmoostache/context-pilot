@@ -103,6 +103,67 @@ pub fn read(path: &Path) -> io::Result<Scan> {
     Ok(scan_bytes(&data))
 }
 
+/// [`read`] for recovery: a decode failure is a torn tail **only** in the
+/// newest segment.
+///
+/// Every older segment was `fdatasync`'d before the writer rolled past it, so
+/// it can never legitimately end in a partial frame. A bad frame there is
+/// corruption, and silently dropping the rest of the segment would lose
+/// acknowledged records — so it is surfaced as an error instead.
+///
+/// # Errors
+///
+/// Propagates I/O errors from reading the file, and returns
+/// [`io::ErrorKind::InvalidData`] when a non-newest segment fails to decode.
+pub fn read_checked(path: &Path, is_newest: bool) -> io::Result<Scan> {
+    let scan = read(path)?;
+    if scan.torn_tail && !is_newest {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("oplog segment {} is corrupt at byte {} (not the newest segment)", path.display(), scan.valid_len),
+        ));
+    }
+    Ok(scan)
+}
+
+/// Decode only the **first** record of a segment, or `None` if the segment is
+/// empty or its first frame is torn.
+///
+/// Reads just the frame header and that one payload — the cheap probe
+/// compaction uses to find checkpoint-bearing segments without decoding every
+/// segment whole.
+///
+/// # Errors
+///
+/// Propagates I/O errors from opening or reading the file.
+pub fn read_first(path: &Path) -> io::Result<Option<OpEntry>> {
+    use std::io::Read as _;
+
+    let mut file = fs::File::open(path)?;
+    let mut header = [0u8; framing::FRAME_HEADER_SIZE];
+    if file.read_exact(&mut header).is_err() {
+        return Ok(None);
+    }
+    // Little-endian length prefix, composed by hand like cp-wire's framing
+    // (`clippy::little_endian_bytes` forbids `from_le_bytes`).
+    let [b0, b1, b2, b3, ..] = header;
+    let len =
+        u32::from(b0) | u32::from(b1).wrapping_shl(8) | u32::from(b2).wrapping_shl(16) | u32::from(b3).wrapping_shl(24);
+    if len > framing::MAX_PAYLOAD_SIZE {
+        return Ok(None);
+    }
+    let payload_len = usize::try_from(len).unwrap_or(usize::MAX);
+    let mut frame = header.to_vec();
+    frame.resize(framing::FRAME_HEADER_SIZE.saturating_add(payload_len), 0);
+    let Some(payload) = frame.get_mut(framing::FRAME_HEADER_SIZE..) else {
+        return Ok(None);
+    };
+    if file.read_exact(payload).is_err() {
+        return Ok(None);
+    }
+    Ok(framing::decode_entry(&frame).ok().map(|(entry, _consumed)| entry))
+}
+
 /// Walk a framed byte buffer, collecting entries up to the first decode
 /// failure. Factored out of [`read`] so it can be unit-tested without touching
 /// the filesystem.

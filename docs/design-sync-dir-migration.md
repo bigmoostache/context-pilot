@@ -1,6 +1,6 @@
 # Migration: runtime artifacts → `~/.context-pilot/sync/<agent-id>/`
 
-**Status:** proposal (T713). Exploration + plan only — no code changed yet.
+**Status:** shipped (T713, PR #192). Runtime artifacts live in `~/.context-pilot/sync/<id>/`; code in `crates/cp-mod-bridge/src/boot`.
 **Decision (T713):** the sync plane moves to a **global, per-agent-namespaced**
 directory in `$HOME`, not a per-realm subdir. Per-realm is kept below as the
 alternative that was considered.
