@@ -112,7 +112,7 @@ fn destroy_reverie_on_error(app: &mut App, system_id: &str, err: &str) {
         format!("Reverie '{label}' error: {err}. Destroying session."),
     );
     cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
-    QueueState::get_mut(&mut app.state).clear();
+    QueueState::get_mut(&mut app.state).clear(Some(system_id));
     drop(app.state.reveries.remove(system_id));
     drop(app.reverie_streams.remove(system_id));
 }
@@ -177,7 +177,7 @@ fn reverie_over_tool_cap(app: &mut App, system_id: &str) -> bool {
         format!("Tool cap ({cap}) reached for '{label}'. Force-stopping."),
     );
     cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
-    QueueState::get_mut(&mut app.state).clear();
+    QueueState::get_mut(&mut app.state).clear(Some(system_id));
     drop(app.state.reveries.remove(system_id));
     drop(app.reverie_streams.remove(system_id));
     true
@@ -193,8 +193,8 @@ fn dispatch_one_reverie_tool(
     tool: &cp_base::tools::ToolUse,
 ) -> Option<crate::infra::tools::ToolResult> {
     if tool.name == "Queue_execute" {
-        // Reverie doesn't need flushed tools (no callbacks) — just the summary
-        return Some(super::tools::queue_flush::execute_queue_flush(tool, &mut app.state).0);
+        // Reverie flushes only its own calls (no callbacks needed) — just the summary
+        return Some(super::tools::queue_flush::execute_queue_flush(tool, &mut app.state, Some(system_id)).0);
     }
     if tool.name == "Queue_pause" {
         if let Some(rev) = app.state.reveries.get_mut(system_id) {
@@ -203,7 +203,7 @@ fn dispatch_one_reverie_tool(
         return Some(crate::infra::tools::ToolResult::new(tool.id.clone(), "Queue paused (reverie)".into(), false));
     }
 
-    if let Some(result) = tools::dispatch_reverie_tool(tool, &app.state) {
+    if let Some(result) = tools::dispatch_reverie_tool(tool, &app.state, system_id) {
         // Check for Report sentinel
         if result.content.starts_with("REVERIE_REPORT:") {
             destroy_reverie_on_report(app, system_id, &result.content);
@@ -217,11 +217,10 @@ fn dispatch_one_reverie_tool(
         app.state.reveries.get(system_id).is_some_and(|r| r.queue_active) && !QueueState::is_queue_tool(&tool.name);
     if should_queue {
         let qs = QueueState::get_mut(&mut app.state);
-        let idx = qs.enqueue(cp_mod_queue::types::QueuedToolCall::new(
-            tool.name.clone(),
-            tool.id.clone(),
-            tool.input.clone(),
-        ));
+        let idx = qs.enqueue(
+            cp_mod_queue::types::QueuedToolCall::new(tool.name.clone(), tool.id.clone(), tool.input.clone())
+                .owned_by(Some(system_id)),
+        );
         return Some(crate::infra::tools::ToolResult::new(tool.id.clone(), format!("Queued as #{idx}"), false));
     }
     // Execute normally through module dispatch
@@ -244,9 +243,9 @@ fn destroy_reverie_on_report(app: &mut App, system_id: &str, content: &str) {
     if let Some(stream) = app.reverie_streams.get_mut(system_id) {
         stream.report_called = true;
     }
-    // Clear queued actions from this reverie (shared queue) but do NOT touch
-    // QueueState.active — that's the main worker's toggle.
-    QueueState::get_mut(&mut app.state).clear();
+    // Clear only this reverie's queued actions; the main agent's calls and its
+    // QueueState.active toggle are untouched.
+    QueueState::get_mut(&mut app.state).clear(Some(system_id));
     drop(app.state.reveries.remove(system_id));
     drop(app.reverie_streams.remove(system_id));
     save_state(&app.state);
@@ -327,7 +326,7 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
                 format!("Reverie '{label}' ended without Report after retry. Force-destroying."),
             );
             cp_mod_spine::types::SpineState::set_notification_agent(&mut app.state, &nid, tid);
-            QueueState::get_mut(&mut app.state).clear();
+            QueueState::get_mut(&mut app.state).clear(Some(&system_id));
             drop(app.state.reveries.remove(&system_id));
             drop(app.reverie_streams.remove(&system_id));
             continue;

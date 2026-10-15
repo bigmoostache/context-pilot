@@ -6,14 +6,25 @@ use cp_base::tools::ToolUse;
 use cp_base::tools::pre_flight::Verdict;
 use cp_mod_queue::types::QueueState;
 
+use crate::tools::matcher::{MatchError, apply, locate};
+
+/// Virtual post-queue content of one file, plus how many queued `Edit`s on it
+/// no longer apply (they would fail at flush time).
+struct VirtualFile {
+    /// Content after replaying every applicable queued Write/Edit.
+    content: String,
+    /// Queued `Edit` calls whose `old_string` did not resolve to a unique match.
+    stale_edits: usize,
+}
+
 /// Build virtual file content by replaying pending queue edits on top of `disk_content`.
 ///
 /// Walks queued tool calls in order. A queued `Write` replaces the virtual content entirely;
-/// a queued `Edit` applies `old_string → new_string` via normalized matching (same logic as
-/// `execute_edit`). Returns `None` when no pending changes touch `canonical_path`.
-fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State) -> Option<String> {
+/// a queued `Edit` is spliced with the same matcher as `execute_edit`. Returns `None` when
+/// no pending changes touch `canonical_path`.
+fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State) -> Option<VirtualFile> {
     let qs = state.get_ext::<QueueState>()?;
-    let mut virtual_content: Option<String> = None;
+    let mut virtual_file: Option<VirtualFile> = None;
 
     for call in &qs.queued_calls {
         let path_val = call.input.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
@@ -24,31 +35,27 @@ fn build_virtual_content(disk_content: &str, canonical_path: &str, state: &State
         if call_canonical != canonical_path {
             continue;
         }
+        let vf = virtual_file.get_or_insert_with(|| VirtualFile { content: disk_content.to_owned(), stale_edits: 0 });
 
         match call.tool_name.as_str() {
             "Write" => {
                 if let Some(contents) = call.input.get("contents").and_then(|v| v.as_str()) {
-                    virtual_content = Some(contents.to_owned());
+                    contents.clone_into(&mut vf.content);
                 }
             }
             "Edit" => {
-                let base = virtual_content.as_deref().unwrap_or(disk_content);
                 let old = call.input.get("old_string").and_then(|v| v.as_str()).unwrap_or("");
                 let new = call.input.get("new_string").and_then(|v| v.as_str()).unwrap_or("");
-
-                if let Some(actual) = crate::tools::edit_file::find_normalized_match(base, old) {
-                    let actual_owned = actual.to_owned();
-                    let mut buf = base.to_owned();
-                    buf = buf.replacen(&actual_owned, new, 1);
-                    virtual_content = Some(buf);
+                match apply(&vf.content, old, new) {
+                    Ok(updated) => vf.content = updated,
+                    Err(_) => vf.stale_edits = vf.stale_edits.saturating_add(1),
                 }
-                // If the queued edit doesn't match, skip it — it may fail at flush time
             }
             _ => {}
         }
     }
 
-    virtual_content
+    virtual_file
 }
 
 /// Pre-flight for `Open`: validate each path exists, is a file, and warn if
@@ -95,9 +102,9 @@ struct EditTarget<'target> {
     canonical: &'target str,
 }
 
-/// Verify `old_string` against both disk and post-queue virtual content,
-/// pushing an error onto `pf` when the edit cannot apply. See the truth matrix
-/// inline for the four current/virtual outcomes.
+/// Verify `old_string` resolves to exactly one place in the post-queue
+/// content (disk content when nothing is queued for this file). Ambiguous or
+/// missing matches are errors; queued edits that no longer apply are warned.
 fn preflight_edit_oldstring(tool: &ToolUse, state: &State, target: &EditTarget<'_>, pf: &mut Verdict) {
     let path_str = target.path.to_string_lossy();
     let Some(old_string) = tool.input.get("old_string").and_then(|v| v.as_str()) else {
@@ -106,23 +113,25 @@ fn preflight_edit_oldstring(tool: &ToolUse, state: &State, target: &EditTarget<'
     let Ok(content) = std::fs::read_to_string(target.path) else {
         return;
     };
-    let current_ok = crate::tools::edit_file::find_normalized_match(&content, old_string).is_some();
-    let virtual_content = build_virtual_content(&content, target.canonical, state);
-    let virtual_ok = virtual_content
-        .as_ref()
-        .is_some_and(|vc| crate::tools::edit_file::find_normalized_match(vc, old_string).is_some());
-
-    if current_ok && !virtual_ok && virtual_content.is_some() {
-        pf.errors.push(format!(
-            "old_string found in '{path_str}' on disk but a pending Queue edit conflicts — the queued changes remove this text"
+    let virtual_file = build_virtual_content(&content, target.canonical, state);
+    if let Some(stale) = virtual_file.as_ref().map(|vf| vf.stale_edits).filter(|&n| n > 0) {
+        pf.warnings.push(format!(
+            "{stale} queued Edit(s) on '{path_str}' no longer match and will fail at flush — fix or Queue_undo them"
         ));
-    } else if !current_ok && !virtual_ok {
-        pf.errors.push(format!("old_string not found in '{path_str}' — open the file to see current content"));
-    } else {
-        // current ✓ virtual ✓, or current ✗ virtual ✓ — the edit applies cleanly.
     }
-    // current ✗ virtual ✓ → fine (model edits post-queue state)
-    // current ✓ virtual ✓ → fine (no conflict)
+    let effective = virtual_file.as_ref().map_or(content.as_str(), |vf| vf.content.as_str());
+    match locate(effective, old_string) {
+        Ok(_) => {}
+        Err(MatchError::NotFound) if virtual_file.is_some() && locate(&content, old_string).is_ok() => {
+            pf.errors.push(format!(
+                "old_string found in '{path_str}' on disk but a pending Queue edit conflicts — the queued changes remove this text"
+            ));
+        }
+        Err(MatchError::NotFound) => {
+            pf.errors.push(format!("old_string not found in '{path_str}' — open the file to see current content"));
+        }
+        Err(other) => pf.errors.push(format!("{} in '{path_str}'", other.describe())),
+    }
 }
 
 /// Pre-flight for `Edit`: activate queue, validate path, warn if not open,

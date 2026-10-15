@@ -10,6 +10,8 @@ use cp_base::state::actions::Action;
 use cp_base::state::context::{Entry, Kind, compute_total_pages, estimate_tokens};
 use cp_base::state::runtime::State;
 
+use crate::classify::{CommandClass, classify, validate_gh_command};
+use crate::parse::combine_output;
 use crate::types::{GithubResultRequest, GithubState};
 use cp_base::panels::scroll_key_action;
 
@@ -27,11 +29,26 @@ impl Panel for GithubResultPanel {
 
     fn build_cache_request(&self, ctx: &Entry, state: &State) -> Option<CacheRequest> {
         let command = ctx.get_meta_str("result_command")?.to_owned();
+        // A run-once command (mutation, download, --web) shows its one output forever.
+        let args = validate_gh_command(&command).ok()?;
+        if classify(&args) != CommandClass::ReadOnly {
+            return None;
+        }
+        // Wait for the mutation to land; the stale flag survives, so the timer retries.
+        if crate::mutation::in_flight() {
+            return None;
+        }
         let token = GithubState::get(state).github_token.as_ref()?;
         let cwd = ctx.get_meta_str("result_cwd").map_or_else(|| state.workdir(), std::path::PathBuf::from);
         Some(CacheRequest::new(
             Kind::new(Kind::GITHUB_RESULT),
-            Box::new(GithubResultRequest { context_id: ctx.id.clone(), command, github_token: token.clone(), cwd }),
+            Box::new(GithubResultRequest {
+                context_id: ctx.id.clone(),
+                args,
+                github_token: token.clone(),
+                cwd,
+                ticket: crate::mutation::ticket(),
+            }),
         ))
     }
 
@@ -50,7 +67,8 @@ impl Panel for GithubResultPanel {
             } else {
                 ctx.token_count = token_count;
             }
-            ctx.cache_deprecated = false;
+            // A refresh that overlapped a mutation may hold pre-mutation data: refetch.
+            ctx.cache_deprecated = crate::mutation::take_overlapped(&ctx.id);
             let content_ref = ctx.cached_content.clone().unwrap_or_default();
             let _r = update_if_changed(ctx, &content_ref);
             true
@@ -62,46 +80,24 @@ impl Panel for GithubResultPanel {
     fn refresh_cache(&self, request: CacheRequest) -> Option<CacheUpdate> {
         let req = request.data.downcast::<GithubResultRequest>().ok()?;
 
-        // Parse and execute the command with timeout
-        let args = super::classify::validate_gh_command(&req.command).ok()?;
-
         let mut cmd = std::process::Command::new("gh");
         let _r = cmd
-            .args(&args)
+            .args(&req.args)
             .current_dir(&req.cwd)
             .env("GITHUB_TOKEN", &req.github_token)
             .env("GH_TOKEN", &req.github_token)
             .env("GH_PROMPT_DISABLED", "1")
             .env("NO_COLOR", "1");
         let output = run_with_timeout(cmd, GH_CMD_TIMEOUT_SECS);
+        crate::mutation::finish_refresh(&req.context_id, req.ticket);
 
-        match output {
-            Ok(out) => {
-                let stdout = String::from_utf8_lossy(&out.stdout);
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                let raw = if stderr.trim().is_empty() {
-                    stdout.to_string()
-                } else if stdout.trim().is_empty() {
-                    stderr.to_string()
-                } else {
-                    format!("{stdout}\n{stderr}")
-                };
-                // Redact token if accidentally in output
-                let redacted = if req.github_token.len() >= 8 && raw.contains(&req.github_token) {
-                    raw.replace(&req.github_token, "[REDACTED]")
-                } else {
-                    raw
-                };
-                let content = truncate_output(&redacted, constants::MAX_RESULT_CONTENT_BYTES);
-                let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
-            }
-            Err(e) => {
-                let content = format!("Error executing gh: {e}");
-                let token_count = estimate_tokens(&content);
-                Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
-            }
-        }
+        let text = match output {
+            Ok(out) => combine_output(&out, &req.github_token),
+            Err(e) => format!("Error executing gh: {e}"),
+        };
+        let content = truncate_output(&text, constants::MAX_RESULT_CONTENT_BYTES);
+        let token_count = estimate_tokens(&content);
+        Some(CacheUpdate::Content { context_id: req.context_id, content, token_count })
     }
 
     fn handle_key(&self, key: &KeyEvent, _state: &State) -> Option<Action> {

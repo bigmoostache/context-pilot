@@ -102,6 +102,14 @@ pub(crate) fn make_default_entry(
     cp_base::state::context::make_default_entry(id, context_type, name, cache_deprecated)
 }
 
+/// The module list, built once. Modules are stateless, so hot paths (tool
+/// dispatch, every save, every panel refresh) share this instead of
+/// allocating ~28 boxed modules per call through [`all_modules`].
+pub(crate) fn registry() -> &'static [Box<dyn Module>] {
+    static MODULES: std::sync::OnceLock<Vec<Box<dyn Module>>> = std::sync::OnceLock::new();
+    MODULES.get_or_init(all_modules)
+}
+
 /// Returns all registered modules.
 pub(crate) fn all_modules() -> Vec<Box<dyn Module>> {
     vec![
@@ -156,7 +164,7 @@ pub(crate) fn build_visualizer_registry() -> HashMap<String, ToolVisualizer> {
 
 /// Collect tool definitions from all active modules.
 pub(crate) fn active_tool_definitions(active_modules: &HashSet<String>) -> Vec<ToolDefinition> {
-    all_modules().into_iter().filter(|m| active_modules.contains(m.id())).flat_map(|m| m.tool_definitions()).collect()
+    registry().iter().filter(|m| active_modules.contains(m.id())).flat_map(|m| m.tool_definitions()).collect()
 }
 
 /// Dispatch a tool call to the appropriate active module.
@@ -173,7 +181,7 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
         return crate::app::reverie::tools::execute_optimize_context(tool, state);
     }
 
-    for module in all_modules() {
+    for module in registry() {
         if active_modules.contains(module.id())
             && let Some(mut result) = module.execute_tool(tool, state)
         {
@@ -196,32 +204,49 @@ pub(crate) fn dispatch_tool(tool: &ToolUse, state: &mut State, active_modules: &
 
 /// Create a panel for the given context type by asking all modules.
 ///
-/// Modules are stateless, so the registry is built once and reused: this runs
-/// per context entry on every panel refresh, and rebuilding ~24 boxed modules
-/// each time showed up in the main-loop profile.
+/// Runs per context entry on every panel refresh, hence the shared
+/// [`registry`].
 pub(crate) fn create_panel(context_type: &Kind) -> Option<Box<dyn Panel>> {
-    static MODULES: std::sync::OnceLock<Vec<Box<dyn Module>>> = std::sync::OnceLock::new();
-    for module in MODULES.get_or_init(all_modules) {
-        if let Some(panel) = module.create_panel(context_type) {
-            return Some(panel);
-        }
-    }
-    None
+    registry().iter().find_map(|module| module.create_panel(context_type))
 }
 
-/// Validate that all active module dependencies are satisfied.
-pub(crate) fn validate_dependencies(active: &HashSet<String>) {
-    for module in all_modules() {
-        if active.contains(module.id()) {
-            for dep in module.dependencies() {
-                assert!(
-                    active.contains(*dep),
-                    "Module '{}' depends on '{}', but '{}' is not active",
-                    module.id(),
-                    dep,
-                    dep
-                );
-            }
+/// Deactivate every active module whose dependencies aren't all active,
+/// repeating until stable (dropping one module can strand its dependents).
+/// Logs each removal; never panics, so a bad persisted module set degrades
+/// instead of crashing boot.
+pub(crate) fn validate_dependencies(active: &mut HashSet<String>) {
+    let deps: Vec<(String, Vec<&'static str>)> =
+        all_modules().iter().map(|m| (m.id().to_owned(), m.dependencies().to_vec())).collect();
+    prune_unsatisfied(active, &deps);
+}
+
+/// Fixpoint removal of modules with an inactive dependency.
+fn prune_unsatisfied(active: &mut HashSet<String>, deps: &[(String, Vec<&'static str>)]) {
+    loop {
+        let broken: Vec<(String, &str)> = deps
+            .iter()
+            .filter(|entry| active.contains(&entry.0))
+            .filter_map(|entry| entry.1.iter().find(|d| !active.contains(**d)).map(|d| (entry.0.clone(), *d)))
+            .collect();
+        if broken.is_empty() {
+            return;
         }
+        for (id, dep) in broken {
+            log::error!("module '{id}' depends on inactive '{dep}'; deactivating it");
+            let _removed = active.remove(&id);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prune_unsatisfied;
+
+    #[test]
+    fn missing_dependency_cascades_without_panic() {
+        let mut active: std::collections::HashSet<String> = ["b", "c", "d"].iter().map(|s| (*s).to_owned()).collect();
+        let deps = vec![("b".to_owned(), vec!["a"]), ("c".to_owned(), vec!["b"]), ("d".to_owned(), vec![])];
+        prune_unsatisfied(&mut active, &deps);
+        assert_eq!(active.into_iter().collect::<Vec<_>>(), vec!["d".to_owned()]);
     }
 }

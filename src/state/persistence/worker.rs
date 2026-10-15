@@ -3,7 +3,7 @@
 //! Handles loading and saving worker state files. One file per agent, named
 //! `states/<agent_id>.json`; an agent with no focused agent keeps the legacy
 //! `states/main_worker.json` (see [`focused_worker_id`]).
-use std::fs;
+
 use std::path::PathBuf;
 
 use crate::infra::constants::{DEFAULT_WORKER_ID, STATES_DIR, STORE_DIR};
@@ -26,9 +26,7 @@ pub(crate) fn exists(worker_id: &str) -> bool {
 
 /// Load worker state from `states/{worker_id}.json`
 pub(crate) fn load_worker(worker_id: &str) -> Option<WorkerState> {
-    let path = worker_path(worker_id);
-    let json = fs::read_to_string(&path).ok()?;
-    serde_json::from_str(&json).ok()
+    super::config::load_json_or_quarantine(&worker_path(worker_id))
 }
 
 /// The state-file id boot must load: the agent whose context was last saved

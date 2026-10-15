@@ -1,8 +1,9 @@
 # Orchestration Backend — Design Doc (WIP)
 
-> **Status:** discussion / brainstorm. **Nothing here is implemented.** Living
-> artifact we iterate on until we're perfectly aligned on the infrastructure
-> that powers the orchestration frontend (the `ui/` maquette).
+> **Status:** shipped, historical. The original brainstorm (2026-06) for what
+> became `cp-orchestrator`, `cp-oplog`, `cp-wire` and `cp-mod-bridge`. The code
+> has since moved on (threads → agents/groups, T860); see `README.md` §4–§8 and
+> `docs/design-orchestration.md` for the current shape.
 >
 > **v5 — grounded in the actual codebase.** v4 hardened the design against an
 > adversarial review but was authored against an *imagined* persistence layer. A
