@@ -92,10 +92,17 @@ pub fn search_conversations(p: &SearchConvParams<'_>) -> Result<Vec<ConvHit>, St
     let client = MeiliClient::new(p.port, p.master_key)?;
     let uid = format!("cp_{}_conversations", p.project_hash);
 
-    // Single-quote-escape a caller-supplied agent id before splicing it into
-    // the Meilisearch filter expression, matching the file-indexer's own
-    // escaping (`delete_one_file`) so a stray quote can't malform the filter.
-    let filter = p.agent_id.map(|t| format!("agent_id = '{}'", t.replace('\'', "\\'")));
+    // Quote a caller-supplied agent id before splicing it into the filter
+    // expression (shared helper, same rules as the file indexer) so a stray
+    // quote can't malform the filter. An unquotable id matches nothing.
+    let filter = match p.agent_id {
+        Some(t) => Some(
+            crate::index::filters::quote_filter_value(t)
+                .map(|q| format!("agent_id = {q}"))
+                .ok_or_else(|| format!("unsupported agent id: {t}"))?,
+        ),
+        None => None,
+    };
 
     // Over-fetch message-hits, then collapse to one (best-scored) per agent so
     // the caller gets `limit` DISTINCT conversations, not every message of a hot
