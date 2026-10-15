@@ -124,27 +124,30 @@ mod lossy_float {
     }
 
     /// Common body for signed integer → integer conversions via `TryInto`.
+    ///
+    /// Out-of-range values clamp to the nearer bound: negatives → `0`,
+    /// positive overflow → target `MAX` (not `0`).
     macro_rules! signed_int_methods {
         () => {
             #[inline]
             fn to_u8(self) -> u8 {
-                self.try_into().unwrap_or(0)
+                self.try_into().unwrap_or(if self < 0 { 0 } else { u8::MAX })
             }
             #[inline]
             fn to_u16(self) -> u16 {
-                self.try_into().unwrap_or(0)
+                self.try_into().unwrap_or(if self < 0 { 0 } else { u16::MAX })
             }
             #[inline]
             fn to_u32(self) -> u32 {
-                self.try_into().unwrap_or(0)
+                self.try_into().unwrap_or(if self < 0 { 0 } else { u32::MAX })
             }
             #[inline]
             fn to_u64(self) -> u64 {
-                self.try_into().unwrap_or(0)
+                self.try_into().unwrap_or(if self < 0 { 0 } else { u64::MAX })
             }
             #[inline]
             fn to_usize(self) -> usize {
-                self.try_into().unwrap_or(0)
+                self.try_into().unwrap_or(if self < 0 { 0 } else { usize::MAX })
             }
             #[inline]
             fn to_i32(self) -> i32 {
