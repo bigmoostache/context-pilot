@@ -12,7 +12,7 @@ use crate::types::ConsoleState;
 
 /// Header shown above the YAML.
 const HEADER: &str = "# To terminate a monitor early, close its console panel (Close_panel on its panel_id).\n\
-# Monitors are not kept across reloads.\n";
+# Monitors survive TUI reloads (resumed where they stopped).\n";
 
 /// YAML shape of the panel body.
 #[derive(Serialize)]

@@ -125,17 +125,27 @@ impl Module for ConsoleModule {
                 ));
             }
         }
-        if sessions_map.is_empty() && cs.next_session_id == 1 {
+        if sessions_map.is_empty() && cs.next_session_id == 1 && cs.monitors.is_empty() {
             serde_json::Value::Null
         } else {
             json!({
                 "sessions": sessions_map,
                 "next_session_id": cs.next_session_id,
+                "monitors": monitor::persist::save(cs),
+                "next_monitor_id": cs.next_monitor_id,
             })
         }
     }
     fn load_module_data(&self, data: &serde_json::Value, state: &mut State) {
         // Server already started in init_state — no need to call find_or_create_server again.
+
+        // Monitors first: their watchers only poll from the main loop, after
+        // the sessions below have reconnected.
+        monitor::persist::restore(
+            data.get("monitors"),
+            data.get("next_monitor_id").and_then(serde_json::Value::as_u64),
+            state,
+        );
 
         // Restore counter
         if let Some(v) = data.get("next_session_id").and_then(serde_json::Value::as_u64) {

@@ -229,3 +229,50 @@ fn status_poller_tolerates_brief_outage() {
     assert!(!unreachable_is_fatal(5));
     assert!(unreachable_is_fatal(6));
 }
+
+/// Save then restore: alive monitors come back with their cursor, agent and a
+/// registered watcher; the id counter never moves backwards.
+#[test]
+fn monitors_round_trip_through_reload() {
+    use std::sync::{Arc, Mutex};
+
+    use cp_base::state::runtime::State;
+    use cp_base::state::watchers::WatcherRegistry;
+
+    use super::persist;
+    use super::spec::{Record, Status};
+    use crate::types::ConsoleState;
+
+    let params =
+        spec::parse(&json!({"type":"console","id":"P3","description":"d","mode":"line","frequency":"ongoing"}))
+            .expect("valid");
+    let record = |id: &str, status: Status| Record {
+        monitor_id: id.to_owned(),
+        params: params.clone(),
+        panel_id: "P3".to_owned(),
+        session: "c_1".to_owned(),
+        started_at_ms: 1,
+        events: 2,
+        status,
+        cursor: 42,
+        agent: Some("A7".to_owned()),
+    };
+    let mut before = ConsoleState::new();
+    before.next_monitor_id = 3;
+    before.monitors.push(Arc::new(Mutex::new(record("M1", Status::Alive))));
+    before.monitors.push(Arc::new(Mutex::new(record("M2", Status::Ended { reason: "r".to_owned(), at_ms: 5 }))));
+    let saved = persist::save(&before);
+
+    let mut state = State::default();
+    state.set_ext(ConsoleState::new());
+    state.set_ext(WatcherRegistry::new());
+    persist::restore(Some(&saved), Some(3), &mut state);
+
+    let cs = ConsoleState::get(&state);
+    assert_eq!(cs.next_monitor_id, 3);
+    assert_eq!(cs.monitors.len(), 2);
+    let m1 = cs.monitors.first().expect("M1").lock().expect("lock").clone();
+    assert_eq!((m1.monitor_id.as_str(), m1.cursor, m1.agent.as_deref()), ("M1", 42, Some("A7")));
+    assert!(m1.is_alive());
+    assert_eq!(WatcherRegistry::get(&state).active_watchers().len(), 1, "only the alive monitor is re-armed");
+}

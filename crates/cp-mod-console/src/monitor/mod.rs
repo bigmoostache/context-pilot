@@ -10,6 +10,8 @@
 pub mod engine;
 /// Fixed Monitor panel.
 pub(crate) mod panel;
+/// Save/restore across TUI reloads.
+pub mod persist;
 /// Parameters, validation and the panel record.
 pub mod spec;
 /// Unit tests.
@@ -80,6 +82,8 @@ fn run(tool: &ToolUse, state: &mut State) -> Result<String, String> {
         started_at_ms: now_ms(),
         events: 0,
         status: Status::Alive,
+        cursor: target.cursor,
+        agent: agent.clone(),
     }));
     cs.monitors.push(Arc::clone(&record));
     cs.prune_monitors();
