@@ -30,11 +30,33 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashSet::new());
 }
 
+/// Forget the "already written" marks of files whose write failed, so this
+/// save re-emits them: `modules/<id>.json` drops its stamp, `messages/<id>.yaml`
+/// its history id. Without this a failed write is never retried until the
+/// module's revision moves again.
+fn forget_failed_writes() {
+    for path in super::writer::take_failed_writes() {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+        let parent = path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str());
+        match parent {
+            Some(MODULES_DIR) => {
+                let _prev = SAVED_REVISIONS.with_borrow_mut(|m| m.remove(stem));
+            }
+            Some(crate::infra::constants::MESSAGES_DIR) => {
+                let _prev = SAVED_HISTORY_MSGS.with_borrow_mut(|s| s.remove(stem));
+            }
+            // Snapshot files (config, states, panels) are rewritten every save.
+            _ => {}
+        }
+    }
+}
+
 /// `modules/<id>.json` writes for own-file modules whose stamp moved since the
 /// last save. Unchanged modules cost one stamp read: no JSON, no write.
 fn module_file_ops(state: &State, dir: &std::path::Path) -> Vec<WriteOp> {
+    forget_failed_writes();
     let mut ops = Vec::new();
-    for module in crate::modules::all_modules() {
+    for module in crate::modules::registry() {
         let Some(rev) = module.save_revision(state) else { continue };
         let id = module.id();
         if SAVED_REVISIONS.with_borrow(|m| m.get(id) == Some(&rev)) {
@@ -103,7 +125,7 @@ pub(crate) fn panel_uids_of(state: &State) -> std::collections::HashSet<String> 
 fn build_module_data_maps(state: &State) -> ModuleDataMaps {
     let mut global_modules = HashMap::new();
     let mut worker_modules = HashMap::new();
-    for module in crate::modules::all_modules() {
+    for module in crate::modules::registry() {
         let _g = crate::infra::profiler::dyn_guard("save_mod_", module.id());
         // Own-file modules are written by `module_file_ops`, not inlined.
         let data = if module.save_revision(state).is_some() {
@@ -378,17 +400,10 @@ pub(crate) fn build_message_op(msg: &Message) -> WriteOp {
     WriteOp { path: dir.join(format!("{file_id}.yaml")), content: yaml.into_bytes() }
 }
 
-/// Execute one write op synchronously (create parent dir, then write).
+/// Execute one write op synchronously and atomically (see
+/// [`write_atomic`](super::writer::write_atomic)).
 pub(crate) fn exec_write_op(op: &WriteOp) {
-    if let Some(parent) = op.path.parent()
-        && let Err(e) = fs::create_dir_all(parent)
-    {
-        drop(writeln!(std::io::stderr(), "[persistence] failed to create dir {}: {}", parent.display(), e));
-        return;
-    }
-    if let Err(e) = fs::write(&op.path, &op.content) {
-        drop(writeln!(std::io::stderr(), "[persistence] failed to write {}: {}", op.path.display(), e));
-    }
+    super::writer::write_file(&op.path, &op.content);
 }
 
 /// Absolute path to the shared `panels/` directory — the dir
