@@ -7,6 +7,8 @@
 pub mod api;
 /// Dynamic panel rendering for search results.
 pub mod panel;
+/// Compact text rendering of API responses for result panels.
+mod render;
 /// Tool dispatch: `brave_search` and `brave_llm_context`.
 pub mod tools;
 /// Brave API response/request serde types.
@@ -68,7 +70,9 @@ impl Module for BraveModule {
             context_type: "brave_result",
             icon_id: "search",
             is_fixed: false,
-            needs_cache: false,
+            // Must match `panel::Results::needs_cache`: the reload path (watchers.rs) only
+            // re-fills `cached_content` from metadata for types flagged here.
+            needs_cache: true,
             fixed_order: None,
             display_name: "brave",
             short_name: "brave",
@@ -210,5 +214,19 @@ impl Module for BraveModule {
 
     fn watcher_immediate_refresh(&self) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BraveModule;
+    use cp_base::modules::Module as _;
+    use cp_base::panels::Panel as _;
+
+    /// A mismatch left restored panels stuck without content after a reload.
+    #[test]
+    fn type_meta_needs_cache_matches_panel() {
+        let meta = BraveModule.context_type_metadata();
+        assert!(meta.iter().all(|m| m.needs_cache == crate::panel::Results.needs_cache()));
     }
 }
