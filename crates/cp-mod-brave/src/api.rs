@@ -1,13 +1,31 @@
+use std::sync::LazyLock;
+use std::time::{Duration, Instant};
+
+use reqwest::Url;
 use reqwest::blocking::Client;
-use std::time::Duration;
 
 use crate::types::{BraveSearchResponse, LLMContextResponse, RichCallbackResponse};
-use std::fmt::Write as _;
 
 /// Base URL for the Brave Search v1 REST API.
 const BRAVE_BASE_URL: &str = "https://api.search.brave.com/res/v1";
-/// HTTP request timeout in seconds.
-const TIMEOUT_SECS: u64 = 10;
+/// Upper bound for a single HTTP request.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// Wall-clock budget for one tool call, retries and rich callback included.
+/// Must stay below the async tool timeout so callers get a real error, not a generic timeout.
+pub const TOTAL_BUDGET: Duration = Duration::from_secs(30);
+/// Below this remaining budget, a new attempt is not worth starting.
+const MIN_ATTEMPT: Duration = Duration::from_secs(2);
+/// Pause between retries of a transient failure.
+const RETRY_DELAY: Duration = Duration::from_secs(1);
+/// Maximum attempts per request (first try included).
+const MAX_ATTEMPTS: u32 = 3;
+/// Max bytes of an error body echoed back to the model.
+const ERROR_BODY_BYTES: usize = 200;
+
+/// Process-wide HTTP client: one connection/TLS pool shared by every call.
+static HTTP: LazyLock<Result<Client, String>> = LazyLock::new(|| {
+    Client::builder().timeout(REQUEST_TIMEOUT).build().map_err(|e| format!("failed to build HTTP client: {e}"))
+});
 
 /// Parameters for a Brave web search request.
 #[derive(Debug)]
@@ -35,7 +53,7 @@ pub struct LLMContextParams<'req> {
     pub query: &'req str,
     /// Approximate max tokens in response (1024-32768).
     pub max_tokens: u32,
-    /// Max search results to consider (1-50).
+    /// Max search results to consider (1-50); also caps the number of URLs used.
     pub count: u32,
     /// Relevance threshold: "strict", "balanced", "lenient", or "disabled".
     pub threshold_mode: &'req str,
@@ -47,63 +65,65 @@ pub struct LLMContextParams<'req> {
     pub goggles: Option<&'req str>,
 }
 
+/// Web search result plus the optional rich-callback payload.
+#[derive(Debug)]
+pub struct SearchOutcome {
+    /// Organic search response.
+    pub response: BraveSearchResponse,
+    /// Rich data (stocks, weather...) when the API offered and delivered it.
+    pub rich: Option<serde_json::Value>,
+    /// Why the offered rich data could not be fetched, so it is reported, not swallowed.
+    pub rich_error: Option<String>,
+}
+
+/// Outcome of a single failed attempt.
+#[derive(Debug, PartialEq, Eq)]
+enum Failure {
+    /// Worth retrying (network error, 5xx).
+    Transient(String),
+    /// Retrying cannot help (auth, rate limit, bad parameters).
+    Fatal(String),
+}
+
 /// HTTP client for the Brave Search API.
 #[derive(Debug)]
 pub struct BraveClient {
-    /// Reusable reqwest HTTP client with timeout.
+    /// Shared reqwest client (cheap `Arc` clone of [`HTTP`]).
     client: Client,
     /// Brave API subscription token.
     api_key: String,
 }
 
 impl BraveClient {
-    /// Create a new client with the given API key (10s request timeout).
+    /// Create a client over the shared connection pool.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the HTTP client fails to build.
+    /// Returns `Err` if the shared HTTP client failed to build.
     pub fn new(api_key: String) -> Result<Self, String> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(TIMEOUT_SECS))
-            .build()
-            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+        let client = HTTP.as_ref().map_err(Clone::clone)?.clone();
         Ok(Self { client, api_key })
     }
 
-    /// Search the web via Brave Search API.
-    /// Always sends `extra_snippets=true` and `enable_rich_callback=1`.
+    /// Search the web, then follow the rich-callback key if the response carries one.
     ///
     /// # Errors
     ///
-    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
-    pub fn search(&self, p: &SearchParams<'_>) -> Result<(BraveSearchResponse, Option<serde_json::Value>), String> {
-        let mut url = format!("{}/web/search?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        let _r1 = write!(url, "&count={}", p.count);
-        url.push_str("&extra_snippets=true");
-        url.push_str("&enable_rich_callback=1");
-        let _r2 = write!(url, "&country={}", urlenc(p.country));
-        let _r3 = write!(url, "&search_lang={}", urlenc(p.search_lang));
-        let _r4 = write!(url, "&safesearch={}", urlenc(p.safe_search));
+    /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error of the main search.
+    /// A rich-callback failure is reported in [`SearchOutcome::rich_error`] instead.
+    pub fn search(&self, p: &SearchParams<'_>) -> Result<SearchOutcome, String> {
+        let start = Instant::now();
+        let body = self.get(&search_url(p)?, start)?;
+        let response: BraveSearchResponse =
+            serde_json::from_str(&body).map_err(|e| format!("Failed to parse search response: {e}"))?;
 
-        if let Some(f) = p.freshness {
-            let _r5 = write!(url, "&freshness={}", urlenc(f));
-        }
-        if let Some(g) = p.goggles_id {
-            let _r6 = write!(url, "&goggles_id={}", urlenc(g));
-        }
-
-        let response = self.get_with_retry(&url)?;
-        let search_resp: BraveSearchResponse =
-            serde_json::from_str(&response).map_err(|e| format!("Failed to parse search response: {e}"))?;
-
-        let rich_data = search_resp
-            .rich
-            .as_ref()
-            .and_then(|r| r.hint.as_ref())
-            .and_then(|h| h.callback_key.as_ref())
-            .and_then(|key| self.fetch_rich_callback(key).ok());
-
-        Ok((search_resp, rich_data))
+        let key = response.rich.as_ref().and_then(|r| r.hint.as_ref()).and_then(|h| h.callback_key.clone());
+        let (rich, rich_error) = match key.map(|k| self.fetch_rich_callback(&k, start)) {
+            None => (None, None),
+            Some(Ok(data)) => (Some(data), None),
+            Some(Err(e)) => (None, Some(e)),
+        };
+        Ok(SearchOutcome { response, rich, rich_error })
     }
 
     /// Get LLM-optimized context from Brave LLM Context API.
@@ -112,87 +132,110 @@ impl BraveClient {
     ///
     /// Returns `Err` on network failure, non-2xx HTTP status, or JSON parse error.
     pub fn llm_context(&self, p: &LLMContextParams<'_>) -> Result<LLMContextResponse, String> {
-        let mut url = format!("{}/llm/context?q={}", BRAVE_BASE_URL, urlenc(p.query));
-        let _r1 = write!(url, "&maximum_number_of_tokens={}", p.max_tokens);
-        let _r2 = write!(url, "&count={}", p.count);
-        let _r3 = write!(url, "&context_threshold_mode={}", urlenc(p.threshold_mode));
-        let _r4 = write!(url, "&country={}", urlenc(p.country));
-        // Hardcoded optimal defaults
-        url.push_str("&maximum_number_of_urls=20");
-        url.push_str("&maximum_number_of_snippets=50");
-        url.push_str("&maximum_number_of_tokens_per_url=4096");
-
-        if let Some(f) = p.freshness {
-            let _r5 = write!(url, "&freshness={}", urlenc(f));
-        }
-        if let Some(g) = p.goggles {
-            let _r6 = write!(url, "&goggles={}", urlenc(g));
-        }
-
-        let response = self.get_with_retry(&url)?;
-        serde_json::from_str(&response).map_err(|e| format!("Failed to parse LLM context response: {e}"))
+        let body = self.get(&llm_context_url(p)?, Instant::now())?;
+        serde_json::from_str(&body).map_err(|e| format!("Failed to parse LLM context response: {e}"))
     }
 
-    /// Fetch rich results via callback key.
-    fn fetch_rich_callback(&self, callback_key: &str) -> Result<serde_json::Value, String> {
-        let url = format!("{}/web/rich?callback_key={}", BRAVE_BASE_URL, urlenc(callback_key));
-        let response = self.get_with_retry(&url)?;
+    /// Fetch rich results via callback key, within what is left of the call budget.
+    fn fetch_rich_callback(&self, callback_key: &str, start: Instant) -> Result<serde_json::Value, String> {
+        let url = Url::parse_with_params(&format!("{BRAVE_BASE_URL}/web/rich"), [("callback_key", callback_key)])
+            .map_err(|e| format!("Invalid rich URL: {e}"))?;
+        let body = self.get(&url, start)?;
         let rich: RichCallbackResponse =
-            serde_json::from_str(&response).map_err(|e| format!("Failed to parse rich response: {e}"))?;
+            serde_json::from_str(&body).map_err(|e| format!("Failed to parse rich response: {e}"))?;
         Ok(rich.data)
     }
 
-    /// GET with 5xx retry (2 attempts, 1s delay).
-    fn get_with_retry(&self, url: &str) -> Result<String, String> {
-        for attempt in 0i32..3i32 {
-            let resp = self
-                .client
-                .get(url)
-                .header("Accept", "application/json")
-                .header("X-Subscription-Token", &self.api_key)
-                .send()
-                .map_err(|e| format!("Request failed: {e}"))?;
-
-            let status = resp.status().as_u16();
-            let body = resp.text().map_err(|e| format!("Failed to read response: {e}"))?;
-
-            match status {
-                200..=299 => return Ok(body),
-                429 => {
-                    return Err(format!("Rate limited (429). Try again later. Response: {}", truncate(&body, 200)));
-                }
-                403 => {
-                    return Err(format!("Forbidden (403). Check API key. Response: {}", truncate(&body, 200)));
-                }
-                500..=599 if attempt < 2i32 => {
-                    std::thread::sleep(Duration::from_secs(1));
-                }
-                _ => {
-                    return Err(format!("HTTP {} error: {}", status, truncate(&body, 200)));
-                }
+    /// GET with retries on transient failures, bounded by [`TOTAL_BUDGET`] since `start`.
+    fn get(&self, url: &Url, start: Instant) -> Result<String, String> {
+        let mut last = "time budget exhausted before the request could start".to_owned();
+        for attempt in 1..=MAX_ATTEMPTS {
+            let remaining = TOTAL_BUDGET.saturating_sub(start.elapsed());
+            if remaining < MIN_ATTEMPT {
+                break;
+            }
+            match self.attempt(url, remaining.min(REQUEST_TIMEOUT)) {
+                Ok(body) => return Ok(body),
+                Err(Failure::Fatal(e)) => return Err(e),
+                Err(Failure::Transient(e)) => last = format!("{e} (attempt {attempt}/{MAX_ATTEMPTS})"),
+            }
+            if attempt < MAX_ATTEMPTS {
+                std::thread::sleep(RETRY_DELAY);
             }
         }
-        Err("Max retries exceeded".to_owned())
+        Err(last)
+    }
+
+    /// One HTTP attempt, classified for the retry loop.
+    fn attempt(&self, url: &Url, timeout: Duration) -> Result<String, Failure> {
+        let resp = self
+            .client
+            .get(url.clone())
+            .timeout(timeout)
+            .header("Accept", "application/json")
+            .header("X-Subscription-Token", &self.api_key)
+            .send()
+            .map_err(|e| Failure::Transient(format!("Request failed: {e}")))?;
+        let status = resp.status().as_u16();
+        let body = resp.text().map_err(|e| Failure::Transient(format!("Failed to read response: {e}")))?;
+        classify_status(status, &body).map(|()| body)
     }
 }
 
-/// Simple URL encoding for query parameters.
-fn urlenc(s: &str) -> String {
-    let mut result = String::with_capacity(s.len().saturating_mul(2));
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(char::from(b));
-            }
-            _ => {
-                let _r = write!(result, "%{b:02X}");
-            }
-        }
+/// Map an HTTP status to success, a retryable failure, or a final one.
+fn classify_status(status: u16, body: &str) -> Result<(), Failure> {
+    let excerpt = truncate(body, ERROR_BODY_BYTES);
+    match status {
+        200..=299 => Ok(()),
+        429 => Err(Failure::Fatal(format!("Rate limited (429). Try again later. Response: {excerpt}"))),
+        403 => Err(Failure::Fatal(format!("Forbidden (403). Check API key. Response: {excerpt}"))),
+        422 => Err(Failure::Fatal(format!("Invalid parameters (422). Response: {excerpt}"))),
+        500..=599 => Err(Failure::Transient(format!("HTTP {status} error: {excerpt}"))),
+        _ => Err(Failure::Fatal(format!("HTTP {status} error: {excerpt}"))),
     }
-    result
+}
+
+/// Build the `/web/search` URL. Always requests extra snippets and the rich callback.
+fn search_url(p: &SearchParams<'_>) -> Result<Url, String> {
+    let count = p.count.to_string();
+    let mut pairs = vec![
+        ("q", p.query),
+        ("count", count.as_str()),
+        ("extra_snippets", "true"),
+        ("enable_rich_callback", "1"),
+        ("country", p.country),
+        ("search_lang", p.search_lang),
+        ("safesearch", p.safe_search),
+    ];
+    pairs.extend(p.freshness.map(|f| ("freshness", f)));
+    pairs.extend(p.goggles_id.map(|g| ("goggles_id", g)));
+    Url::parse_with_params(&format!("{BRAVE_BASE_URL}/web/search"), pairs).map_err(|e| format!("Invalid URL: {e}"))
+}
+
+/// Build the `/llm/context` URL. `maximum_number_of_urls` follows `count` so the model's choice is honoured.
+fn llm_context_url(p: &LLMContextParams<'_>) -> Result<Url, String> {
+    let max_tokens = p.max_tokens.to_string();
+    let count = p.count.to_string();
+    let mut pairs = vec![
+        ("q", p.query),
+        ("maximum_number_of_tokens", max_tokens.as_str()),
+        ("count", count.as_str()),
+        ("maximum_number_of_urls", count.as_str()),
+        ("context_threshold_mode", p.threshold_mode),
+        ("country", p.country),
+        ("maximum_number_of_snippets", "50"),
+        ("maximum_number_of_tokens_per_url", "4096"),
+    ];
+    pairs.extend(p.freshness.map(|f| ("freshness", f)));
+    pairs.extend(p.goggles.map(|g| ("goggles", g)));
+    Url::parse_with_params(&format!("{BRAVE_BASE_URL}/llm/context"), pairs).map_err(|e| format!("Invalid URL: {e}"))
 }
 
 /// Truncate a string to at most `max` bytes on a char boundary.
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() <= max { s } else { s.get(..s.floor_char_boundary(max)).unwrap_or("") }
 }
+
+#[cfg(test)]
+#[path = "api_tests.rs"]
+mod tests;
