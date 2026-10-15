@@ -417,8 +417,9 @@ where
 {
     let groups = &mut cp_groups::types::GroupsState::get_mut_unstamped(state).groups;
     let before: Vec<Vec<cp_groups::social::Substate>> = groups.iter().map(|g| g.social.clone()).collect();
-    let offset = cp_mod_utilities::time::local_utc_offset_secs();
-    let fired = cp_groups::social::tick(groups, (now_ms, offset), is_idle);
+    // DST-aware per firing instant (not the offset in force now).
+    let next_fire = |cron: &cp_mod_utilities::cron::Cron, after_ms: u64| cron.next_after_local(after_ms);
+    let fired = cp_groups::social::tick(groups, (now_ms, &next_fire), is_idle);
     let changed = groups.len() != before.len() || groups.iter().zip(&before).any(|(g, old)| g.social != *old);
     if changed || !fired.is_empty() {
         let _stamp = cp_groups::types::GroupsState::get_mut(state);
