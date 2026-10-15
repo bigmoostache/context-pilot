@@ -158,7 +158,7 @@ where
 /// fold).
 fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<Recovered>> {
     for &index in indices.iter().rev() {
-        let scan = segment::read(&segment::path(dir, index))?;
+        let scan = segment::read_checked(&segment::path(dir, index), indices.last() == Some(&index))?;
         let Some(first) = scan.entries.first() else {
             // Empty or torn-at-zero segment: try the next-older one.
             continue;
@@ -189,10 +189,10 @@ fn replay_fast(dir: &Path, indices: &[u64]) -> OplogResult<Option<Recovered>> {
 /// Slow path: fold every record across every segment, oldest to newest. Always
 /// correct; used only when the fast path declines (young single-segment log or
 /// an invariant-violating segment).
-fn replay_full(dir: &Path, indices: &[u64]) -> OplogResult<Recovered> {
+pub(crate) fn replay_full(dir: &Path, indices: &[u64]) -> OplogResult<Recovered> {
     let mut state = Recovered::default();
     for &index in indices {
-        let scan = segment::read(&segment::path(dir, index))?;
+        let scan = segment::read_checked(&segment::path(dir, index), indices.last() == Some(&index))?;
         for entry in &scan.entries {
             fold_entry(&mut state, entry);
             state.rev_head = Some(entry.rev);
