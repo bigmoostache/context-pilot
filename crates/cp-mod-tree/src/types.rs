@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use cp_base::state::runtime::State;
 
 /// A file description in the tree
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TreeFileDescription {
     /// Relative file/folder path.
     pub path: String,
