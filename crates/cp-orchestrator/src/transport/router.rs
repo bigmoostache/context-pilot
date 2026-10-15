@@ -111,7 +111,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         }
 
         // ── Vault snapshot (BridgeVault cache warm-up) ──────────────
-        (&Method::Get, &["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_user),
+        (&Method::Get, &["api", "vault", "snapshot"]) => rest::vault_snapshot(auth_token),
 
         // ── IT infra (design §13.5, re-homed from the maint plane; can_manage_it) ──
         (&Method::Get, &["api", "it", "ca", "fingerprint"]) => rest::it_ca_fingerprint(auth_user),

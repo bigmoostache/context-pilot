@@ -12,8 +12,10 @@ use cp_base::state::watchers::carriers::DynPanel;
 use cp_base::tools::async_exec::{ToolOutput, spawn_async_tool};
 use cp_base::tools::{ToolResult, ToolUse};
 
+use crate::parse::combine_output;
 use crate::types::GithubState;
 
+use super::classify::invalidation::affects;
 use super::classify::{CommandClass, classify, validate_gh_command};
 
 /// Max lines for inline output (matches console's `easy_bash` threshold).
@@ -24,11 +26,6 @@ const INLINE_MAX_BYTES: usize = 8_000;
 
 /// Max execution time (ms) for inline treatment — slow commands always get panels.
 const INLINE_MAX_DURATION_MS: u128 = 10_000;
-
-/// Redact a GitHub token from command output if accidentally leaked.
-fn redact_token(output: &str, token: &str) -> String {
-    if token.len() >= 8 && output.contains(token) { output.replace(token, "[REDACTED]") } else { output.to_owned() }
-}
 
 /// Execute a raw gh (GitHub CLI) command.
 ///
@@ -64,26 +61,28 @@ pub(crate) fn execute_gh_command(tool: &ToolUse, state: &mut State) -> ToolResul
     // Classify
     let class = classify(&args);
 
-    // Pre-invalidate cached panels for mutating commands (needs &mut State).
-    if class == CommandClass::Mutating {
-        let invalidations = super::cache_invalidation::find_invalidations(command);
+    // Mutations mark affected panels stale now; the guard holds their refresh
+    // back until the `gh` process has exited (see `crate::mutation`).
+    let guard = (class == CommandClass::Mutating).then(|| {
         for ctx in &mut state.agent_mut().context {
-            if ctx.context_type.as_str() == Kind::GITHUB_RESULT {
-                let matches = ctx
-                    .get_meta_str("result_command")
-                    .is_some_and(|cached_cmd| invalidations.iter().any(|re| re.is_match(cached_cmd)));
-                if matches {
-                    ctx.cache_deprecated = true;
-                }
+            if ctx.context_type.as_str() == Kind::GITHUB_RESULT
+                && ctx.get_meta_str("result_command").is_some_and(|cmd| affects(&args, cmd))
+            {
+                ctx.cache_deprecated = true;
             }
         }
         // Always invalidate Git status (PRs/merges can affect it)
         mark_panels_dirty(state, Kind::GIT);
-    }
+        crate::mutation::begin()
+    });
 
     // All commands: run async, decide inline vs panel on completion.
     let run = GhRun { args, token, command: command.to_owned(), cwd: state.workdir() };
-    spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || run_gh(&run))
+    spawn_async_tool(state, tool, GH_CMD_TIMEOUT_SECS.saturating_add(5), move || {
+        let output = run_gh(&run);
+        drop(guard);
+        output
+    })
 }
 
 /// One `gh` invocation, owned so it can move into the async worker.
@@ -132,17 +131,8 @@ fn format_gh_output(output: &std::process::Output, run: &GhRun, elapsed_ms: u128
     let command = run.command.as_str();
     let token = run.token.as_str();
     let cwd = run.cwd.as_path();
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = if stderr.trim().is_empty() {
-        stdout.trim().to_owned()
-    } else if stdout.trim().is_empty() {
-        stderr.trim().to_owned()
-    } else {
-        format!("{}\n{}", stdout.trim(), stderr.trim())
-    };
     let is_error = !output.status.success();
-    let combined = redact_token(&raw, token);
+    let combined = combine_output(output, token);
 
     // Empty output — always inline.
     if combined.is_empty() {
