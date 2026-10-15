@@ -220,3 +220,20 @@ fn empty_or_missing_dir_scans_clean() {
     assert!(reg.scan().expect("scan").is_empty());
     assert_eq!(reg.reap_tmp(DEFAULT_TMP_GRACE).expect("reap"), 0);
 }
+
+#[test]
+fn scan_ignores_agents_outside_the_protocol_window() {
+    let dir = tempdir().expect("dir");
+    let me = std::process::id();
+    let hb_path = dir.path().join("hb-a");
+    write_heartbeat(&hb_path, &heartbeat(me, now_ms()));
+    let mut newer = entry("future", me, &hb_path, FleetStatus::Running);
+    newer.protocol_version = cp_wire::PROTOCOL_VERSION.saturating_add(1);
+    write_record(dir.path(), &newer);
+    write_record(dir.path(), &entry("a", me, &hb_path, FleetStatus::Running));
+
+    let mut reg = FleetScanner::new(dir.path().to_path_buf());
+    let events = reg.scan().expect("scan");
+    assert_appeared_live(&reg, &events, "a");
+    assert_eq!(reg.liveness("future"), None, "a newer-major agent must not be adopted");
+}
