@@ -294,7 +294,6 @@ fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
     // so MaxAutoRetries caps healthy runaway loops too.
     cp_mod_spine::types::SpineState::on_stream_success(&mut app.state);
 
-
     record_stream_breakpoints(app, BreakpointRecord { bp_hashes, bp_panel_ids, alive_count, alive_positions_permille });
 }
 
