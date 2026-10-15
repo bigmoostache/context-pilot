@@ -64,7 +64,7 @@ fn apply_stream_event(app: &mut App, evt: StreamEvent) {
     {
         app.stream_rt_mut().typewriter.mark_done();
         app.state.agent_mut().streaming_tool = None;
-        app.stream_rt_mut().pending_done = Some((
+        app.stream_rt_mut().pending_done = Some(crate::app::PendingDone {
             input_tokens,
             output_tokens,
             cache_hit_tokens,
@@ -74,7 +74,7 @@ fn apply_stream_event(app: &mut App, evt: StreamEvent) {
             bp_panel_ids,
             alive_count,
             alive_positions_permille,
-        ));
+        });
         // API call succeeded — reset retry counter immediately at tick level
         app.state.agent_mut().api_retry_count = 0;
     } else if let StreamEvent::Error(e) = evt {
@@ -251,16 +251,12 @@ pub(super) fn finalize_stream(app: &mut App) {
     }
 }
 
-/// Full nine-field payload of a completed stream (`StreamEvent::Done`), taken
-/// from `App::pending_done` when the tick is ready to finalize.
-type StreamDonePayload = (usize, usize, usize, usize, Option<String>, Vec<String>, Vec<String>, usize, Vec<u16>);
-
 /// Apply a completed stream's `Done` payload: fold token/cost totals via
 /// `Action::StreamDone` (persisting the message + state per the result), reset
 /// the spine auto-continuation + error-backoff counters, unblock guard-railed
 /// notifications, and record the cache breakpoints for next turn.
-fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
-    let (
+fn apply_stream_done(app: &mut App, done: crate::app::PendingDone) {
+    let crate::app::PendingDone {
         input_tokens,
         output_tokens,
         cache_hit_tokens,
@@ -270,7 +266,7 @@ fn apply_stream_done(app: &mut App, done: StreamDonePayload) {
         bp_panel_ids,
         alive_count,
         alive_positions_permille,
-    ) = done;
+    } = done;
 
     app.state.flags.ui.dirty = true;
     // `if let` chain (not an exhaustive match) so ActionResult stays #[non_exhaustive].
