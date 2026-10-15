@@ -38,7 +38,7 @@ pub(crate) fn save_message(msg: &Message) {
     let file_id = msg.uid.as_ref().unwrap_or(&msg.id);
     let path = message_path(file_id);
     if let Ok(yaml) = serde_yaml::to_string(msg) {
-        let _r = fs::write(path, yaml).ok();
+        super::writer::write_file(&path, yaml.as_bytes());
     }
 }
 
