@@ -333,7 +333,10 @@ pub(super) fn check_timer_based_deprecation(app: &mut App) {
     {
         let _g = crate::profile!("dispatch_requests");
         for (i, request) in requests {
-            process_cache_request(request, app.cache_tx.clone());
+            {
+                let _s = crate::profile!("cache_submit");
+                process_cache_request(request, app.cache_tx.clone());
+            }
             if let Some(ctx) = app.state.agent_mut().context.get_mut(i) {
                 ctx.cache_in_flight = true;
                 let _r = app.last_poll_ms.insert(ctx.id.clone(), current_ms);

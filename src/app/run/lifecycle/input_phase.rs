@@ -60,7 +60,10 @@ impl App {
                 EventStep::Handled => {}
             }
             routed = routed.saturating_add(1);
-            ready = poll_now()?;
+            ready = {
+                let _guard = crate::profile!("event_poll");
+                poll_now()?
+            };
         }
         if modal {
             self.render_frame(terminal, current_ms)?;
@@ -83,7 +86,11 @@ impl App {
             self.last_full_redraw_ms = 0;
             self.state.flags.ui.dirty = true;
         }
-        if self.route_modal_event(evt) {
+        let modal = {
+            let _guard = crate::profile!("route_modal");
+            self.route_modal_event(evt)
+        };
+        if modal {
             return EventStep::Modal;
         }
         let mapped = {
@@ -102,6 +109,7 @@ impl App {
         if matches!(action, Action::None) {
             return EventStep::Handled;
         }
+        let _guard = crate::profile!("apply_input_action");
         self.apply_input_action(action);
         EventStep::Handled
     }

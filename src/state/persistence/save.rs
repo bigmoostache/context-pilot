@@ -316,6 +316,22 @@ fn worker_state_op(
     })
 }
 
+/// Group message files + agent activity files changed since their last write
+/// (durable lane). Each changed file is re-serialized whole, so the two halves
+/// are timed apart as `….thread_files.groups` / `….thread_files.activity`.
+fn thread_file_ops(state: &State) -> Vec<WriteOp> {
+    let _g = crate::profile!("thread_files");
+    let group_ops = {
+        let _t = crate::profile!("groups");
+        cp_groups::persist::dirty_group_file_ops(&cp_groups::types::GroupsState::get(state).groups)
+    };
+    let activity_ops = {
+        let _t = crate::profile!("activity");
+        cp_mod_agents::types::activity::dirty_file_ops(&cp_mod_agents::types::AgentsState::get(state).agents)
+    };
+    group_ops.into_iter().chain(activity_ops).map(|(path, content)| WriteOp { path, content }).collect()
+}
+
 /// Serialize all config, worker state, panels, and history messages
 /// into a batch of file write/delete operations.
 pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
@@ -336,24 +352,17 @@ pub(crate) fn build_save_batch(state: &State) -> WriteBatch {
         dir.join(MODULES_DIR),
     ];
 
-    // Group message files + agent activity files, only those changed since last write.
-    let mut durable: Vec<WriteOp> = {
-        let _g = crate::profile!("thread_files");
-        let groups = &cp_groups::types::GroupsState::get(state).groups;
-        let agents = &cp_mod_agents::types::AgentsState::get(state).agents;
-        cp_groups::persist::dirty_group_file_ops(groups)
-            .into_iter()
-            .chain(cp_mod_agents::types::activity::dirty_file_ops(agents))
-            .map(|(path, content)| WriteOp { path, content })
-            .collect()
-    };
+    let mut durable = thread_file_ops(state);
 
     let (global_modules, worker_modules) = {
         let _g = crate::profile!("modules");
         build_module_data_maps(state)
     };
     // Durable lane: the stamp is recorded as soon as the op is built.
-    durable.extend(module_file_ops(state, &dir));
+    {
+        let _g = crate::profile!("module_files");
+        durable.extend(module_file_ops(state, &dir));
+    }
 
     writes.extend(shared_config_op(state, global_modules, &dir));
     writes.push(WriteOp { path: dir.join(OWNER_FILE), content: current_pid().to_string().into_bytes() });

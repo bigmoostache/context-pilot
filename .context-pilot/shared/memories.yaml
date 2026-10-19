@@ -780,9 +780,9 @@ M-tiny-48:
 M-tiny-49:
   tier: tiny
   title: Agent runs /usr/local/bin
-  contents: 'Agent runs root-owned /usr/local/bin/cpilot, not releases/<tag>/cpilot. Deploy: sudo cp target/release/tui there (user pw). Check ps+strings.'
-  importance: high
-  last_edited_ms: 1791297095116
+  contents: Agents run root-owned /usr/local/bin/cpilot, not releases/<tag>/cpilot. Slot-only deploy = fix not live (tree fix, 10-14). Needs user sudo; verify by hash.
+  importance: critical
+  last_edited_ms: 1791977568824
 M-tiny-5:
   tier: tiny
   title: 'CI web-install fix:'
@@ -813,6 +813,24 @@ M-tiny-53:
   contents: 'TODO (user, critical): tackle ever-expanding groups. Group panels show the WHOLE history, no truncation/omitted (user mandate), so group size grows unbounded in context. Needs a design.'
   importance: critical
   last_edited_ms: 1791972359342
+M-tiny-54:
+  tier: tiny
+  title: Tree folders per-agent
+  contents: 'Huge-tree-on-new-agent bug fixed (1f7a8ed3): open_folders carved from shared TreeState into per-agent TreeView ext (set_ext_agent). TreeState keeps filter+descriptions shared.'
+  importance: medium
+  last_edited_ms: 1791974503333
+M-tiny-55:
+  tier: tiny
+  title: Parallel agents jam cargo
+  contents: 9 parallel agents => 57 queued cargo runs (callbacks), 10min lock waits. Kill stale dupes; agents batch edits via skip_callbacks + one check before commit.
+  importance: high
+  last_edited_ms: 1791990416261
+M-tiny-56:
+  tier: tiny
+  title: Rebase local on master
+  contents: 'User mandate 10-15: always rebase our local stack on latest origin/master ("main.HEAD"); fix PRs target master. Merge PRs once CI is green.'
+  importance: critical
+  last_edited_ms: 1792062235956
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'

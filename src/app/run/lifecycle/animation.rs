@@ -20,7 +20,7 @@ impl App {
     /// mutations) set `dirty` at their source, so real changes still render instantly.
     /// This gating fixed the "idle yet pinning CPU" pathology (T309). The 100ms throttle
     /// caps the (cheap) animation scan itself to 10Hz.
-    /// While the F12 perf overlay is open the tick runs at 30fps unconditionally,
+    /// While the F12 perf overlay is open the tick runs at 2 Hz unconditionally,
     /// so its live numbers refresh even when nothing else animates.
     pub(super) fn update_spinner_animation(&mut self) {
         let now = now_ms();
