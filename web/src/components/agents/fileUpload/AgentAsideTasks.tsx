@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from "react"
-import { ChevronRight, StickyNote } from "lucide-react"
+import { ChevronRight, NotepadText } from "lucide-react"
 import type { AgentTask, AgentNote } from "@/lib/types"
 import { Markdown } from "@/lib/support/markdown"
 
@@ -66,15 +66,12 @@ export function TaskList({ tasks }: { tasks: AgentTask[] }) {
   )
 }
 
-/** "3 of 8 done" over a hairline progress bar. Static: no motion. */
+/** "3 of 8 done" over a hairline progress bar (the tab already says "Tasks"). Static. */
 function ProgressHeader({ done, total }: { done: number; total: number }) {
   return (
     <div className="mb-2 px-2">
-      <div className="flex items-baseline justify-between text-[11px] text-foreground/75">
-        <span>Tasks</span>
-        <span className="tabular-nums">
-          {done} of {total} done
-        </span>
+      <div className="text-right text-[11px] text-foreground/75 tabular-nums">
+        {done} of {total} done
       </div>
       <div className="mt-1.5 h-[2px] overflow-hidden rounded-full bg-foreground/8">
         <div
@@ -301,10 +298,6 @@ export function NoteList({
 
   return (
     <div className="px-1.5 pt-2 pb-3">
-      <div className="mb-1.5 flex items-baseline justify-between px-2 text-[11px] text-foreground/75">
-        <span>Notes</span>
-        <span className="tabular-nums">{notes.length}</span>
-      </div>
       {notes.map((note) => (
         <button
           key={note.id}
@@ -313,7 +306,7 @@ export function NoteList({
           className="flex w-full items-start gap-2 rounded-md px-2 py-[7px] text-left transition-colors hover:bg-muted/45"
         >
           <span className="flex h-[18px] shrink-0 items-center">
-            <StickyNote className="size-[14px] text-(--linear-purple)" />
+            <NotepadText className="size-[14px] text-foreground/55" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12.5px]/[18px] font-medium text-foreground">
@@ -346,7 +339,7 @@ export function NotePreview({ note }: { note: AgentNote }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-6">
       <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold text-foreground">
-        <StickyNote className="size-4 shrink-0 text-(--linear-purple)" />
+        <NotepadText className="size-4 shrink-0 text-foreground/55" />
         <span className="min-w-0 wrap-break-word">{note.title}</span>
       </h2>
       <Markdown text={note.content} className="text-[13px] leading-relaxed text-foreground/90" />
