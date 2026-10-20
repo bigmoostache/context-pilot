@@ -396,6 +396,7 @@ export function AgentConversation({
             key={agent.id}
             status={agent.status}
             paused={agent.paused}
+            warning={agent.warning}
             onSend={onSend}
             onAttach={onAttach}
             pendingFiles={pendingFiles}

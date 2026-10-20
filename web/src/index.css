@@ -136,6 +136,7 @@
   --warn: #c2904f;
   --lit: var(--signal); /* sidebar agent light — same hue as the old status dot */
   --unlit: #b5aa9b; /* sidebar agent square off — lighter than muted-foreground */
+  --alarm: #e0201a; /* sidebar agent square when the TUI shows ⚠ — pure red */
   --danger: #c0685c;
   --shadow-color: 30deg 30% 60%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 12%), 0 4px 12px hsl(var(--shadow-color) / 8%);
@@ -218,6 +219,7 @@
   --warn: #e5c07b; /* gold / amber (TUI warning) */
   --lit: var(--signal); /* sidebar agent light — same hue as the old status dot */
   --unlit: var(--muted-foreground); /* sidebar agent square off */
+  --alarm: #ff3b30; /* sidebar agent square when the TUI shows ⚠ — pure red */
   --danger: #c85050; /* blood red (TUI error) */
   --shadow-color: 45deg 10% 3%;
   --shadow-card:

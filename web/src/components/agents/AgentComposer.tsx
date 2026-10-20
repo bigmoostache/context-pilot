@@ -22,6 +22,7 @@ export type { CommandSuggestion } from "./fileUpload/helpers"
 export function AgentComposer({
   status,
   paused = false,
+  warning = null,
   onSend,
   onAttach,
   pendingFiles = [],
@@ -36,6 +37,8 @@ export function AgentComposer({
   status: AgentStatus
   /** true when this agent has been paused by the user (T371) */
   paused?: boolean | undefined
+  /** why the TUI shows ⚠ for this agent (backend reason), else null */
+  warning?: string | null | undefined
   onSend?: ((text: string) => Promise<boolean>) | undefined
   /** Upload picked files into this agent (paperclip). May be async (T471). */
   onAttach?: ((files: File[]) => void | Promise<void>) | undefined
@@ -64,7 +67,7 @@ export function AgentComposer({
   const streaming = status === "ACTIVE"
   // The agent owes a response on this agent (its turn, or actively streaming).
   const fleetBusy = !userTurn
-  const banner = resolveComposerBanner(paused, fleetBusy, streaming)
+  const banner = resolveComposerBanner(paused, fleetBusy, streaming, warning)
 
   const sendable = composer.canSend(pendingFiles.length)
 

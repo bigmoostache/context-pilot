@@ -144,6 +144,11 @@ pub struct RosterAgent {
     /// `#[serde(default)]`: N-1 compatible.
     #[serde(default)]
     pub lit: bool,
+
+    /// Why the TUI row shows ⚠, folded alongside [`lit`](Self::lit); `None`
+    /// when fine. `#[serde(default)]`: N-1 compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
 }
 
 /// The facts a `AgentCreated` oplog delta carries — the borrowed payload of
@@ -232,6 +237,7 @@ impl RosterAgent {
                 notes: Vec::new(),
                 parent_agent_id: created.parent_agent_id.map(str::to_owned),
                 lit: false,
+                warning: None,
             });
         }
     }
@@ -250,10 +256,12 @@ impl RosterAgent {
         }
     }
 
-    /// Set the sidebar light for `agent_id`, if present (a no-op otherwise).
-    pub fn fold_lit(roster: &mut [Self], agent_id: &str, lit: bool) {
+    /// Set the sidebar light and ⚠ reason for `agent_id`, if present (a no-op
+    /// otherwise).
+    pub fn fold_lit(roster: &mut [Self], agent_id: &str, lit: bool, warning: Option<String>) {
         if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.lit = lit;
+            existing.warning = warning;
         }
     }
 

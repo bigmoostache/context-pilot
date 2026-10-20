@@ -179,10 +179,13 @@ export function parseDraft(key: string | undefined): Draft {
   return { text: raw, selStart: raw.length, selEnd: raw.length }
 }
 
-/** A sidebar row's status-square colour: the old dot's orange-brown when the
- *  backend lights it, grey otherwise (always grey once archived). */
+/** A sidebar row's status-square colour: red when the backend reports a ⚠
+ *  stall (`warning`), the old dot's orange-brown when it lights it, grey
+ *  otherwise (always grey once archived). */
 export function litColor(t: AgentDetail, archived: boolean): string {
-  return !archived && t.lit ? "var(--lit)" : "var(--unlit)"
+  if (archived) return "var(--unlit)"
+  if (t.warning) return "var(--alarm)"
+  return t.lit ? "var(--lit)" : "var(--unlit)"
 }
 
 /** Where a sidebar row's hierarchy lines run (see {@link treeGuides}). */
@@ -253,6 +256,8 @@ export const ROW_ACTION_COPY = {
 export interface Banner {
   working: boolean
   paused: boolean
+  /** the agent is stalled (TUI ⚠): `text` is the backend's reason */
+  warning: boolean
   color: string | undefined
   text: string
 }
@@ -261,9 +266,10 @@ export interface Banner {
  * Resolve the composer's turn-status banner from the agent state (T39/T371).
  *
  * A flat precedence chain (not a nested ternary): a paused agent shows the
- * amber pause notice; otherwise, on the agent's turn, a spinner reading
- * "streaming" or "working" (focus plays no part). Returns null on the user's
- * turn (no banner).
+ * amber pause notice; a stalled agent (the TUI's ⚠, `warning` = the backend's
+ * reason) shows that reason in red; otherwise, on the agent's turn, a spinner
+ * reading "streaming" or "working" (focus plays no part). Returns null on the
+ * user's turn (no banner).
  *
  * Lives here, beside {@link ROW_ACTION_COPY}, for the same reason: it is a pure
  * agent-state → copy derivation with no JSX in it, and the sentences it picks
@@ -273,18 +279,35 @@ export function resolveComposerBanner(
   paused: boolean,
   fleetBusy: boolean,
   streaming: boolean,
+  warning?: string | null,
 ): Banner | null {
   if (paused) {
     return {
       working: false,
       paused: true,
+      warning: false,
       color: undefined,
       text: "Agent paused — it won't respond until resumed.",
     }
   }
+  if (warning) {
+    return { working: false, paused: false, warning: true, color: "var(--alarm)", text: warning }
+  }
   if (!fleetBusy) return null
   if (streaming) {
-    return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
+    return {
+      working: true,
+      paused: false,
+      warning: false,
+      color: "var(--ok)",
+      text: "Agent is streaming…",
+    }
   }
-  return { working: true, paused: false, color: "var(--signal)", text: "Agent is working…" }
+  return {
+    working: true,
+    paused: false,
+    warning: false,
+    color: "var(--signal)",
+    text: "Agent is working…",
+  }
 }

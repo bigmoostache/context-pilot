@@ -259,7 +259,7 @@ const FLAG_PATCH: Partial<Record<string, (k: Kind) => Partial<AgentDetail>>> = {
   agent_paused: () => ({ paused: true }),
   agent_resumed: () => ({ paused: false }),
   agent_status_changed: (k) => ({ status: turnToStatus(k.status) }),
-  agent_lit_changed: (k) => ({ lit: Boolean(k.lit) }),
+  agent_lit_changed: (k) => ({ lit: Boolean(k.lit), warning: k.warning ?? null }),
 }
 
 /**

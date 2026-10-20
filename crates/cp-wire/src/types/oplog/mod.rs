@@ -215,12 +215,17 @@ pub enum OpEntryKind {
     /// An agent's sidebar light flipped. Lit = the TUI agents list shows a
     /// working spinner OR a green (human's turn, not paused) circle; the web
     /// sidebar renders it as-is (brown lit, grey unlit), deriving nothing.
+    /// Also carries the TUI ⚠ reason, which overrides the light with red.
     #[serde(rename = "agent_lit_changed")]
     AgentLitChanged {
         /// The affected agent.
         agent_id: String,
         /// The agent's new light.
         lit: bool,
+        /// Why the TUI row shows ⚠ (stalled owing a turn), `None` when fine.
+        /// `#[serde(default)]`: N-1 compatible.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        warning: Option<String>,
     },
 
     /// An agent's projected task list changed — the read-only todo items the

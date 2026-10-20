@@ -38,6 +38,7 @@ export type AgentDetail = {
     status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
     tasks?: Array<AgentTask>;
     unread?: number;
+    warning?: string | null;
 };
 
 export type AgentMsg = {
@@ -678,6 +679,7 @@ export type OpEntryKind = {
     threshold_tokens?: number;
     timestamp_ms?: number;
     used_tokens?: number;
+    warning?: string;
 };
 
 export type ProviderDef = {

@@ -14,8 +14,11 @@ pub(super) mod messages;
 mod prompt;
 /// Virtualized agent-list entries.
 mod visible;
+/// Human-readable reason behind an agent row's ⚠ (web red square + banner).
+mod warning;
 use prompt::{NEW_AGENT_PROMPT, RENAME_PROMPT, render_title_prompt};
 use visible::push_visible_entries;
+pub(crate) use warning::agent_warning;
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};

@@ -126,6 +126,10 @@
           },
           "unread": {
             "type": "integer"
+          },
+          "warning": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -1931,6 +1935,9 @@
           },
           "used_tokens": {
             "type": "integer"
+          },
+          "warning": {
+            "type": "string"
           }
         },
         "required": [
