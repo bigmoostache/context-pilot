@@ -766,7 +766,15 @@ html.mobile.standalone .mobile-shell {
   --mx: 50%;
   --my: 50%;
 
+  /* light: the palette's warm hairline beige, no new tint */
+  --row-spot: var(--border-strong);
+
   isolation: isolate;
+}
+
+/* dark: the torch accent, kept faint */
+.dark .agent-row {
+  --row-spot: color-mix(in oklab, var(--signal) 12%, transparent);
 }
 
 .agent-row::before {
@@ -775,8 +783,8 @@ html.mobile.standalone .mobile-shell {
   z-index: -1;
   border-radius: inherit;
   background: radial-gradient(
-    140px circle at var(--mx) var(--my),
-    color-mix(in oklab, var(--signal) 18%, transparent),
+    110px circle at var(--mx) var(--my),
+    var(--row-spot),
     transparent 70%
   );
   content: "";
