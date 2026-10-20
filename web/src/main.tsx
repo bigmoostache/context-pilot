@@ -36,6 +36,21 @@ function migrateAgentStorage(): void {
 migrateAgentStorage()
 
 /**
+ * Stale-deploy guard: a rebuild deletes the old hashed chunks, so a tab still
+ * on the previous bundle fails its next lazy import (e.g. SheetGrid). Reload
+ * once to fetch the new bundle; the timestamp stops a loop if the chunk is
+ * really missing.
+ */
+window.addEventListener("vite:preloadError", (event) => {
+  const key = "cp-chunk-reload-at"
+  const last = Number(sessionStorage.getItem(key) ?? 0)
+  if (Date.now() - last < 10_000) return
+  sessionStorage.setItem(key, String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
+
+/**
  * App-wide error boundary — the safety net the app was missing (T644).
  *
  * Before this, the tree carried NO error boundary anywhere, so a single
