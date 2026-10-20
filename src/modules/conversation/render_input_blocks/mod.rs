@@ -9,6 +9,7 @@ use crate::infra::constants::icons;
 use crate::ui::helpers::wrap_text;
 
 /// Paste-sentinel expansion (split out for the 500-line structure limit).
+pub(crate) mod file_chip;
 mod sentinels;
 use sentinels::expand_paste_sentinels;
 

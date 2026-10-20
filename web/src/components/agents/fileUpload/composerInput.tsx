@@ -2,6 +2,7 @@ import { useRef } from "react"
 import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
 import { Tip } from "@/components/ui/tip"
 import type { Banner } from "@/lib/support/agentMessages"
+import { handleComposerPaste } from "@/lib/live/agentUpload"
 
 /**
  * The composer's input row: the file-picker + paperclip, the auto-growing
@@ -56,17 +57,7 @@ export function ComposerInputRow({
         onChange={onChange}
         onSelect={onSelect}
         onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const items = [...e.clipboardData.items]
-          const images = items
-            .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-            .map((i) => i.getAsFile())
-            .filter((f): f is File => f !== null)
-          if (images.length > 0 && onAttach) {
-            e.preventDefault()
-            void onAttach(images)
-          }
-        }}
+        onPaste={(e) => handleComposerPaste(e, onAttach)}
         placeholder="Reply to this agent…"
         rows={1}
         className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"

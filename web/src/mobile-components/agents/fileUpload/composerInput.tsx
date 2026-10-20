@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
 import { prefersReducedMotion } from "@/lib/utils"
+import { handleComposerPaste } from "@/lib/live/agentUpload"
 import { ArrowUp, Plus, Loader2, Clock, Pause } from "lucide-react"
 
 /** The turn-status banner shown above the composer input, or null. */
@@ -85,17 +86,7 @@ export function ComposerInputRow({
           onChange={onChange}
           onSelect={onSelect}
           onKeyDown={onKeyDown}
-          onPaste={(e) => {
-            const items = [...e.clipboardData.items]
-            const images = items
-              .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-              .map((i) => i.getAsFile())
-              .filter((f): f is File => f !== null)
-            if (images.length > 0 && onAttach) {
-              e.preventDefault()
-              void onAttach(images)
-            }
-          }}
+          onPaste={(e) => handleComposerPaste(e, onAttach)}
           placeholder="Message…"
           rows={1}
           className="max-h-[200px] min-h-[30px] min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[16px] leading-snug text-foreground/90 outline-none placeholder:text-muted-foreground/50"
