@@ -24,8 +24,8 @@ function toolDigest(msgs: AgentMsg[]): string {
  * Motion is anime.js: the body's height tweens from its current value (so a
  * toggle mid-flight reverses smoothly instead of jumping), rows fade in with a
  * stagger capped at ~220 ms total whatever the run length, and the chevron
- * turns on a spring. Collapsing tweens height to 0, then unmounts the rows so a
- * closed run costs nothing. Reduced motion jumps straight to the end state.
+ * turns on a spring. Collapsing mirrors it: rows fade out bottom-up while the
+ * height eases to 0, then the rows unmount so a closed run costs nothing. Reduced motion jumps straight to the end state.
  *
  * `memo`: re-renders only when `msgs` changes (T510 render-storm fix — the
  * parent memoizes `segmentLog`, so the array stays reference-stable).
@@ -36,6 +36,7 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const chevronRef = useRef<SVGSVGElement>(null)
   const anim = useRef<JSAnimation | null>(null)
+  const rowsAnim = useRef<JSAnimation | null>(null)
   const first = useRef(true)
   const n = msgs.length
 
@@ -60,16 +61,26 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
       if (!open) setMounted(false)
       return
     }
+    rowsAnim.current?.pause()
     const from = el.offsetHeight
+    const rows = el.querySelectorAll<HTMLElement>("[data-row]")
+    const step = Math.min(24, 220 / Math.max(rows.length, 1))
     if (open) {
       if (from === 0) {
-        const rows = el.querySelectorAll<HTMLElement>("[data-row]")
         for (const r of rows) r.style.opacity = "0"
-        animate(rows, {
+        rowsAnim.current = animate(rows, {
           opacity: [0, 1],
           translateX: [-6, 0],
           duration: 340,
-          delay: stagger(Math.min(24, 220 / Math.max(rows.length, 1)), { start: 60 }),
+          delay: stagger(step, { start: 60 }),
+          ease: "outQuad",
+        })
+      } else {
+        // Reopened mid-collapse: settle rows back from wherever they are.
+        rowsAnim.current = animate(rows, {
+          opacity: 1,
+          translateX: 0,
+          duration: 220,
           ease: "outQuad",
         })
       }
@@ -82,10 +93,19 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
         },
       })
     } else {
+      // Mirror of opening: rows fade out bottom-up while the height eases shut.
+      rowsAnim.current = animate(rows, {
+        opacity: 0,
+        translateX: -6,
+        duration: 220,
+        delay: stagger(step, { from: "last" }),
+        ease: "inQuad",
+      })
       anim.current = animate(el, {
         height: [from, 0],
-        duration: 260,
-        ease: "inOutQuad",
+        duration: 340,
+        delay: 60,
+        ease: "inOutQuart",
         onComplete: () => {
           setMounted(false)
         },
