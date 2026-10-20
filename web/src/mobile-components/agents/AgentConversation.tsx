@@ -1,6 +1,7 @@
-import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
 import { Message } from "@/mobile-components/conversation/Message"
+import { ToolRun } from "@/mobile-components/conversation/ToolRun"
 import { AgentComposer, type CommandSuggestion } from "@/mobile-components/agents/AgentComposer"
 import { CreateCommandDialog } from "@/mobile-components/agents/CreateCommandDialog"
 import { SystemEditorDialog } from "@/mobile-components/shell/behaviour/SystemEditor"
@@ -10,42 +11,8 @@ import type { UploadedFile } from "@/mobile-components/agents/fileUpload/helpers
 import { FormMessageRow } from "@/mobile-components/agents/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/agents/forms/helpers"
 import { useScrollPin, useAgentForms } from "@/mobile-components/agents/forms/useAgentForms"
-import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/agentMessages"
+import { segmentLog, toChatMessage } from "@/lib/support/agentMessages"
 import type { AgentDetail, AgentMsg } from "@/lib/types"
-
-/**
- * A collapsed run of auto tool-activity traces, rendered as an aligned
- * three-column grid (verb · tool · intent). Identical to the desktop twin — the
- * memo boundary keys on `msgs` reference so an unrelated SSE delta skips this
- * whole subtree (T510 render-storm fix).
- */
-const AutoRun = memo(function AutoRun({ msgs }: { msgs: AgentMsg[] }) {
-  const n = msgs.length
-  return (
-    <details className="group/auto mb-2 ml-5">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors active:bg-muted/40">
-        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
-          ▸
-        </span>
-        <span>
-          ⚙ {n} tool action{n === 1 ? "" : "s"}
-        </span>
-      </summary>
-      <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
-        {msgs.map((m) => {
-          const { verb, tool, intent } = parseAutoLine(m)
-          return (
-            <Fragment key={m.id}>
-              <span className="text-(--interactive)">{verb}</span>
-              <span className="text-foreground/70">{tool}</span>
-              <span className="truncate text-muted-foreground/55">{intent}</span>
-            </Fragment>
-          )
-        })}
-      </div>
-    </details>
-  )
-})
 
 /**
  * One rendered NON-auto message row — the memoized boundary that kills the T510
@@ -174,7 +141,7 @@ function useMessageActions(
  *     entire drag apparatus is dropped — attaching is the composer paperclip
  *     only.
  *
- * Everything else — the memoized `AutoRun` / `MessageRow` rows, the scroll-pin,
+ * Everything else — the memoized `ToolRun` / `MessageRow` rows, the scroll-pin,
  * the forms plumbing, delete-message — is the shared desktop behaviour, so the
  * two conversations stay in lock-step on logic and fork only on chrome.
  */
@@ -304,7 +271,7 @@ export function AgentConversation({
 
           {segments.map((seg) =>
             seg.type === "auto" ? (
-              <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
             ) : isFormMessage(seg.msg.text ?? "") ? (
               <FormMessageRow
                 key={seg.msg.id}
