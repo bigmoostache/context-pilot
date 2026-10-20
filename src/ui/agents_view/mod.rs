@@ -193,14 +193,14 @@ const fn agent_is_working(exec: AgentExecState) -> bool {
     matches!(exec, AgentExecState::Runnable | AgentExecState::Streaming)
 }
 
-/// The web sidebar light: the row shows the working spinner OR a green circle
-/// (human's turn, not paused). Shared with the bridge emitter so the web square
-/// always matches this list.
+/// The web sidebar light: the row shows the working spinner OR an orange
+/// circle (LLM's turn, not paused). Agents waiting on the human stay unlit.
+/// Shared with the bridge emitter so the web square always matches this list.
 pub(crate) fn agent_lit(state: &State, agent: &cp_mod_agents::types::Agent) -> bool {
     let working = agent_is_working(FleetExecMirror::get(state).exec_state_of(&agent.id));
-    let green = !agent.paused
-        && !matches!(cp_mod_agents::types::turn::status(state, &agent.id), cp_mod_agents::types::AgentStatus::MyTurn);
-    working || green
+    let orange = !agent.paused
+        && matches!(cp_mod_agents::types::turn::status(state, &agent.id), cp_mod_agents::types::AgentStatus::MyTurn);
+    working || orange
 }
 
 /// Whether `agent` holds an LLM reply the human has not yet seen in the TUI:
