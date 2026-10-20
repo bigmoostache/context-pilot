@@ -10,6 +10,29 @@ use crate::state::persistence::save_state;
 use cp_base::config::REVERIE;
 use cp_mod_queue::types::QueueState;
 
+/// One main-loop reverie pass, each step timed (`loop.reverie.rv_*`) so a
+/// spike is attributed instead of showing as untimed self time.
+pub(super) fn run_reverie_phase(app: &mut App) {
+    {
+        // Start a stream for any reverie that has none yet.
+        let _g = crate::profile!("rv_start");
+        maybe_start_reverie_stream(app);
+    }
+    {
+        // Text chunks, tool calls, done/error.
+        let _g = crate::profile!("rv_events");
+        process_reverie_events(app);
+    }
+    {
+        // After main tools: the main AI has priority.
+        let _g = crate::profile!("rv_tools");
+        handle_reverie_tools(app);
+    }
+    // Auto-relaunch guard rail when a reverie ends without Report.
+    let _g = crate::profile!("rv_end_turn");
+    check_reverie_end_turn(app);
+}
+
 /// Check if any reverie needs a stream started (state has reverie but no stream).
 /// Called from the main event loop.
 pub(super) fn maybe_start_reverie_stream(app: &mut App) {

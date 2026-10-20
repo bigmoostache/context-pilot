@@ -269,10 +269,14 @@ fn paint_agent_messages(frame: &mut Frame<'_>, state: &mut State, lines: &[ratat
     let start = offset.round().to_usize().min(content_height);
     let end = start.saturating_add(viewport_height).min(content_height);
     let paragraph = Paragraph::new(lines.get(start..end).unwrap_or_default().to_vec());
-    frame.render_widget(paragraph, area);
+    {
+        let _g = crate::profile!("tv_paragraph");
+        frame.render_widget(paragraph, area);
+    }
 
     // Scrollbar — colors via semantic mapping
     if content_height > viewport_height {
+        let _g = crate::profile!("tv_scrollbar");
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .style(ir::semantic_to_style(Semantic::Border))

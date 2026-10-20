@@ -223,7 +223,10 @@ enum TimerOutcome {
 /// Decide one panel's timer fate: auto-close, refresh (initial / dirty /
 /// interval), or nothing. Pure read of `app` — no mutation.
 fn classify_timer_panel(app: &App, ctx: &crate::state::Entry, current_ms: u64) -> Option<TimerOutcome> {
-    let panel = crate::app::panels::get_panel(&ctx.context_type);
+    let panel = {
+        let _g = crate::profile!("tr_get_panel");
+        crate::app::panels::get_panel(&ctx.context_type)
+    };
     let suicide = {
         let _g = crate::infra::profiler::dyn_guard("tr_suicide_", ctx.context_type.as_str());
         panel.suicide(ctx, &app.state)
