@@ -22,6 +22,7 @@ import FindEnUS from "@univerjs/preset-sheets-find-replace/locales/en-US"
 import FindFrFR from "@univerjs/preset-sheets-find-replace/locales/fr-FR"
 import "@univerjs/preset-sheets-find-replace/lib/index.css"
 import { Save } from "lucide-react"
+import { apiErrorMessage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import {
   clearEdits,
@@ -152,7 +153,7 @@ export function SheetGrid({
       setTimeout(() => setSaveStatus("idle"), 1500)
     } catch (error) {
       setSaveStatus("error")
-      setSaveError(error instanceof Error ? error.message : "Save failed")
+      setSaveError(apiErrorMessage(error, "Save failed"))
     }
   }, [fleetId, path, storageKey])
 
@@ -171,7 +172,7 @@ export function SheetGrid({
     }
 
     // Formula engine off the main thread: recalculating a large workbook froze the tab.
-    const worker = new Worker(new URL("../support/sheetWorker.ts", import.meta.url), {
+    const worker = new Worker(new URL("../../support/sheetWorker.ts", import.meta.url), {
       type: "module",
     })
     const { univerAPI } = createUniver({
@@ -264,10 +265,10 @@ export function SheetGrid({
           )}
           {saveStatus === "error" && (
             <span
-              className="rounded-md bg-danger/90 px-2 py-0.5 text-[10px] font-medium text-primary-foreground"
+              className="max-w-80 truncate rounded-md bg-danger/90 px-2 py-0.5 text-[10px] font-medium text-primary-foreground"
               title={saveError ?? undefined}
             >
-              Save failed
+              {saveError ?? "Save failed"}
             </span>
           )}
         </div>

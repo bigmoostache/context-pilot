@@ -227,6 +227,21 @@ export function useFsSheet(
   })
 }
 
+/**
+ * Live pptx preview: the deck resolved server-side to positioned shapes.
+ * Point-in-time read like {@link useFsSheet} (no SSE bridge, no poll).
+ */
+export function useFsSlides(
+  fleetId: string,
+  path: string,
+  enabled: boolean,
+): LiveQueryResult<api.SlideDeck> {
+  return useLive(qk.fsSlides(fleetId, path), () => api.fetchSlides(fleetId, path), {
+    enabled: enabled && !!fleetId && !!path,
+    pollMs: 0,
+  })
+}
+
 // ── Metrics (§19 observability — agent-scoped) ────────────────────────
 //
 // Health vitals (stream health, view-vs-oplog rev lag) are NOT delta-covered —

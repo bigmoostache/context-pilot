@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
+import { useFsPreview, useFsSheet, useFsSlides, useWriteFile } from "@/lib/live"
 import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited.
@@ -16,7 +16,27 @@ import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } f
 /** Lazy-loaded — Univer + ExcelJS (~46 MB) deferred until a sheet is previewed.
  *  Resolves to the mobile SheetGrid (a stub re-exporting the desktop Univer
  *  wrapper: the engine handles touch natively, so it is not forked). */
-const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m.SheetGrid })))
+const LazySheetGrid = lazy(() =>
+  import("./sheet/SheetGrid").then((m) => ({ default: m.SheetGrid })),
+)
+/** Lazy-loaded slide renderer (stub of the desktop one; it scales to the pane width). */
+const LazySlideDeck = lazy(() =>
+  import("./slides/SlideDeck").then((m) => ({ default: m.SlideDeck })),
+)
+
+/** Mobile LIVE pptx preview — same resolved deck as desktop, scaled to the screen. */
+export function LiveSlidesPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSlides(fleetId, node.path, true)
+  if (loading) return <PreviewStatus label="Loading presentation…" />
+  if (error || !data || data.slides.length === 0) return <Generic node={node} />
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Suspense fallback={<PreviewStatus label="Loading presentation…" />}>
+        <LazySlideDeck deck={data} />
+      </Suspense>
+    </div>
+  )
+}
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM

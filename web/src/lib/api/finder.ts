@@ -9,6 +9,7 @@ import type {
   FsPreview,
   SheetData,
   SheetSaveResult,
+  SlideDeck,
   UploadResult,
   UploadUniqueResult,
   WriteResult,
@@ -18,6 +19,7 @@ import {
   getApiFleetByIdFsDescriptions,
   getApiFleetByIdFsPreview,
   getApiFleetByIdFsSheet,
+  getApiFleetByIdFsSlides,
   postApiFleetByIdFsSheetSave,
   postApiFleetByIdFsUpload,
   postApiFleetByIdFsUploadUnique,
@@ -29,6 +31,17 @@ import { BASE, getToken, sdk } from "./client"
 
 export type { FinderNode, FsPreview, SheetData, SheetSaveResult } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
+export type {
+  SlideDeck,
+  Slide,
+  SlideShape,
+  SlideTextBody,
+  SlideParagraph,
+  SlideRun,
+  SlideStroke,
+  SlideTable,
+  SlideTableCell,
+} from "./generated/types.gen"
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
@@ -46,6 +59,11 @@ export function fetchFsPreview(fleetId: string, path: string): Promise<FsPreview
 
 export function fetchSheet(fleetId: string, path: string): Promise<SheetData> {
   return sdk(getApiFleetByIdFsSheet({ path: { id: fleetId }, query: { path } }))
+}
+
+/** A pptx resolved to positioned shapes (master → layout → slide cascade). */
+export function fetchSlides(fleetId: string, path: string): Promise<SlideDeck> {
+  return sdk(getApiFleetByIdFsSlides({ path: { id: fleetId }, query: { path } }))
 }
 
 // ── POST endpoints (SDK) ─────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { useFsPreview, useFsSheet, useWriteFile } from "@/lib/live"
+import { useFsPreview, useFsSheet, useFsSlides, useWriteFile } from "@/lib/live"
 import { downloadFile, rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited. */
@@ -11,7 +11,31 @@ const LazyMarkdownEditor = lazy(() =>
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
 /** Lazy-loaded — Univer + ExcelJS (~46 MB) deferred until a sheet is previewed. */
-const LazySheetGrid = lazy(() => import("./SheetGrid").then((m) => ({ default: m.SheetGrid })))
+const LazySheetGrid = lazy(() =>
+  import("./sheet/SheetGrid").then((m) => ({ default: m.SheetGrid })),
+)
+/** Lazy-loaded — the slide renderer is only needed once a deck is previewed. */
+const LazySlideDeck = lazy(() =>
+  import("./slides/SlideDeck").then((m) => ({ default: m.SlideDeck })),
+)
+
+/**
+ * Render a LIVE pptx from the backend's `/fs/slides` endpoint: shapes, text,
+ * tables and pictures already resolved through the master/layout cascade.
+ * Legacy `.ppt` / `.odp` are refused by the backend (415) → generic fallback.
+ */
+export function LiveSlidesPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const { data, loading, error } = useFsSlides(fleetId, node.path, true)
+  if (loading) return <PreviewStatus label="Loading presentation…" />
+  if (error || !data || data.slides.length === 0) return <Generic node={node} />
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Suspense fallback={<PreviewStatus label="Loading presentation…" />}>
+        <LazySlideDeck deck={data} />
+      </Suspense>
+    </div>
+  )
+}
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM
