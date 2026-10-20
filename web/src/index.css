@@ -760,46 +760,23 @@ html.mobile.standalone .mobile-shell {
   gap: 2px;
 }
 
-/* Sidebar agent rows (AgentList): a signal-tinted spotlight follows the cursor
-   on hover. --mx/--my are fed by SelectionGlide's pointer listener. */
-.agent-row {
-  --mx: 50%;
-  --my: 50%;
-
-  /* light: the palette's warm hairline beige, no new tint */
-  --row-spot: var(--border-strong);
-
-  isolation: isolate;
+/* Sidebar agent title (AgentList): on row hover a bold underline draws in from
+   the left; on leave it slides out to the right. The anchor flips with the
+   hover state, so the bar always exits in the direction it was drawn. */
+.agent-title {
+  padding-bottom: 2px;
+  background: linear-gradient(currentcolor, currentcolor) no-repeat right bottom / 0 2px;
+  transition: background-size 380ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* dark: the torch accent, kept faint */
-.dark .agent-row {
-  --row-spot: color-mix(in oklab, var(--signal) 12%, transparent);
-}
-
-.agent-row::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: radial-gradient(
-    110px circle at var(--mx) var(--my),
-    var(--row-spot),
-    transparent 70%
-  );
-  content: "";
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 380ms ease-out;
-}
-
-.agent-row:hover::before {
-  opacity: 1;
-  transition-duration: 140ms;
+.group:hover .agent-title {
+  background-position: left bottom;
+  background-size: 100% 2px;
+  transition-duration: 320ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-row::before {
+  .agent-title {
     transition: none;
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react"
+import { useLayoutEffect, useRef, type RefObject } from "react"
 import { prefersReducedMotion } from "@/lib/utils"
 
 /** Ease-out with a long tail: quick start, soft landing, no overshoot. */
@@ -62,23 +62,6 @@ export function SelectionGlide({
     ro.observe(root)
     return () => ro.disconnect()
   }, [containerRef, selectedId, layoutKey])
-
-  // Cursor spotlight: one delegated listener feeds the hovered row its local
-  // pointer position, which `.agent-row::before` centres its glow on.
-  useEffect(() => {
-    const root = containerRef.current
-    if (!root) return
-    const onMove = (e: PointerEvent) => {
-      if (!(e.target instanceof Element)) return
-      const row = e.target.closest<HTMLElement>("[data-row-id]")
-      if (!row) return
-      const r = row.getBoundingClientRect()
-      row.style.setProperty("--mx", `${e.clientX - r.left}px`)
-      row.style.setProperty("--my", `${e.clientY - r.top}px`)
-    }
-    root.addEventListener("pointermove", onMove, { passive: true })
-    return () => root.removeEventListener("pointermove", onMove)
-  }, [containerRef])
 
   return (
     <div

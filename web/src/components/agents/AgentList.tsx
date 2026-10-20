@@ -217,7 +217,7 @@ function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HT
     <span className="min-w-0 flex-1 overflow-hidden">
       <span
         ref={trackRef}
-        className="block truncate text-[13px] font-medium text-foreground/90 group-hover:overflow-visible group-hover:text-clip group-hover:text-foreground"
+        className="agent-title inline-block max-w-full truncate align-top text-[13px] font-medium text-foreground/90 group-hover:overflow-visible group-hover:text-clip group-hover:text-foreground"
       >
         {name}
       </span>
@@ -286,7 +286,7 @@ function AgentRow({
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "agent-row group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-[background-color,scale] duration-300 ease-out select-none hover:duration-150 active:scale-[0.99]",
+        "group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-[background-color,scale] duration-300 ease-out select-none hover:duration-150 active:scale-[0.99]",
         !selected && "hover:bg-card/55",
       )}
       data-row-id={t.id}
