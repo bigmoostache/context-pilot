@@ -2,6 +2,7 @@ import { Archive, ArchiveRestore, ChevronLeft, Pause, Pencil, Play, Trash2 } fro
 import { useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { PendingSpinner } from "@/components/ui/pending"
+import { SelectionGlide } from "@/components/ui/selectionGlide"
 import { Tip } from "@/components/ui/tip"
 import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
@@ -75,6 +76,7 @@ export function AgentList({
   const navHintOf = (id: string): "up" | "down" | undefined =>
     id === prevId ? "up" : id === nextId ? "down" : undefined
   const guides = treeGuides(visible)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const row = (t: AgentDetail, archivedRow?: boolean) => (
     <AgentRow
@@ -112,7 +114,12 @@ export function AgentList({
         <ScrollArea className="min-h-0 flex-1">
           {/* The panel's single inner inset — one `p-2` on the content (not the
               ScrollArea) so the scrollbar still runs flush to the panel edge. */}
-          <div className="p-2">
+          <div ref={listRef} className="relative p-2">
+            <SelectionGlide
+              containerRef={listRef}
+              selectedId={selectedId}
+              layoutKey={showArchived ? "archived" : "live"}
+            />
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
             {visible.map((t) => row(t, showArchived))}
@@ -279,9 +286,10 @@ function AgentRow({
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-colors select-none",
-        selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
+        "group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-[background-color,scale] duration-300 ease-out select-none hover:duration-150 active:scale-[0.99]",
+        !selected && "hover:bg-card/55",
       )}
+      data-row-id={t.id}
     >
       {navHint && (
         <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
