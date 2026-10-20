@@ -1,4 +1,17 @@
-import { useEffect, useId, useState, type ReactNode } from "react"
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
+import { Maximize2, XIcon, ZoomIn, ZoomOut } from "lucide-react"
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  type ReactNode,
+} from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -103,6 +116,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
   // cascading effect render. A miss seeds `null` → the effect renders it async.
   const [svg, setSvg] = useState<string | null>(() => svgCache.get(cacheKey) ?? null)
   const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
   // `useId` gives a stable, globally-unique id per component instance; strip the
   // framework's `:` delimiters so it is a valid DOM/SVG id (mermaid uses it in
   // selectors internally).
@@ -162,11 +176,283 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
   }
 
   return (
-    <div
-      className="my-2 flex justify-center overflow-x-auto [&>svg]:h-auto [&>svg]:max-w-full"
-      // mermaid renders with securityLevel:"strict" (DOMPurify-sanitised SVG,
-      // no inline scripts/handlers), so the markup is safe to inject.
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <button
+        type="button"
+        title="Open diagram"
+        aria-label="Open diagram full size"
+        onClick={() => {
+          setOpen(true)
+        }}
+        className="my-2 flex w-full cursor-zoom-in justify-center overflow-x-auto rounded-lg transition-colors hover:bg-foreground/3 [&_svg]:h-auto"
+      >
+        <span
+          className="contents"
+          // mermaid renders with securityLevel:"strict" (DOMPurify-sanitised SVG,
+          // no inline scripts/handlers), so the markup is safe to inject.
+          dangerouslySetInnerHTML={{ __html: resizeSvg(svg, "inline") }}
+        />
+      </button>
+      {open && (
+        <MermaidViewer
+          svg={svg}
+          onClose={() => {
+            setOpen(false)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+/** Inline diagrams render this much larger than mermaid's natural size (still capped at 100%). */
+const INLINE_SCALE = 1.5
+
+/**
+ * Rewrite the `max-width: Npx` mermaid stamps on its root `<svg>` (alongside
+ * `width="100%"`). That cap is what made diagrams read tiny: inline it grows by
+ * `INLINE_SCALE` while staying within the message column; in the viewer the
+ * SVG gets its intrinsic width and no cap, so the CSS transform owns the scale.
+ */
+function resizeSvg(svg: string, mode: "inline" | "viewer"): string {
+  return svg.replace(/max-width:\s*([\d.]+)px;?/, (_m, raw: string) => {
+    const px = Number(raw)
+    return mode === "inline"
+      ? `max-width: min(100%, ${Math.round(px * INLINE_SCALE)}px);`
+      : `width: ${px}px; max-width: none;`
+  })
+}
+
+/** Zoom bounds and the per-step factor for buttons / keys. */
+const ZOOM = { min: 0.1, max: 12, step: 1.25 } as const
+
+/** Pan offset (px, from the stage centre) + scale of the viewer's diagram. */
+interface View {
+  x: number
+  y: number
+  k: number
+}
+
+const clampK = (k: number): number => Math.min(ZOOM.max, Math.max(ZOOM.min, k))
+
+/** Centre-relative coordinates of a client point inside `el`. */
+function centred(el: Element, clientX: number, clientY: number): { x: number; y: number } {
+  const r = el.getBoundingClientRect()
+  return { x: clientX - r.left - r.width / 2, y: clientY - r.top - r.height / 2 }
+}
+
+/**
+ * Pan/zoom state + gesture handlers for the viewer stage: wheel and pinch zoom
+ * anchored at the cursor, one-pointer drag pan, `+`/`-`/`0` keys, fit-to-stage.
+ */
+function useViewerGestures(
+  stageRef: RefObject<HTMLDivElement | null>,
+  contentRef: RefObject<HTMLDivElement | null>,
+) {
+  const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 })
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>())
+  const pinchRef = useRef<number | null>(null)
+
+  /** Scale by `factor`, keeping the centre-relative stage point (`px`,`py`) fixed. */
+  const zoomAt = useCallback((factor: number, px = 0, py = 0) => {
+    setView((v) => {
+      const k = clampK(v.k * factor)
+      const f = k / v.k
+      return { k, x: px - (px - v.x) * f, y: py - (py - v.y) * f }
+    })
+  }, [])
+
+  /** Fit the whole diagram in the stage with a small margin, centred. */
+  const fit = useCallback(() => {
+    const stage = stageRef.current
+    const svgEl = contentRef.current?.querySelector("svg")
+    if (!stage || !svgEl) {
+      return
+    }
+    const w = svgEl.clientWidth || 1
+    const h = svgEl.clientHeight || 1
+    setView({
+      x: 0,
+      y: 0,
+      k: clampK(Math.min((stage.clientWidth * 0.92) / w, (stage.clientHeight * 0.92) / h)),
+    })
+  }, [stageRef, contentRef])
+
+  // Fit once the popup is mounted and measurable.
+  useLayoutEffect(() => {
+    const raf = requestAnimationFrame(fit)
+    return () => {
+      cancelAnimationFrame(raf)
+    }
+  }, [fit])
+
+  // Wheel zoom needs a NON-passive listener to preventDefault the page scroll;
+  // React's onWheel is passive, hence the manual subscription. Trackpad pinch
+  // arrives as ctrl+wheel with small deltas, hence the steeper factor.
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) {
+      return
+    }
+    const onWheel = (e: WheelEvent): void => {
+      e.preventDefault()
+      const p = centred(stage, e.clientX, e.clientY)
+      zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)), p.x, p.y)
+    }
+    stage.addEventListener("wheel", onWheel, { passive: false })
+    return () => {
+      stage.removeEventListener("wheel", onWheel)
+    }
+  }, [stageRef, zoomAt])
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    pinchRef.current = null
+  }
+
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    const prev = pointersRef.current.get(e.pointerId)
+    if (!prev) {
+      return
+    }
+    const next = { x: e.clientX, y: e.clientY }
+    pointersRef.current.set(e.pointerId, next)
+    const [a, b] = pointersRef.current.values().toArray()
+    if (a && b) {
+      // Two fingers: pinch-zoom around their midpoint.
+      const dist = Math.hypot(a.x - b.x, a.y - b.y)
+      if (pinchRef.current !== null) {
+        const mid = centred(e.currentTarget, (a.x + b.x) / 2, (a.y + b.y) / 2)
+        zoomAt(dist / pinchRef.current, mid.x, mid.y)
+      }
+      pinchRef.current = dist
+      return
+    }
+    setView((v) => ({ ...v, x: v.x + next.x - prev.x, y: v.y + next.y - prev.y }))
+  }
+
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    pointersRef.current.delete(e.pointerId)
+    pinchRef.current = null
+  }
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const factor = { "+": ZOOM.step, "=": ZOOM.step, "-": 1 / ZOOM.step, _: 1 / ZOOM.step }[e.key]
+    if (factor !== undefined) {
+      zoomAt(factor)
+    } else if (e.key === "0") {
+      fit()
+    } else {
+      return
+    }
+    e.preventDefault()
+  }
+
+  return { view, zoomAt, fit, onPointerDown, onPointerMove, onPointerUp, onKeyDown }
+}
+
+const TOOL_BTN =
+  "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-foreground"
+
+/** Floating top-right toolbar: zoom out / level / zoom in / fit / close. */
+function ViewerToolbar({
+  k,
+  zoomAt,
+  fit,
+}: {
+  k: number
+  zoomAt: (factor: number) => void
+  fit: () => void
+}): ReactNode {
+  return (
+    <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded-lg bg-popover/90 p-1 shadow-(--shadow-pop) backdrop-blur-sm">
+      <button
+        type="button"
+        className={TOOL_BTN}
+        aria-label="Zoom out"
+        onClick={() => {
+          zoomAt(1 / ZOOM.step)
+        }}
+      >
+        <ZoomOut className="size-4" />
+      </button>
+      <span className="w-12 text-center text-[12px] text-muted-foreground tabular-nums">
+        {Math.round(k * 100)}%
+      </span>
+      <button
+        type="button"
+        className={TOOL_BTN}
+        aria-label="Zoom in"
+        onClick={() => {
+          zoomAt(ZOOM.step)
+        }}
+      >
+        <ZoomIn className="size-4" />
+      </button>
+      <button type="button" className={TOOL_BTN} aria-label="Fit to screen" onClick={fit}>
+        <Maximize2 className="size-4" />
+      </button>
+      <DialogPrimitive.Close className={TOOL_BTN} aria-label="Close">
+        <XIcon className="size-4" />
+      </DialogPrimitive.Close>
+    </div>
+  )
+}
+
+/**
+ * Full-screen diagram viewer: a dialog covering 90% of the viewport with the
+ * classic image-viewer gestures (see `useViewerGestures`); Esc (Base UI) or the
+ * cross closes it.
+ *
+ * Built on the Base UI primitive directly: `lib/` may not import from
+ * `components/` (boundaries rule). The diagram is laid out once at intrinsic
+ * size and moved with one CSS transform, so zoom stays crisp (vector) and never
+ * re-runs mermaid's layout.
+ */
+function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }): ReactNode {
+  const stageRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const g = useViewerGestures(stageRef, contentRef)
+
+  return (
+    <DialogPrimitive.Root
+      open
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose()
+        }
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPrimitive.Popup
+          className="fixed top-1/2 left-1/2 z-50 flex h-[90vh] w-[90vw] -translate-1/2 animate-[modal-pop_.2s_cubic-bezier(.16,1,.3,1)] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-(--shadow-pop) outline-none"
+          onKeyDown={g.onKeyDown}
+        >
+          <DialogPrimitive.Title className="sr-only">Diagram</DialogPrimitive.Title>
+          <ViewerToolbar k={g.view.k} zoomAt={g.zoomAt} fit={g.fit} />
+          <div
+            ref={stageRef}
+            className="relative flex-1 cursor-grab touch-none overflow-hidden select-none active:cursor-grabbing"
+            onPointerDown={g.onPointerDown}
+            onPointerMove={g.onPointerMove}
+            onPointerUp={g.onPointerUp}
+            onPointerCancel={g.onPointerUp}
+            onDoubleClick={g.fit}
+          >
+            <div
+              ref={contentRef}
+              className="absolute top-1/2 left-1/2"
+              style={{
+                transform: `translate(-50%, -50%) translate(${g.view.x}px, ${g.view.y}px) scale(${g.view.k})`,
+              }}
+              // Same strict-sanitised mermaid SVG as the inline copy.
+              dangerouslySetInnerHTML={{ __html: resizeSvg(svg, "viewer") }}
+            />
+          </div>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
