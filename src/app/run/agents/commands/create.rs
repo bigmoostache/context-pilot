@@ -109,6 +109,8 @@ pub(super) fn announce_agent(state: &mut State, id: &str, name: &str, branched_f
     );
     if let Some(bs) = state.get_ext_mut::<BridgeState>() {
         let _prev = bs.agent_statuses.insert(id.to_owned(), created_turn);
+        // Marks the agent as known to the view, so the adoption emitter skips it.
+        let _prev_name = bs.agent_name_memo.insert(id.to_owned(), name.to_owned());
     }
     state.flags.ui.dirty = true;
 }

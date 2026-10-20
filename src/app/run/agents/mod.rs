@@ -17,7 +17,7 @@ pub(super) use bridge::{bridge_active, emit_agent_status, emit_vitals, poll_brid
 pub(super) use commands::drain_management;
 pub(super) use messages::{emit_messages, emit_notes, emit_task_lists};
 pub(super) use observers::{emit_agent_focus, emit_behaviour};
-pub(super) use paused::{emit_agent_paused, emit_agent_renamed};
+pub(super) use paused::{emit_agent_adopted, emit_agent_paused, emit_agent_renamed};
 
 use crate::app::App;
 use cp_base::state::runtime::State;
@@ -126,7 +126,8 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
     };
     // Each emitter gets its own level-2 perf row (`loop.agents_emit.<name>`).
     // `true` = roster emitter, skipped while the roster fingerprint is unchanged.
-    let emitters: [Emitter; 10] = [
+    let emitters: [Emitter; 11] = [
+        ("emit_agent_adopted", emit_agent_adopted, true),
         ("emit_vitals", emit_vitals, false),
         ("emit_messages", emit_messages, true),
         ("emit_task_lists", emit_task_lists, false),

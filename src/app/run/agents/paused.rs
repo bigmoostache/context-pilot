@@ -14,7 +14,7 @@ use cp_mod_agents::types::AgentsState;
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
-use super::bridge::{bridge_active, emit_roster_delta};
+use super::bridge::{bridge_active, emit_roster_delta, wire_turn};
 use crate::app::App;
 
 /// Replay the agent's oplog to recover the **last per-agent paused flag
@@ -80,26 +80,76 @@ pub(in crate::app::run) fn emit_agent_paused(app: &mut App) {
     }
 }
 
+/// Seed [`BridgeState::agent_name_memo`] from the oplog roster on the first
+/// post-boot pass. The memo doubles as the set of agents the view knows.
+fn seed_name_memo(app: &mut App) {
+    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.names());
+    if seeded {
+        return;
+    }
+    let names: Vec<(String, String)> = super::oplog_roster(&app.state)
+        .map(|r| r.iter().map(|t| (t.agent_id.clone(), t.name.clone())).collect())
+        .unwrap_or_default();
+    let bs = app.state.ext_mut::<BridgeState>();
+    bs.agent_name_memo.extend(names);
+    bs.seeded.seed_names();
+}
+
+/// Emit `AgentCreated` for every live agent the view has never been told
+/// about (absent from the name memo).
+///
+/// Creation paths that skip `announce_agent` (TUI new-agent input, a delta
+/// lost on exit) otherwise leave the agent out of the view roster forever:
+/// every later `AgentStatusChanged` folds as a no-op and the web shows it idle.
+/// Runs first in the emitter table, so the status/archived/paused emitters
+/// layer the live flags on top of this creation.
+pub(in crate::app::run) fn emit_agent_adopted(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+    seed_name_memo(app);
+    let unknown: Vec<String> = {
+        let memo = &app.state.ext::<BridgeState>().agent_name_memo;
+        AgentsState::get(&app.state).agents.iter().filter(|t| !memo.contains_key(&t.id)).map(|t| t.id.clone()).collect()
+    };
+    for agent_id in unknown {
+        let (name, parent_agent_id) = AgentsState::get(&app.state)
+            .agents
+            .iter()
+            .find(|t| t.id == agent_id)
+            .map(|t| (t.name.clone(), t.parent_agent_id.clone()))
+            .unwrap_or_default();
+        let status = wire_turn(cp_mod_agents::types::turn::status(&app.state, &agent_id));
+        log::info!("bridge: adopting unannounced agent {agent_id} into the view roster");
+        emit_roster_delta(
+            &app.state,
+            OpEntryKind::AgentCreated {
+                agent_id: agent_id.clone(),
+                name: name.clone(),
+                status,
+                timestamp_ms: cp_base::panels::now_ms(),
+                branched_from: None,
+                parent_agent_id,
+            },
+        );
+        let bs = app.state.ext_mut::<BridgeState>();
+        let _prev_status = bs.agent_statuses.insert(agent_id.clone(), status);
+        let _prev_name = bs.agent_name_memo.insert(agent_id, name);
+    }
+}
+
 /// Emit `AgentRenamed` the instant any agent's display name changes — same
 /// observe-on-change discipline, over [`BridgeState::agent_name_memo`]. Every
 /// rename source (web command, TUI Ctrl+R, `Agent` tool) only mutates
 /// `agent.name`; this is the single emitter.
 ///
-/// An agent missing from the memo (created after the seed) is adopted
-/// silently: its `AgentCreated` already carried the name.
+/// An agent missing from the memo is adopted silently (defensive: the
+/// adoption emitter normally registers it first).
 pub(in crate::app::run) fn emit_agent_renamed(app: &mut App) {
     if !bridge_active(&app.state) {
         return;
     }
-    let seeded = app.state.get_ext::<BridgeState>().is_some_and(|bs| bs.seeded.names());
-    if !seeded {
-        let names: Vec<(String, String)> = super::oplog_roster(&app.state)
-            .map(|r| r.iter().map(|t| (t.agent_id.clone(), t.name.clone())).collect())
-            .unwrap_or_default();
-        let bs = app.state.ext_mut::<BridgeState>();
-        bs.agent_name_memo.extend(names);
-        bs.seeded.seed_names();
-    }
+    seed_name_memo(app);
     // (id, name, emit?) for every agent whose memo entry is missing or stale.
     let changed: Vec<(String, String, bool)> = {
         let memo = &app.state.ext::<BridgeState>().agent_name_memo;
