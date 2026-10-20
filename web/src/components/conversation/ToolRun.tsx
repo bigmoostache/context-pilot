@@ -5,17 +5,6 @@ import { parseAutoLine } from "@/lib/support/agentMessages"
 import { prefersReducedMotion } from "@/lib/utils"
 import type { AgentMsg } from "@/lib/types"
 
-/** Up to three distinct tool names, in first-use order, for the collapsed summary. */
-function toolDigest(msgs: AgentMsg[]): string {
-  const seen: string[] = []
-  for (const m of msgs) {
-    const { tool } = parseAutoLine(m)
-    if (tool && !seen.includes(tool)) seen.push(tool)
-  }
-  const head = seen.slice(0, 3).join(", ")
-  return seen.length > 3 ? `${head} +${String(seen.length - 3)}` : head
-}
-
 /** `[data-slide]` spans per timeline row (verb, intent): maps a span index to its row. */
 const SLIDES_PER_ROW = 2
 
@@ -72,7 +61,7 @@ function animateRows(body: HTMLElement, open: boolean, fresh: boolean): JSAnimat
 
 /**
  * A run of consecutive tool-activity traces, collapsed to one quiet summary
- * line ("12 tool calls · Edit, Git, Send"). Opening it unfolds a hairline
+ * line ("12 tool calls"). Opening it unfolds a hairline
  * timeline of verb · intent rows (the tool name is not shown).
  *
  * Motion is anime.js: the body's height tweens from its current value (so a
@@ -158,10 +147,6 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
         />
         <span className="font-medium tabular-nums">
           {n} tool call{n === 1 ? "" : "s"}
-        </span>
-        <span className="text-muted-foreground/35">·</span>
-        <span className="truncate font-mono text-[10.5px] text-muted-foreground/50">
-          {toolDigest(msgs)}
         </span>
       </button>
       {mounted && (
