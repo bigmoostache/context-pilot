@@ -99,6 +99,11 @@ function foldAgentCreated(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
  * the agent is unknown (→ hydrate). Shared by the archived/restored and
  * paused/resumed case pairs, which differ only in which field they set.
  */
+/** `agent_renamed`: set the row's name; a delta without a name → `null` (hydrate). */
+function foldAgentRenamed(prev: AgentDetail[], k: Kind): AgentDetail[] | null {
+  return typeof k.name === "string" ? foldAgentFlag(prev, k.agent_id, { name: k.name }) : null
+}
+
 function foldAgentFlag(
   prev: AgentDetail[],
   agentId: string | undefined,
@@ -276,6 +281,9 @@ export function applyAgentDelta(
     }
     case "agent_resumed": {
       return foldAgentFlag(prev, k.agent_id, { paused: false })
+    }
+    case "agent_renamed": {
+      return foldAgentRenamed(prev, k)
     }
     case "agent_deleted": {
       return foldAgentDeleted(prev, k)

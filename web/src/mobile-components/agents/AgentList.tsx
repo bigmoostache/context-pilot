@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { animate, stagger } from "animejs"
 import {
   Search,
@@ -10,6 +10,7 @@ import {
   Trash2,
   Plus,
   ChevronRight,
+  Pencil,
   LayoutGrid,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
@@ -20,6 +21,7 @@ import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { previewOf, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { PendingSpinner } from "@/mobile-components/ui/pending"
+import { RenameInput } from "./dialogs/RenameInput"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 
 interface AgentListProps {
@@ -41,6 +43,8 @@ interface AgentListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single agent (T371) */
   onPause: (id: string) => void
+  /** rename a live agent */
+  onRename: (id: string, name: string) => void
   /** create a agent named `name` — the bottom search field doubles as the
    *  create input, so its current value IS the new agent's name (T633) */
   onNewAgent: (name: string) => void
@@ -69,11 +73,12 @@ export function AgentList({
   onArchive,
   onDelete,
   onPause,
+  onRename,
   onNewAgent,
 }: AgentListProps) {
-  // The bottom search/create bar floats as a glass overlay (T637), so reserve a
-  // 1.5× bottom spacer in the scroll content sized from its measured height —
-  // the last row must scroll clear of the frosted bar. Mirrors the composer.
+  const [renamingId, setRenamingId] = useState<string | null>(null) // swipe → Rename row
+  // The bottom bar floats as glass (T637): a 1.5× spacer sized from its measured
+  // height lets the last row scroll clear of it. Mirrors the composer.
   const barRef = useRef<HTMLDivElement>(null)
   const barH = useElementHeight(barRef)
 
@@ -141,9 +146,8 @@ export function AgentList({
           so the caption was redundant chrome — dropped, and the archived list
           now pads + scrolls edge-to-edge exactly like the live list. */}
       <ScrollArea className="min-h-0 flex-1">
-        {/* pad the top so the first row clears the floating corner buttons AND
-            sits below the iOS status bar at rest, while scrolling edge-to-edge
-            UNDER it — applied in BOTH live and archived modes now (T639). */}
+        {/* top pad clears the corner buttons + iOS status bar at rest; content
+            still scrolls edge-to-edge UNDER it, live and archived (T639). */}
         <div className="pt-[calc(env(safe-area-inset-top)+3rem)]">
           {visible.length === 0 ? (
             <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
@@ -151,23 +155,28 @@ export function AgentList({
             <ul ref={listRef} className="flex flex-col">
               {visible.map((t) => (
                 <li key={t.id}>
-                  <SwipeRow
-                    archived={showArchived}
-                    isPaused={!showArchived && Boolean(t.paused)}
-                    onArchive={() => onArchive(t.id)}
-                    onDelete={() => onDelete(t.id)}
-                    onPause={() => onPause(t.id)}
-                  >
-                    <AgentRow
-                      t={t}
-                      selected={t.id === selectedId}
+                  {renamingId === t.id ? (
+                    <RenameRow t={t} onRename={onRename} onDone={() => setRenamingId(null)} />
+                  ) : (
+                    <SwipeRow
                       archived={showArchived}
-                      onSelect={(id) => {
-                        if (!t.pending) onSelect(id)
-                      }}
-                      guide={guides.get(t.id)}
-                    />
-                  </SwipeRow>
+                      isPaused={!showArchived && Boolean(t.paused)}
+                      onArchive={() => onArchive(t.id)}
+                      onDelete={() => onDelete(t.id)}
+                      onPause={() => onPause(t.id)}
+                      onRename={() => setRenamingId(t.id)}
+                    >
+                      <AgentRow
+                        t={t}
+                        selected={t.id === selectedId}
+                        archived={showArchived}
+                        onSelect={(id) => {
+                          if (!t.pending) onSelect(id)
+                        }}
+                        guide={guides.get(t.id)}
+                      />
+                    </SwipeRow>
+                  )}
                 </li>
               ))}
             </ul>
@@ -352,8 +361,33 @@ function TreeGuides({ depth, guide }: { depth: number; guide: TreeGuide | undefi
 
 // ── swipe-to-reveal actions ──────────────────────────────────────────
 
-/** Pixel width of the revealed action strip (two 68px action buttons). */
-const ACTION_W = 136
+/** A row swapped for the inline name editor (swipe → Rename); `onDone` always fires. */
+function RenameRow({
+  t,
+  onRename,
+  onDone,
+}: {
+  t: AgentDetail
+  onRename: (id: string, name: string) => void
+  onDone: () => void
+}) {
+  return (
+    <div className="flex items-center px-4 py-2.5">
+      <RenameInput
+        name={t.name}
+        className="py-1 text-[16px]"
+        onCommit={(next) => {
+          onDone()
+          onRename(t.id, next)
+        }}
+        onCancel={onDone}
+      />
+    </div>
+  )
+}
+
+/** Width of one 68px swipe action button; live rows show 3, archived rows 2. */
+const ACTION_BTN_W = 68
 
 /**
  * Wrap a row so a **left-swipe** slides it aside to reveal its trailing actions
@@ -369,6 +403,7 @@ function SwipeRow({
   onArchive,
   onDelete,
   onPause,
+  onRename,
 }: {
   children: React.ReactNode
   archived: boolean
@@ -376,20 +411,34 @@ function SwipeRow({
   onArchive: () => void
   onDelete: () => void
   onPause: () => void
+  onRename: () => void
 }) {
-  const { rowRef, close, bind } = useSwipeRow(ACTION_W)
+  const actionW = ACTION_BTN_W * (archived ? 2 : 3)
+  const { rowRef, close, bind } = useSwipeRow(actionW)
 
-  // Second action is delete for an archived row (permanent), else pause/resume.
+  // Live row: rename / archive / pause. Archived row: restore / delete.
   return (
     <div className="relative overflow-hidden">
       {/* action strip — behind the row content, pinned to the right edge */}
-      <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTION_W }}>
+      <div className="absolute inset-y-0 right-0 flex" style={{ width: actionW }}>
+        {!archived && (
+          <button
+            onClick={() => {
+              close()
+              onRename()
+            }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-muted-foreground text-[11px] font-medium text-white"
+          >
+            <Pencil className="size-4" />
+            Rename
+          </button>
+        )}
         <button
           onClick={() => {
             onArchive()
             close()
           }}
-          className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
+          className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
         >
           {archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
           {archived ? "Restore" : "Archive"}
@@ -400,7 +449,7 @@ function SwipeRow({
               onDelete()
               close()
             }}
-            className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--danger) text-[11px] font-medium text-white"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--danger) text-[11px] font-medium text-white"
           >
             <Trash2 className="size-4" />
             Delete
@@ -411,7 +460,7 @@ function SwipeRow({
               onPause()
               close()
             }}
-            className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
           >
             {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
             {isPaused ? "Resume" : "Pause"}

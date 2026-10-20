@@ -194,6 +194,8 @@ export interface Actions extends BranchActions {
   agents: AgentDetail[]
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
+  /** rename an agent; the `agent_renamed` delta updates the list */
+  handleRename: (id: string, name: string) => void
   handleDelete: (id: string) => void
   handleCreate: (opts: CreateAgentOpts) => void
   /** resolves false when the send failed, so the composer restores its text */
@@ -295,6 +297,15 @@ export function useAgentActions(
     [agents, activeFleetId, flash, offerUndo],
   )
 
+  const handleRename = useCallback(
+    (id: string, name: string) => {
+      sendCommand(activeFleetId, { kind: "rename_agent", agent_id: id, name }).catch((e: unknown) =>
+        flash(describeCommandError("rename the agent", e)),
+      )
+    },
+    [activeFleetId, flash],
+  )
+
   const handleDelete = useCallback(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
@@ -346,6 +357,7 @@ export function useAgentActions(
     agents: view,
     handleArchive,
     handlePause,
+    handleRename,
     handleDelete,
     handleCreate,
     handleSend,

@@ -1,5 +1,5 @@
-import { Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
-import { useRef } from "react"
+import { Archive, ArchiveRestore, ChevronLeft, Pause, Pencil, Play, Trash2 } from "lucide-react"
+import { useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { PendingSpinner } from "@/components/ui/pending"
 import { Tip } from "@/components/ui/tip"
@@ -10,6 +10,7 @@ import { dotColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/sup
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useAgentReadState } from "@/lib/live/agentView"
 import { AgentSearchPalette } from "./dialogs/AgentSearchPalette"
+import { RenameInput } from "./dialogs/RenameInput"
 
 interface AgentListProps {
   /** all of the realm's agents (archived included) — filtering happens here */
@@ -25,6 +26,8 @@ interface AgentListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single agent (T371) */
   onPause: (id: string) => void
+  /** rename a live agent */
+  onRename: (id: string, name: string) => void
   /** Search-palette open state — CONTROLLED (trigger lives in the header rail,
    *  a sibling of this view; the palette renders here for the list + agent). */
   searchOpen: boolean
@@ -47,6 +50,7 @@ export function AgentList({
   onArchive,
   onDelete,
   onPause,
+  onRename,
   searchOpen,
   onSearchOpenChange,
 }: AgentListProps) {
@@ -82,6 +86,7 @@ export function AgentList({
       }}
       onArchive={onArchive}
       onPause={archivedRow ? undefined : onPause}
+      onRename={archivedRow ? undefined : onRename}
       onDelete={archivedRow ? onDelete : undefined}
       archived={archivedRow}
       navHint={navHintOf(t.id)}
@@ -213,12 +218,36 @@ function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HT
   )
 }
 
+/** The row title's inline name editor; `onDone` fires on commit and cancel. */
+function RowRenameInput({
+  t,
+  onRename,
+  onDone,
+}: {
+  t: AgentDetail
+  onRename: (id: string, name: string) => void
+  onDone: () => void
+}) {
+  return (
+    <RenameInput
+      name={t.name}
+      className="text-[13px] font-medium"
+      onCommit={(name) => {
+        onDone()
+        onRename(t.id, name)
+      }}
+      onCancel={onDone}
+    />
+  )
+}
+
 function AgentRow({
   t,
   selected,
   onSelect,
   onArchive,
   onPause,
+  onRename,
   onDelete,
   archived,
   navHint,
@@ -230,6 +259,7 @@ function AgentRow({
   onSelect: (id: string) => void
   onArchive: (id: string) => void
   onPause?: ((id: string) => void) | undefined
+  onRename?: ((id: string, name: string) => void) | undefined
   onDelete?: ((id: string) => void) | undefined
   archived?: boolean | undefined
   /** Which loop-nav arrow badge this row shows while ⌘/Ctrl is held (T634). */
@@ -242,6 +272,7 @@ function AgentRow({
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
   const marquee = useTitleMarquee()
+  const [renaming, setRenaming] = useState(false)
 
   return (
     <div
@@ -263,18 +294,25 @@ function AgentRow({
         <StatusDot t={t} archived={Boolean(archived)} />
         {isFocused && <StatusBadge tone="ok" label="focused" />}
         {isPaused && <StatusBadge tone="warn" label="paused" />}
-        <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
+        {renaming && onRename ? (
+          <RowRenameInput t={t} onRename={onRename} onDone={() => setRenaming(false)} />
+        ) : (
+          <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
+        )}
         {t.pending && <PendingSpinner />}
         <span className="relative ml-auto flex shrink-0 items-center">
           <UnreadBadge count={archived ? 0 : (t.unread ?? 0)} />
-          <RowActions
-            id={t.id}
-            archived={Boolean(archived)}
-            isPaused={Boolean(isPaused)}
-            onArchive={onArchive}
-            onDelete={onDelete}
-            onPause={onPause}
-          />
+          {!renaming && (
+            <RowActions
+              id={t.id}
+              archived={Boolean(archived)}
+              isPaused={Boolean(isPaused)}
+              onArchive={onArchive}
+              onDelete={onDelete}
+              onPause={onPause}
+              onRename={() => setRenaming(true)}
+            />
+          )}
         </span>
       </div>
     </div>
@@ -353,7 +391,7 @@ function UnreadBadge({ count }: { count: number }) {
   )
 }
 
-/** Hover-revealed row actions: archive/restore, delete (archived), pause/resume (live). Each stops propagation so it doesn't select the row. */
+/** Hover-revealed row actions: archive/restore, delete (archived), rename + pause/resume (live). Each stops propagation so it doesn't select the row. */
 function RowActions({
   id,
   archived,
@@ -361,6 +399,7 @@ function RowActions({
   onArchive,
   onDelete,
   onPause,
+  onRename,
 }: {
   id: string
   archived: boolean
@@ -368,9 +407,14 @@ function RowActions({
   onArchive: (id: string) => void
   onDelete?: ((id: string) => void) | undefined
   onPause?: ((id: string) => void) | undefined
+  /** opens the inline name editor */
+  onRename?: (() => void) | undefined
 }) {
   return (
     <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      {!archived && onRename && (
+        <RowAction copy={ROW_ACTION_COPY.rename} icon={Pencil} onClick={onRename} />
+      )}
       <RowAction
         copy={ROW_ACTION_COPY[archived ? "restore" : "archive"]}
         icon={archived ? ArchiveRestore : Archive}

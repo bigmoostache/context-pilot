@@ -252,6 +252,7 @@ export const ROW_ACTION_COPY = {
   },
   pause: { title: "Pause", body: "Stop this agent from running. Queued messages wait." },
   resume: { title: "Resume", body: "Let this agent run again." },
+  rename: { title: "Rename", body: "Change this agent's name. Enter saves, Esc cancels." },
 } as const
 
 /** The turn-status banner shown above the composer input, or null. */

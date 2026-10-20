@@ -205,6 +205,7 @@ export function AgentsView({
           onArchive={actions.handleArchive}
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
+          onRename={actions.handleRename}
           onNewAgent={(name) => {
             actions.handleCreate({ title: name, firstMessage: "", files: [], paused: false })
             setDrawerOpen(false)

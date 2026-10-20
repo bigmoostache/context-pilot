@@ -130,6 +130,7 @@ export function AgentsView({
           onArchive={actions.handleArchive}
           onDelete={actions.handleDelete}
           onPause={actions.handlePause}
+          onRename={actions.handleRename}
           searchOpen={searchOpen}
           onSearchOpenChange={onSearchOpenChange}
         />
