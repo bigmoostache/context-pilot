@@ -179,10 +179,10 @@ export function parseDraft(key: string | undefined): Draft {
   return { text: raw, selStart: raw.length, selEnd: raw.length }
 }
 
-/** A sidebar row's status-square colour: brown when the backend lights it,
- *  grey otherwise (always grey once archived). */
+/** A sidebar row's status-square colour: the old dot's orange-brown when the
+ *  backend lights it, grey otherwise (always grey once archived). */
 export function litColor(t: AgentDetail, archived: boolean): string {
-  return !archived && t.lit ? "var(--lit)" : "var(--muted-foreground)"
+  return !archived && t.lit ? "var(--lit)" : "var(--unlit)"
 }
 
 /** Where a sidebar row's hierarchy lines run (see {@link treeGuides}). */
