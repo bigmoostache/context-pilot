@@ -253,8 +253,79 @@ pub(super) fn deploy() -> Value {
                 "hits": arr(r("ConvHit"))
             },
             "required": ["hits"]
-        }
+        },
+        // ── PPTX preview (fs/slides) ─────────────────────────────────
+        // Geometry in EMU, font sizes in 1/100 pt, colours CSS strings.
+        "SlideDeck": obj(json!({
+            "width": int(), "height": int(), "slides": arr(r("Slide")), "truncated": boolean()
+        }), &["width", "height", "slides", "truncated"]),
+        "Slide": obj(json!({
+            "index": int(), "hidden": boolean(), "background": string(),
+            "shapes": arr(r("SlideShape")), "notes": string()
+        }), &["index", "hidden", "shapes"]),
+        "SlideShape": obj(json!({
+            "name": string(), "x": int(), "y": int(), "w": int(), "h": int(), "rot": int(),
+            "flipH": boolean(), "flipV": boolean(),
+            "path": { "type": "string", "description": "SVG path in the shape's own EMU box." },
+            "fill": { "type": "string", "description": "CSS colour or gradient." },
+            "stroke": r("SlideStroke"),
+            "image": { "type": "string", "description": "data: URL of the picture fill." },
+            "text": r("SlideTextBody"), "table": r("SlideTable")
+        }), &["name", "x", "y", "w", "h", "rot", "flipH", "flipV"]),
+        "SlideStroke": obj(json!({
+            "color": string(), "width": int(), "dash": string(), "head": string(), "tail": string()
+        }), &["color", "width"]),
+        "SlideTextBody": obj(json!({
+            "anchor": string(), "insets": arr(int()), "wrap": boolean(), "fontScale": int(),
+            "vert": string(), "paragraphs": arr(r("SlideParagraph"))
+        }), &["anchor", "insets", "wrap", "fontScale", "paragraphs"]),
+        "SlideParagraph": obj(json!({
+            "align": string(), "marginLeft": int(), "indent": int(),
+            "lineSpacing": { "type": "integer", "description": "Positive: 1/1000 percent; negative: 1/100 pt." },
+            "spaceBefore": int(), "spaceAfter": int(), "bullet": r("SlideBullet"),
+            "endSize": int(), "runs": arr(r("SlideRun"))
+        }), &["align", "marginLeft", "indent", "lineSpacing", "spaceBefore", "spaceAfter", "endSize", "runs"]),
+        "SlideBullet": obj(json!({
+            "text": string(), "color": string(), "font": string(), "scale": int()
+        }), &["text", "scale"]),
+        "SlideRun": obj(json!({
+            "text": string(), "size": int(), "bold": boolean(), "italic": boolean(),
+            "underline": boolean(), "strike": boolean(), "color": string(), "font": string(),
+            "highlight": string(), "baseline": int(), "caps": string(), "link": string()
+        }), &["text", "size", "bold", "italic", "underline", "strike", "color", "font", "baseline"]),
+        "SlideTable": obj(json!({ "cols": arr(int()), "rows": arr(r("SlideTableRow")) }), &["cols", "rows"]),
+        "SlideTableRow": obj(json!({ "height": int(), "cells": arr(r("SlideTableCell")) }), &["height", "cells"]),
+        "SlideTableCell": obj(json!({
+            "colSpan": int(), "rowSpan": int(), "merged": boolean(), "fill": string(),
+            "borders": { "type": "array", "items": { "allOf": [r("SlideStroke")], "nullable": true },
+                         "description": "Left, top, right, bottom." },
+            "text": r("SlideTextBody")
+        }), &["colSpan", "rowSpan", "merged", "borders", "text"])
         // The `ItNetwork*` schemas live in [`schemas_net`](super::schemas_net),
         // together with the request bodies they share their field lists with.
     })
+}
+
+/// Object schema from `properties` with the `required` names.
+fn obj(properties: Value, required: &[&str]) -> Value {
+    let mut schema = serde_json::Map::new();
+    drop(schema.insert("type".into(), json!("object")));
+    drop(schema.insert("properties".into(), properties));
+    drop(schema.insert("required".into(), json!(required)));
+    Value::Object(schema)
+}
+
+/// `{"type": "integer"}`.
+fn int() -> Value {
+    json!({ "type": "integer" })
+}
+
+/// `{"type": "string"}`.
+fn string() -> Value {
+    json!({ "type": "string" })
+}
+
+/// `{"type": "boolean"}`.
+fn boolean() -> Value {
+    json!({ "type": "boolean" })
 }

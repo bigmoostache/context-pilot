@@ -11,6 +11,8 @@
 //! workbook can't balloon the response; `truncated` flags when either cap (or
 //! the multi-sheet limit) clipped the data.
 
+mod univer;
+
 use std::sync::Mutex;
 
 use calamine::{Data, Reader as _, open_workbook_auto};
@@ -105,7 +107,7 @@ pub(crate) fn fs_sheet_save(state: &Mutex<Backend>, fleet_id: &str, query: &str,
     let Ok(snapshot) = serde_json::from_slice::<serde_json::Value>(body) else {
         return HttpReply::error(400, "body is not a JSON snapshot");
     };
-    match super::univer::save(&target, &snapshot) {
+    match univer::save(&target, &snapshot) {
         Ok(patched) => HttpReply::ok(&serde_json::json!({
             "written": target.metadata().map_or(0, |m| m.len()),
             "path": relative,
@@ -125,19 +127,19 @@ fn save_guard(target: &std::path::Path) -> Option<HttpReply> {
     if !matches!(ext.as_str(), "xlsx" | "xlsm") {
         return Some(HttpReply::error(415, "only xlsx/xlsm can be patched"));
     }
-    (target.metadata().map_or(0, |m| m.len()) > super::univer::MAX_FILE_BYTES)
+    (target.metadata().map_or(0, |m| m.len()) > univer::MAX_FILE_BYTES)
         .then(|| HttpReply::error(413, "workbook too large"))
 }
 
-/// Full-fidelity `xlsx`/`xlsm` reply: `413` over [`super::univer::MAX_FILE_BYTES`],
+/// Full-fidelity `xlsx`/`xlsm` reply: `413` over [`univer::MAX_FILE_BYTES`],
 /// else the Univer snapshot (`workbook` + `activeSheet`, empty `sheets`).
 /// `None` when umya can't read the file, so the caller falls back to calamine.
 fn univer_reply(target: &std::path::Path) -> Option<HttpReply> {
     let size = target.metadata().map_or(0, |m| m.len());
-    if size > super::univer::MAX_FILE_BYTES {
+    if size > univer::MAX_FILE_BYTES {
         return Some(HttpReply::error(413, "workbook too large to preview"));
     }
-    let out = super::univer::convert_cached(target)?;
+    let out = univer::convert_cached(target)?;
     Some(HttpReply::ok(&serde_json::json!({
         "sheets": [],
         "truncated": out.truncated,

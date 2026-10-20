@@ -9,7 +9,9 @@
 //!
 //! * [`listing`] — read views: `fs_list`, `fs_preview`, `fs_descriptions`,
 //!   `conversation`.
-//! * [`sheet`] — spreadsheet → table JSON (`fs_sheet`, CSV/TSV/xlsx/xls/ods).
+//! * [`sheet`] — spreadsheet → table JSON (`fs_sheet`, CSV/TSV/xlsx/xls/ods),
+//!   with the full-fidelity Univer converter under `sheet::univer`.
+//! * [`slides`] — `PowerPoint` → resolved slide model (`fs_slides`, pptx).
 //! * [`mutate`] — writes: `fs_upload`, `fs_write`, `fs_mkdir`, `fs_rename`,
 //!   `fs_move`, `fs_trash`.
 //! * [`download`] — raw file / zipped-folder download (`fs_download`) and the
@@ -24,8 +26,8 @@ mod download;
 mod listing;
 mod mutate;
 mod sheet;
+mod slides;
 pub(super) mod support;
-mod univer;
 mod upload;
 
 pub(crate) use download::{fs_download, fs_raw};
@@ -34,4 +36,5 @@ pub(crate) use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
 // Private re-export so sibling `upload` can reach these via `super::`.
 use mutate::{is_bare_name, rel_child};
 pub(crate) use sheet::{fs_sheet, fs_sheet_save};
+pub(crate) use slides::fs_slides;
 pub(crate) use upload::{fs_upload, fs_upload_unique};
