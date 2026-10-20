@@ -333,46 +333,57 @@ pub mod test_helpers {
     }
 }
 
-/// Format a slice of messages into a text chunk for `ConversationHistory` panels.
-///
-/// Skips Deleted/Detached messages. Uses the same format the LLM sees:
-/// tool calls as `tool_call name(json)`, tool results as raw content,
-/// and text messages as `[role]: content`.
-#[must_use]
-pub fn format_messages_to_chunk(messages: &[Message]) -> String {
-    use std::fmt::Write as _;
+/// Single-key YAML mapping `{key: value}` — one history list item.
+fn yaml_entry(key: &str, value: serde_yaml::Value) -> serde_yaml::Value {
+    let mut map = serde_yaml::Mapping::new();
+    drop(map.insert(serde_yaml::Value::String(key.to_owned()), value));
+    serde_yaml::Value::Mapping(map)
+}
 
-    let mut output = String::new();
-    for msg in messages {
-        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-            continue;
+/// Append the YAML history items for one message (a tool-call message can
+/// carry several calls, a tool-result message several results).
+fn push_yaml_items(msg: &Message, items: &mut Vec<serde_yaml::Value>) {
+    use serde_yaml::{Mapping, Value};
+    match msg.msg_type {
+        MsgKind::ToolCall => {
+            for tu in &msg.tool_uses {
+                let mut call = Mapping::new();
+                drop(call.insert(Value::String("name".to_owned()), Value::String(tu.name.clone())));
+                let input = serde_yaml::to_value(&tu.input).unwrap_or(Value::Null);
+                drop(call.insert(Value::String("input".to_owned()), input));
+                items.push(yaml_entry("tool_call", Value::Mapping(call)));
+            }
         }
-        match msg.msg_type {
-            MsgKind::ToolCall => {
-                for tu in &msg.tool_uses {
-                    let _r = writeln!(
-                        output,
-                        "tool_call {}({})",
-                        tu.name,
-                        serde_json::to_string(&tu.input).unwrap_or_default()
-                    );
-                }
+        MsgKind::ToolResult => {
+            for tr in &msg.tool_results {
+                let body = tr.tldr.as_deref().unwrap_or(&tr.content);
+                items.push(yaml_entry("tool_result", Value::String(body.to_owned())));
             }
-            MsgKind::ToolResult => {
-                for tr in &msg.tool_results {
-                    // When detaching into history, prefer the tldr so verbose
-                    // Think bodies shrink to their essence. Falls through to
-                    // the full content when no tldr was provided.
-                    let body = tr.tldr.as_deref().unwrap_or(&tr.content);
-                    let _r = writeln!(output, "{body}");
-                }
-            }
-            MsgKind::TextMessage => {
-                if !msg.content.is_empty() {
-                    let _r = writeln!(output, "[{}]: {}", msg.role, msg.content);
-                }
+        }
+        MsgKind::TextMessage => {
+            if !msg.content.is_empty() {
+                items.push(yaml_entry(&msg.role, Value::String(msg.content.clone())));
             }
         }
     }
-    output
+}
+
+/// Render messages as a YAML sequence for a frozen conversation-history panel.
+///
+/// The same string is sent to the LLM and shown verbatim in the TUI. One entry
+/// per item: `- user: |`, `- assistant: |`, `- tool_call: {name, input}`,
+/// `- tool_result: |`. Tool results prefer their `tldr` so verbose Think
+/// bodies shrink to their essence. Deleted/Detached messages are skipped.
+#[must_use]
+pub fn format_messages_to_chunk(messages: &[Message]) -> String {
+    let mut items: Vec<serde_yaml::Value> = Vec::new();
+    for msg in messages {
+        if msg.status != MsgStatus::Deleted && msg.status != MsgStatus::Detached {
+            push_yaml_items(msg, &mut items);
+        }
+    }
+    if items.is_empty() {
+        return String::new();
+    }
+    serde_yaml::to_string(&items).unwrap_or_default()
 }
