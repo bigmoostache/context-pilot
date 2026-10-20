@@ -759,3 +759,70 @@ html.mobile.standalone .mobile-shell {
   font-size: 12px;
   gap: 2px;
 }
+
+/* Sidebar agent rows (AgentList): a signal-tinted spotlight follows the cursor
+   (--mx/--my fed by SelectionGlide), the row lifts onto a card, the status dot
+   springs up, and a press dips the row. Selected rows keep the gliding card. */
+.agent-row {
+  --mx: 50%;
+  --my: 50%;
+
+  isolation: isolate;
+  transition:
+    background-color 260ms ease-out,
+    box-shadow 320ms ease-out,
+    scale 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.agent-row::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    140px circle at var(--mx) var(--my),
+    color-mix(in oklab, var(--signal) 18%, transparent),
+    transparent 70%
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 380ms ease-out;
+}
+
+.agent-row:hover::before {
+  opacity: 1;
+  transition-duration: 140ms;
+}
+
+.agent-row:active {
+  scale: 0.975;
+  transition-duration: 260ms, 320ms, 90ms;
+}
+
+.agent-row:not([data-selected]):hover {
+  background-color: color-mix(in oklab, var(--card) 75%, transparent);
+  box-shadow: var(--shadow-card);
+  transition-duration: 140ms, 180ms, 420ms;
+}
+
+.agent-row .agent-dot {
+  transition: scale 460ms cubic-bezier(0.34, 1.8, 0.64, 1);
+}
+
+.agent-row:hover .agent-dot {
+  scale: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-row,
+  .agent-row::before,
+  .agent-row .agent-dot {
+    transition: none;
+  }
+
+  .agent-row:active,
+  .agent-row:hover .agent-dot {
+    scale: none;
+  }
+}
