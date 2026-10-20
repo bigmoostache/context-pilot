@@ -114,7 +114,9 @@ function TaskRow({
     <div
       className={
         "relative flex items-start gap-2 rounded-md py-[5px] pr-2" +
-        (parent ? " cursor-pointer hover:bg-muted/45" : "")
+        (parent
+          ? " group/row cursor-pointer transition-colors duration-150 hover:bg-muted/50 active:bg-muted/70"
+          : "")
       }
       style={{ paddingLeft: PAD + depth * INDENT }}
       title={task.description ?? undefined}
@@ -147,11 +149,11 @@ function TaskRow({
         {task.name}
       </span>
       {parent && (
-        <span className="flex h-[18px] shrink-0 items-center gap-1 text-[10.5px] text-foreground/65 tabular-nums">
+        <span className="flex h-[18px] shrink-0 items-center gap-1 text-[10.5px] text-foreground/65 tabular-nums transition-colors group-hover/row:text-foreground/85">
           {progress.done}/{progress.total}
           <ChevronRight
             className={
-              "size-3 text-foreground/55 transition-transform duration-150" +
+              "size-3 text-foreground/55 transition-[transform,color] duration-150 group-hover/row:text-foreground/85" +
               (collapsed ? "" : " rotate-90")
             }
           />
@@ -303,21 +305,22 @@ export function NoteList({
           key={note.id}
           type="button"
           onClick={() => onSelect(note.id)}
-          className="flex w-full items-start gap-2 rounded-md px-2 py-[7px] text-left transition-colors hover:bg-muted/45"
+          className="group/note flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-[7px] text-left transition-colors duration-150 hover:bg-muted/50 active:bg-muted/70"
         >
           <span className="flex h-[18px] shrink-0 items-center">
-            <NotepadText className="size-[14px] text-foreground/55" />
+            <NotepadText className="size-[14px] text-foreground/55 transition-colors group-hover/note:text-foreground/85" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[12.5px]/[18px] font-medium text-foreground">
               {note.title}
             </span>
             {excerpt(note.content) && (
-              <span className="mt-0.5 line-clamp-2 text-[11.5px]/[16px] text-foreground/65">
+              <span className="mt-0.5 line-clamp-2 text-[11.5px]/[16px] text-foreground/65 transition-colors group-hover/note:text-foreground/80">
                 {excerpt(note.content)}
               </span>
             )}
           </span>
+          <ChevronRight className="mt-[3px] size-3 shrink-0 -translate-x-0.5 text-foreground/55 opacity-0 transition-[opacity,transform] duration-200 group-hover/note:translate-x-0 group-hover/note:opacity-100 motion-reduce:transition-none" />
         </button>
       ))}
     </div>
