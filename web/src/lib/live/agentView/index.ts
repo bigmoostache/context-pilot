@@ -92,7 +92,22 @@ export function useAgentSelection(
   const [ownSelectedId, setOwnSelectedId] = useState(() => localStorage.getItem(agentKey) ?? "")
   const controlled = controlledSelection !== undefined
   const selectedId = controlled ? controlledSelection.selectedId : ownSelectedId
-  const setSelectedId = controlled ? controlledSelection.setSelectedId : setOwnSelectedId
+  const setRawSelectedId = controlled ? controlledSelection.setSelectedId : setOwnSelectedId
+  // Selecting an agent also moves the human's focus agent-side, so the footer
+  // (status, context, cost — all built from the focused agent) follows the
+  // sidebar. Fire-and-forget: a lost focus command only leaves the footer on
+  // the previous agent.
+  const setSelectedId = useCallback(
+    (id: string) => {
+      setRawSelectedId(id)
+      if (id) {
+        sendCommand(activeFleetId, { kind: "focus_agent", agent_id: id }).catch((e: unknown) => {
+          console.warn("focus_agent failed", e)
+        })
+      }
+    },
+    [activeFleetId, setRawSelectedId],
+  )
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])

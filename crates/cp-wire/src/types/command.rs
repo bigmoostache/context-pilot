@@ -144,6 +144,14 @@ pub enum Kind {
         name: String,
     },
 
+    /// Move the human's focus to an agent (the web sidebar selection), so the
+    /// footer — built from the focused agent — tracks what the user is viewing.
+    #[serde(rename = "focus_agent")]
+    FocusAgent {
+        /// Agent to focus.
+        agent_id: String,
+    },
+
     /// Resume a previously paused agent.
     #[serde(rename = "resume_agent", alias = "resume_thread")]
     ResumeAgent {
