@@ -16,8 +16,8 @@ function toolDigest(msgs: AgentMsg[]): string {
   return seen.length > 3 ? `${head} +${String(seen.length - 3)}` : head
 }
 
-/** `[data-slide]` spans per timeline row (verb, tool, intent): maps a span index to its row. */
-const SLIDES_PER_ROW = 3
+/** `[data-slide]` spans per timeline row (verb, intent): maps a span index to its row. */
+const SLIDES_PER_ROW = 2
 
 /**
  * Staggered row reveal/hide inside `body`. Rows only fade, so their dots stay
@@ -73,7 +73,7 @@ function animateRows(body: HTMLElement, open: boolean, fresh: boolean): JSAnimat
 /**
  * A run of consecutive tool-activity traces, collapsed to one quiet summary
  * line ("12 tool calls · Edit, Git, Send"). Opening it unfolds a hairline
- * timeline of verb · tool · intent rows.
+ * timeline of verb · intent rows (the tool name is not shown).
  *
  * Motion is anime.js: the body's height tweens from its current value (so a
  * toggle mid-flight reverses smoothly instead of jumping), rows fade in with a
@@ -169,15 +169,15 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
         // here and holds it still while the body shrinks, so the chat below
         // doesn't move until the rows unmount, then jumps all at once.
         <div ref={bodyRef} style={{ height: 0 }} className="overflow-hidden [overflow-anchor:none]">
-          <div className="relative mt-1 ml-[5px] grid grid-cols-[auto_auto_minmax(0,1fr)] gap-x-3 py-0.5 pl-3">
+          <div className="relative mt-1 ml-[5px] grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 py-0.5 pl-3">
             <span className="absolute inset-y-1.5 left-0 w-px bg-foreground/8" />
             {msgs.map((m) => {
-              const { verb, tool, intent } = parseAutoLine(m)
+              const { verb, intent } = parseAutoLine(m)
               return (
                 <div
                   key={m.id}
                   data-row
-                  className="relative col-span-3 grid grid-cols-subgrid items-baseline rounded-sm py-[3px] text-[11px] leading-tight"
+                  className="relative col-span-2 grid grid-cols-subgrid items-baseline rounded-sm py-[3px] text-[11px] leading-tight"
                 >
                   <span className="absolute top-[9px] left-[-14.5px] size-[4px] rounded-full bg-muted-foreground/35" />
                   <span
@@ -185,9 +185,6 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
                     className="text-[10px] tracking-wide text-muted-foreground/50 uppercase"
                   >
                     {verb}
-                  </span>
-                  <span data-slide className="font-mono text-foreground/75">
-                    {tool}
                   </span>
                   <span data-slide className="truncate text-muted-foreground/60">
                     {intent}
