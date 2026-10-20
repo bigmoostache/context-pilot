@@ -766,8 +766,8 @@ html.mobile.standalone .mobile-shell {
 .agent-title {
   padding-bottom: 2px;
   background: linear-gradient(
-      color-mix(in oklab, currentcolor 55%, transparent),
-      color-mix(in oklab, currentcolor 55%, transparent)
+      color-mix(in oklab, currentcolor 25%, transparent),
+      color-mix(in oklab, currentcolor 25%, transparent)
     )
     no-repeat right bottom / 0 1.5px;
   cursor: pointer;
