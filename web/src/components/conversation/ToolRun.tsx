@@ -16,6 +16,60 @@ function toolDigest(msgs: AgentMsg[]): string {
   return seen.length > 3 ? `${head} +${String(seen.length - 3)}` : head
 }
 
+/** `[data-slide]` spans per timeline row (verb, tool, intent): maps a span index to its row. */
+const SLIDES_PER_ROW = 3
+
+/**
+ * Staggered row reveal/hide inside `body`. Rows only fade, so their dots stay
+ * on the timeline line; the text spans carry the slide. `fresh` = opening from
+ * fully closed (rows start hidden); a reopen mid-collapse settles from wherever
+ * the rows are. Returns [fade, slide] so the caller can pause them.
+ */
+function animateRows(body: HTMLElement, open: boolean, fresh: boolean): JSAnimation[] {
+  const rows = body.querySelectorAll<HTMLElement>("[data-row]")
+  const slides = body.querySelectorAll<HTMLElement>("[data-slide]")
+  const step = Math.min(24, 220 / Math.max(rows.length, 1))
+  const rowOf = (i: number | undefined) => Math.floor((i ?? 0) / SLIDES_PER_ROW)
+  if (!open) {
+    const last = rows.length - 1
+    return [
+      animate(rows, {
+        opacity: 0,
+        duration: 220,
+        delay: stagger(step, { from: "last" }),
+        ease: "inQuad",
+      }),
+      animate(slides, {
+        translateX: -6,
+        duration: 220,
+        delay: (_t, i) => (last - rowOf(i)) * step,
+        ease: "inQuad",
+      }),
+    ]
+  }
+  if (!fresh) {
+    return [
+      animate(rows, { opacity: 1, duration: 220, ease: "outQuad" }),
+      animate(slides, { translateX: 0, duration: 220, ease: "outQuad" }),
+    ]
+  }
+  for (const r of rows) r.style.opacity = "0"
+  return [
+    animate(rows, {
+      opacity: [0, 1],
+      duration: 340,
+      delay: stagger(step, { start: 60 }),
+      ease: "outQuad",
+    }),
+    animate(slides, {
+      translateX: [-6, 0],
+      duration: 340,
+      delay: (_t, i) => 60 + rowOf(i) * step,
+      ease: "outQuad",
+    }),
+  ]
+}
+
 /**
  * A run of consecutive tool-activity traces, collapsed to one quiet summary
  * line ("12 tool calls · Edit, Git, Send"). Opening it unfolds a hairline
@@ -36,7 +90,7 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const chevronRef = useRef<SVGSVGElement>(null)
   const anim = useRef<JSAnimation | null>(null)
-  const rowsAnim = useRef<JSAnimation | null>(null)
+  const rowAnims = useRef<JSAnimation[]>([])
   const first = useRef(true)
   const n = msgs.length
 
@@ -61,56 +115,31 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
       if (!open) setMounted(false)
       return
     }
-    rowsAnim.current?.pause()
+    for (const a of rowAnims.current) a.pause()
     const from = el.offsetHeight
-    const rows = el.querySelectorAll<HTMLElement>("[data-row]")
-    const step = Math.min(24, 220 / Math.max(rows.length, 1))
-    if (open) {
-      if (from === 0) {
-        for (const r of rows) r.style.opacity = "0"
-        rowsAnim.current = animate(rows, {
-          opacity: [0, 1],
-          translateX: [-6, 0],
-          duration: 340,
-          delay: stagger(step, { start: 60 }),
-          ease: "outQuad",
-        })
-      } else {
-        // Reopened mid-collapse: settle rows back from wherever they are.
-        rowsAnim.current = animate(rows, {
-          opacity: 1,
-          translateX: 0,
-          duration: 220,
-          ease: "outQuad",
-        })
-      }
-      anim.current = animate(el, {
-        height: [from, el.scrollHeight],
-        duration: 420,
-        ease: "outQuint",
-        onComplete: () => {
-          el.style.height = "auto"
-        },
-      })
-    } else {
-      // Mirror of opening: rows fade out bottom-up while the height eases shut.
-      rowsAnim.current = animate(rows, {
-        opacity: 0,
-        translateX: -6,
-        duration: 220,
-        delay: stagger(step, { from: "last" }),
-        ease: "inQuad",
-      })
-      anim.current = animate(el, {
-        height: [from, 0],
-        duration: 340,
-        delay: 60,
-        ease: "inOutQuart",
-        onComplete: () => {
-          setMounted(false)
-        },
-      })
-    }
+    rowAnims.current = animateRows(el, open, from === 0)
+    // Closing mirrors opening: rows fade out bottom-up while the height eases shut.
+    anim.current = animate(
+      el,
+      open
+        ? {
+            height: [from, el.scrollHeight],
+            duration: 420,
+            ease: "outQuint",
+            onComplete: () => {
+              el.style.height = "auto"
+            },
+          }
+        : {
+            height: [from, 0],
+            duration: 340,
+            delay: 60,
+            ease: "inOutQuart",
+            onComplete: () => {
+              setMounted(false)
+            },
+          },
+    )
   }, [open])
 
   const toggle = () => {
@@ -139,7 +168,10 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
         </span>
       </button>
       {mounted && (
-        <div ref={bodyRef} style={{ height: 0 }} className="overflow-hidden">
+        // overflow-anchor:none: otherwise the browser anchors scroll on a row in
+        // here and holds it still while the body shrinks, so the chat below
+        // doesn't move until the rows unmount, then jumps all at once.
+        <div ref={bodyRef} style={{ height: 0 }} className="overflow-hidden [overflow-anchor:none]">
           <div className="relative mt-1 ml-[5px] grid grid-cols-[auto_auto_minmax(0,1fr)] gap-x-3 py-0.5 pl-3">
             <span className="absolute inset-y-1.5 left-0 w-px bg-foreground/8" />
             {msgs.map((m) => {
@@ -151,11 +183,18 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
                   className="relative col-span-3 grid grid-cols-subgrid items-baseline rounded-sm py-[3px] text-[11px] leading-tight"
                 >
                   <span className="absolute top-[9px] left-[-14.5px] size-[4px] rounded-full bg-muted-foreground/35" />
-                  <span className="text-[10px] tracking-wide text-muted-foreground/50 uppercase">
+                  <span
+                    data-slide
+                    className="text-[10px] tracking-wide text-muted-foreground/50 uppercase"
+                  >
                     {verb}
                   </span>
-                  <span className="font-mono text-foreground/75">{tool}</span>
-                  <span className="truncate text-muted-foreground/60">{intent}</span>
+                  <span data-slide className="font-mono text-foreground/75">
+                    {tool}
+                  </span>
+                  <span data-slide className="truncate text-muted-foreground/60">
+                    {intent}
+                  </span>
                 </div>
               )
             })}
