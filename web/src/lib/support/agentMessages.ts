@@ -50,6 +50,7 @@ export function toChatMessage(m: AgentMsg): ChatMessage {
     tool: m.tool,
     ts: formatTs(m.ts),
     streaming: m.streaming,
+    pending: m.pending,
   }
 }
 
@@ -188,6 +189,47 @@ export function dotColor(isFocused: boolean, status: AgentDetail["status"]): str
   if (status === "MY_TURN") return "var(--signal)"
   if (status === "ACTIVE") return "var(--ok)"
   return "var(--muted-foreground)"
+}
+
+/** Where a sidebar row's hierarchy lines run (see {@link treeGuides}). */
+export interface TreeGuide {
+  /** per ancestor column (0..depth-2): the line passes straight through */
+  through: boolean[]
+  /** a later sibling follows, so the row's own column continues below the elbow */
+  more: boolean
+  /** the next row is a child, so a stub runs from the dot down to it */
+  kids: boolean
+}
+
+/**
+ * Guide-line layout for a list already in tree order (each row's `depth`,
+ * sub-agents right under their parent). A column's line continues only while
+ * a later row still hangs off it; the last child therefore draws just the upper
+ * half of its line, and a parent gets a stub below its dot down to its children.
+ */
+export function treeGuides(
+  rows: { id: string; depth?: number | undefined }[],
+): Map<string, TreeGuide> {
+  const depthAt = (i: number) => rows[i]?.depth ?? 0
+  // Does a row at exactly `d` follow `i` before the list climbs above `d`?
+  const continues = (i: number, d: number) => {
+    for (let j = i + 1; j < rows.length; j++) {
+      const dj = depthAt(j)
+      if (dj < d) return false
+      if (dj === d) return true
+    }
+    return false
+  }
+  const out = new Map<string, TreeGuide>()
+  for (const [i, r] of rows.entries()) {
+    const d = depthAt(i)
+    out.set(r.id, {
+      through: Array.from({ length: Math.max(0, d - 1) }, (_, c) => continues(i, c + 1)),
+      more: d > 0 && continues(i, d),
+      kids: depthAt(i + 1) > d,
+    })
+  }
+  return out
 }
 
 /**

@@ -1,11 +1,12 @@
 import { Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
 import { useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { PendingSpinner } from "@/components/ui/pending"
 import { Tip } from "@/components/ui/tip"
 import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
 import { clickable, useLoopNav } from "@/lib/support/a11y"
-import { dotColor, ROW_ACTION_COPY } from "@/lib/support/agentMessages"
+import { dotColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useAgentReadState } from "@/lib/live/agentView"
 import { AgentSearchPalette } from "./dialogs/AgentSearchPalette"
@@ -69,19 +70,23 @@ export function AgentList({
 
   const navHintOf = (id: string): "up" | "down" | undefined =>
     id === prevId ? "up" : id === nextId ? "down" : undefined
+  const guides = treeGuides(visible)
 
   const row = (t: AgentDetail, archivedRow?: boolean) => (
     <AgentRow
       key={t.id}
       t={t}
       selected={t.id === selectedId}
-      onSelect={onSelect}
+      onSelect={(id) => {
+        if (!t.pending) onSelect(id)
+      }}
       onArchive={onArchive}
       onPause={archivedRow ? undefined : onPause}
       onDelete={archivedRow ? onDelete : undefined}
       archived={archivedRow}
       navHint={navHintOf(t.id)}
       navHeld={navHeld}
+      guide={guides.get(t.id)}
     />
   )
 
@@ -218,6 +223,7 @@ function AgentRow({
   archived,
   navHint,
   navHeld,
+  guide,
 }: {
   t: AgentDetail
   selected: boolean
@@ -230,6 +236,8 @@ function AgentRow({
   navHint?: "up" | "down" | undefined
   /** Whether ⌘/Ctrl is currently held — gates the badge's visibility. */
   navHeld?: boolean | undefined
+  /** hierarchy-line layout for this row ({@link treeGuides}) */
+  guide?: TreeGuide | undefined
 }) {
   const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
@@ -240,14 +248,14 @@ function AgentRow({
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative mb-0.5 flex w-full items-stretch rounded-lg px-2.5 text-left transition-colors select-none",
+        "group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-colors select-none",
         selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
       )}
     >
       {navHint && (
         <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
       )}
-      <TreeGuides depth={t.depth ?? 0} />
+      <TreeGuides depth={t.depth ?? 0} guide={guide} />
       <div
         {...clickable(() => onSelect(t.id))}
         className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left"
@@ -256,6 +264,7 @@ function AgentRow({
         {isFocused && <StatusBadge tone="ok" label="focused" />}
         {isPaused && <StatusBadge tone="warn" label="paused" />}
         <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
+        {t.pending && <PendingSpinner />}
         <span className="relative ml-auto flex shrink-0 items-center">
           <UnreadBadge count={archived ? 0 : (t.unread ?? 0)} />
           <RowActions
@@ -292,21 +301,41 @@ function StatusDot({ t, archived }: { t: AgentDetail; archived: boolean }) {
   )
 }
 
-/** Tree indent for a sub-agent row: one 12px column per depth level, each
- *  carrying a vertical guide line; the last column adds the elbow to the dot. */
-function TreeGuides({ depth }: { depth: number }) {
-  if (depth <= 0) return null
+/** Tree indent for a row: one 12px column per depth level. Ancestor columns
+ *  carry a line only while their branch continues below; the own column draws
+ *  the upper half + elbow, plus the lower half when a sibling follows. A parent
+ *  gets a stub from its dot down to its children's column. */
+function TreeGuides({ depth, guide }: { depth: number; guide: TreeGuide | undefined }) {
+  const line = "absolute left-1 w-px bg-muted-foreground/25"
   return (
-    <span aria-hidden className="flex shrink-0">
-      {Array.from({ length: depth }, (_, i) => (
-        <span key={i} className="relative w-3">
-          <span className="absolute inset-y-0 left-1 w-px bg-muted-foreground/25" />
-          {i === depth - 1 && (
-            <span className="absolute top-1/2 left-1 h-px w-2 bg-muted-foreground/25" />
-          )}
+    <>
+      {depth > 0 && (
+        <span aria-hidden className="flex shrink-0">
+          {Array.from({ length: depth }, (_, i) => {
+            const own = i === depth - 1
+            return (
+              <span key={i} className="relative w-3">
+                {own ? (
+                  <>
+                    <span className={cn(line, "top-0", guide?.more ? "bottom-0" : "h-1/2")} />
+                    <span className="absolute top-1/2 left-1 h-px w-2 bg-muted-foreground/25" />
+                  </>
+                ) : (
+                  guide?.through[i] && <span className={cn(line, "inset-y-0")} />
+                )}
+              </span>
+            )
+          })}
         </span>
-      ))}
-    </span>
+      )}
+      {guide?.kids && (
+        <span
+          aria-hidden
+          className="absolute top-1/2 bottom-0 w-px bg-muted-foreground/25"
+          style={{ left: 14 + depth * 12 }}
+        />
+      )}
+    </>
   )
 }
 

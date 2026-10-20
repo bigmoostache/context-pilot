@@ -39,7 +39,7 @@ export function AgentComposer({
   focused?: boolean | undefined
   /** true when this agent has been paused by the user (T371) */
   paused?: boolean | undefined
-  onSend?: ((text: string) => void) | undefined
+  onSend?: ((text: string) => Promise<boolean>) | undefined
   /** Upload picked files into this agent (paperclip). May be async (T471). */
   onAttach?: ((files: File[]) => void | Promise<void>) | undefined
   /** Files uploaded but not yet sent — rendered as removable chips (T331). */

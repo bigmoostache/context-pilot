@@ -100,7 +100,7 @@ export function AgentsView({
     return <EmptyRealm fleetName={undefined} />
   }
 
-  const agent = agents.find((t) => t.id === sel.effectiveSelectedId)
+  const agent = actions.agents.find((t) => t.id === sel.effectiveSelectedId)
 
   return (
     <div
@@ -194,7 +194,7 @@ export function AgentsView({
         }
       >
         <AgentList
-          agents={agents}
+          agents={actions.agents}
           selectedId={sel.effectiveSelectedId}
           onSelect={openAgent}
           onGoToFleets={onGoToFleets}

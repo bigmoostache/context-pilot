@@ -193,7 +193,7 @@ export function AgentConversation({
   agent: AgentDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
   fleetId: string
-  onSend?: ((text: string) => void) | undefined
+  onSend?: ((text: string) => Promise<boolean>) | undefined
   /** upload picked files into this agent (composer paperclip). May be async so
    *  callers can `await` it to keep an in-flight loader up (T471). */
   onAttach?: ((files: File[]) => void | Promise<void>) | undefined

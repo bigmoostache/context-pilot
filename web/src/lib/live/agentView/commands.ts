@@ -20,6 +20,17 @@ export interface CreateAgentOpts {
   paused: boolean
 }
 
+/** Per-fleet localStorage key of the New Agent dialog's in-progress draft. */
+export function newAgentDraftKey(fleetId: string): string {
+  return `cp-newagent-${fleetId}`
+}
+
+/** Put a failed create's inputs back as the dialog draft, so reopening it shows
+ *  them pre-filled (the draft shape is exactly {@link CreateAgentOpts}). */
+export function restoreNewAgentDraft(fleetId: string, opts: CreateAgentOpts): void {
+  localStorage.setItem(newAgentDraftKey(fleetId), JSON.stringify(opts))
+}
+
 /**
  * Build a combined message body from user text and pending file attachments,
  * reusing the exact same ` ```file-upload ` block composer the agent composer

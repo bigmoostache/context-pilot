@@ -18,7 +18,8 @@ import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottom
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
-import { previewOf } from "@/lib/support/agentMessages"
+import { previewOf, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
+import { PendingSpinner } from "@/mobile-components/ui/pending"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 
 interface AgentListProps {
@@ -88,6 +89,7 @@ export function AgentList({
   // Backend order = sidebar tree (creation order, sub-agents under their
   // parent, `depth` per row, T860); render as received.
   const visible = source.filter((t) => matches(t))
+  const guides = treeGuides(visible)
 
   // #3 List cascade (anime.js): stagger the rows in on first mount and whenever
   // the set flips live↔archived. Deliberately keyed ONLY on `showArchived` (not
@@ -160,7 +162,10 @@ export function AgentList({
                       t={t}
                       selected={t.id === selectedId}
                       archived={showArchived}
-                      onSelect={onSelect}
+                      onSelect={(id) => {
+                        if (!t.pending) onSelect(id)
+                      }}
+                      guide={guides.get(t.id)}
                     />
                   </SwipeRow>
                 </li>
@@ -260,11 +265,13 @@ function AgentRow({
   selected,
   archived,
   onSelect,
+  guide,
 }: {
   t: AgentDetail
   selected: boolean
   archived: boolean
   onSelect: (id: string) => void
+  guide?: TreeGuide | undefined
 }) {
   const unread = archived ? 0 : (t.unread ?? 0)
   const attention = !archived && (unread > 0 || t.status === "MY_TURN" || Boolean(t.focused))
@@ -272,11 +279,11 @@ function AgentRow({
     <button
       onClick={() => onSelect(t.id)}
       className={cn(
-        "flex w-full items-stretch px-4 text-left",
+        "relative flex w-full items-stretch px-4 text-left",
         selected ? "bg-muted/50" : "bg-background active:bg-muted/40",
       )}
     >
-      <TreeGuides depth={t.depth ?? 0} />
+      <TreeGuides depth={t.depth ?? 0} guide={guide} />
       <span className="flex min-w-0 flex-1 items-center gap-2 py-3">
         <span
           className="size-2.5 shrink-0 rounded-full"
@@ -290,6 +297,7 @@ function AgentRow({
         >
           {t.name}
         </span>
+        {t.pending && <PendingSpinner />}
         {unread > 0 && (
           <span
             className="shrink-0 px-1.5 text-[12px] font-semibold text-(--primary-foreground) tabular-nums"
@@ -304,21 +312,41 @@ function AgentRow({
   )
 }
 
-/** Tree indent: one 16px column per depth level with a vertical guide line;
- *  the last column adds the elbow toward the dot. */
-function TreeGuides({ depth }: { depth: number }) {
-  if (depth <= 0) return null
+/** Tree indent: one 16px column per depth level. Ancestor columns carry a line
+ *  only while their branch continues below; the own column draws the upper half
+ *  + elbow, plus the lower half when a sibling follows. A parent gets a stub from
+ *  its dot down to its children's column. */
+function TreeGuides({ depth, guide }: { depth: number; guide: TreeGuide | undefined }) {
+  const line = "absolute left-1.5 w-px bg-muted-foreground/25"
   return (
-    <span aria-hidden className="flex shrink-0">
-      {Array.from({ length: depth }, (_, i) => (
-        <span key={i} className="relative w-4">
-          <span className="absolute inset-y-0 left-1.5 w-px bg-muted-foreground/25" />
-          {i === depth - 1 && (
-            <span className="absolute top-1/2 left-1.5 h-px w-2.5 bg-muted-foreground/25" />
-          )}
+    <>
+      {depth > 0 && (
+        <span aria-hidden className="flex shrink-0">
+          {Array.from({ length: depth }, (_, i) => {
+            const own = i === depth - 1
+            return (
+              <span key={i} className="relative w-4">
+                {own ? (
+                  <>
+                    <span className={cn(line, "top-0", guide?.more ? "bottom-0" : "h-1/2")} />
+                    <span className="absolute top-1/2 left-1.5 h-px w-2.5 bg-muted-foreground/25" />
+                  </>
+                ) : (
+                  guide?.through[i] && <span className={cn(line, "inset-y-0")} />
+                )}
+              </span>
+            )
+          })}
         </span>
-      ))}
-    </span>
+      )}
+      {guide?.kids && (
+        <span
+          aria-hidden
+          className="absolute top-1/2 bottom-0 w-px bg-muted-foreground/25"
+          style={{ left: 22 + depth * 16 }}
+        />
+      )}
+    </>
   )
 }
 

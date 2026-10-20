@@ -53,11 +53,15 @@ export type Fleet = Omit<GenFleet, "status"> & {
 export type AgentMsg = Omit<GenAgentMsg, "ts"> & {
   ts?: number | string | undefined
   streaming?: boolean | undefined
+  /** UI-only: optimistic message the backend has not confirmed yet */
+  pending?: boolean | undefined
 }
 
 /** AgentDetail re-exported as-is (field optionality matches backend). */
 export type AgentDetail = Omit<GenAgentDetail, "log"> & {
   log: AgentMsg[]
+  /** UI-only: optimistic agent the backend has not created yet */
+  pending?: boolean | undefined
 }
 
 // ── Derived type aliases (extracted from generated union literals) ────
@@ -89,6 +93,8 @@ export interface ChatMessage {
   tool?: import("./api/generated/types.gen").ToolCall | undefined
   ts: string
   streaming?: boolean | undefined
+  /** optimistic, not yet confirmed by the backend — shows the pending loader */
+  pending?: boolean | undefined
 }
 
 // ── Account / current user (avatar menu + profile) ───────────────

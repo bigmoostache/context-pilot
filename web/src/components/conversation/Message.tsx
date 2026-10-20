@@ -5,6 +5,7 @@ import { CopyButton } from "./CopyButton"
 import { MessageFileChip } from "@/components/agents/fileUpload"
 import { splitMessageSegments, type UploadedFile } from "@/components/agents/fileUpload/helpers"
 import { cn } from "@/lib/utils"
+import { PendingSpinner } from "@/components/ui/pending"
 
 /**
  * Props every message renderer accepts.
@@ -181,6 +182,7 @@ function UserMessage({
         />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
+        {msg.pending && <PendingSpinner />}
         <User className="size-2.5" />
         {msg.ts}
       </span>

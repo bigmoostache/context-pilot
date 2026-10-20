@@ -50,7 +50,8 @@ export interface ComposerOpts {
   draftKey: string | undefined
   /** localStorage key of the per-agent attached `/command` (T654). */
   commandKey: string | undefined
-  onSend: ((text: string) => void) | undefined
+  /** may resolve `false` on failure — the composer then restores the text */
+  onSend: ((text: string) => Promise<boolean>) | undefined
   device: ComposerDevice
 }
 
@@ -178,7 +179,23 @@ export function useComposer({ draftKey, commandKey, onSend, device }: ComposerOp
     const base = attachedCmd?.body?.trim() ? attachedCmd.body.trimEnd() : ""
     const msg = base && text.trim() ? `${base}\n\n${text}` : base || text
     if (msg.trim().length === 0) return
-    onSend(msg)
+    const sentText = text
+    const sentCmd = attachedCmd
+    // Failed send (no retry): put the text and command back. Anything typed
+    // meanwhile is kept after the restored text.
+    void onSend(msg).then((ok) => {
+      if (ok) return
+      setText((cur) => {
+        const restored = cur ? `${sentText}\n${cur}` : sentText
+        persistDraft(restored, restored.length, restored.length)
+        return restored
+      })
+      setCaret(sentText.length)
+      if (sentCmd) {
+        setAttachedCmd(sentCmd)
+        persistCmd(sentCmd)
+      }
+    })
     setText("")
     setCaret(0)
     persistDraft("", 0, 0)
