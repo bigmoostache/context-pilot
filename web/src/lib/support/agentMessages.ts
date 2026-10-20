@@ -184,10 +184,8 @@ export function parseDraft(key: string | undefined): Draft {
  * accent when it is your turn, muted otherwise. A flat if-chain rather than
  * nested ternaries — four outcomes read as four lines.
  */
-export function dotColor(isFocused: boolean, status: AgentDetail["status"]): string {
-  if (isFocused) return "var(--ok)"
-  if (status === "MY_TURN") return "var(--signal)"
-  if (status === "ACTIVE") return "var(--ok)"
+export function dotColor(status: AgentDetail["status"]): string {
+  if (status === "MY_TURN" || status === "ACTIVE") return "var(--ok)"
   return "var(--muted-foreground)"
 }
 

@@ -257,7 +257,6 @@ function AgentRow({
   /** hierarchy-line layout for this row ({@link treeGuides}) */
   guide?: TreeGuide | undefined
 }) {
-  const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
   const marquee = useTitleMarquee()
   const [renaming, setRenaming] = useState(false)
@@ -281,7 +280,6 @@ function AgentRow({
         className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left"
       >
         <StatusDot t={t} archived={Boolean(archived)} />
-        {isFocused && <StatusBadge tone="ok" label="focused" />}
         {isPaused && <StatusBadge tone="warn" label="paused" />}
         {renaming && onRename ? (
           <RowRenameInput t={t} onRename={onRename} onDone={() => setRenaming(false)} />
@@ -309,17 +307,16 @@ function AgentRow({
 }
 
 /** Leading status dot: grey archived, warn paused, else {@link dotColor}; pulses
- *  while focused or on the agent's turn. */
+ *  while the agent is working (its turn). */
 function StatusDot({ t, archived }: { t: AgentDetail; archived: boolean }) {
-  const isFocused = !archived && Boolean(t.focused)
   const isPaused = !archived && Boolean(t.paused)
   const live = !archived && !isPaused
-  const pulse = live && (isFocused || t.status === "MY_TURN" || t.status === "ACTIVE")
+  const pulse = live && (t.status === "MY_TURN" || t.status === "ACTIVE")
   const background = archived
     ? "var(--muted-foreground)"
     : isPaused
       ? "var(--warn)"
-      : dotColor(isFocused, t.status)
+      : dotColor(t.status)
   return (
     <span
       className={cn("size-2 shrink-0 rounded-full", pulse && "animate-pulse")}
@@ -465,7 +462,7 @@ function RowAction({
   )
 }
 
-/** A first-line status pill (focused / paused), tone-keyed to the palette (no `rounded-*` — the codebase is square). */
+/** A first-line status pill (paused), tone-keyed to the palette (no `rounded-*` — the codebase is square). */
 function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
   return (
     <span
