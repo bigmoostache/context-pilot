@@ -394,21 +394,6 @@ html.mobile.standalone .mobile-shell {
   }
 }
 
-/* In-progress task glyph: a lit segment (the "snake") travels clockwise around
-   a FIXED square outline via marching stroke-dashoffset — the square itself and
-   its centre dot never move. pathLength normalises the perimeter to 100, so the
-   offset runs 0→-100 for exactly one full lap. See StatusIcon in
-   ThreadAsideTasks. */
-@keyframes snake-border {
-  from {
-    stroke-dashoffset: 0;
-  }
-
-  to {
-    stroke-dashoffset: -100;
-  }
-}
-
 /*
   ── Finder polish ────────────────────────────────────────────────────────
   Apple-grade micro-motion: QuickLook pop, a soft checkerboard for image

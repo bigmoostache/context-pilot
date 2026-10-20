@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react"
-import { Square, SquareCheckBig, ChevronRight, StickyNote } from "lucide-react"
+import { ChevronRight, StickyNote } from "lucide-react"
 import type { AgentTask, AgentNote } from "@/lib/types"
 import { Markdown } from "@/lib/support/markdown"
 
 /**
  * The Tasks-tab body of {@link AgentAside} (T662) — the agent's todo tree,
- * read-only, with one behaviour beyond the old flat {@link TodoSidebar}:
- *
- *  1. **Auto-collapse of completed branches** — a parent whose entire subtree is
- *     done/cancelled starts collapsed (its children hidden behind a chevron), so
- *     finished work folds away. Clicking the row toggles it. A parent with any
- *     still-open descendant stays expanded.
+ * read-only: an overall progress header, then indented rows with one status
+ * icon family. Parents show their subtree's done/total and fold on click; a
+ * parent whose subtree is all done or all planned starts folded.
  *
  * The tree is projected by the agent (cancelled excluded upstream) and rides the
  * live `task_list_changed` delta, so this stays purely presentational.
  */
 export function TaskList({ tasks }: { tasks: AgentTask[] }) {
-  // Parent → children buckets + the set of ids whose whole subtree is closed
-  // (all descendants done/cancelled) — those parents default to collapsed.
+  // Parent → children buckets, per-parent progress, and the ids whose subtree
+  // defaults to collapsed (all finished, or none started).
   const model = useMemo(() => buildModel(tasks), [tasks])
 
   // User overrides on the default collapsed state, keyed by task id. Effective
@@ -36,81 +33,103 @@ export function TaskList({ tasks }: { tasks: AgentTask[] }) {
     setOverrides((o) => ({ ...o, [id]: !currentlyCollapsed }))
 
   // Pre-order walk, skipping the subtree of any collapsed parent.
-  const rows: { task: AgentTask; depth: number; hasChildren: boolean; collapsed: boolean }[] = []
+  const rows: { task: AgentTask; depth: number; collapsed: boolean }[] = []
   const walk = (parentKey: string, depth: number) => {
-    const children = model.childrenOf.get(parentKey) ?? []
-    for (const t of children) {
-      const hasChildren = model.childrenOf.has(t.id)
-      const collapsed = hasChildren ? (overrides[t.id] ?? model.defaultCollapsed.has(t.id)) : false
-      rows.push({ task: t, depth, hasChildren, collapsed })
-      if (hasChildren && !collapsed) walk(t.id, depth + 1)
+    const kids = model.childrenOf.get(parentKey) ?? []
+    for (const t of kids) {
+      const parent = model.childrenOf.has(t.id)
+      const collapsed = parent && (overrides[t.id] ?? model.defaultCollapsed.has(t.id))
+      rows.push({ task: t, depth, collapsed })
+      if (parent && !collapsed) walk(t.id, depth + 1)
     }
   }
   walk(ROOT_KEY, 0)
 
+  const done = tasks.filter((t) => t.status === "done").length
+
   return (
-    <div className="space-y-0.5">
-      {rows.map(({ task, depth, hasChildren, collapsed }) => (
-        <TaskRow
-          key={task.id}
-          task={task}
-          depth={depth}
-          hasChildren={hasChildren}
-          collapsed={collapsed}
-          onToggle={() => toggle(task.id, collapsed)}
-        />
-      ))}
+    <div className="px-1.5 pt-2 pb-3">
+      <ProgressHeader done={done} total={tasks.length} />
+      <div>
+        {rows.map(({ task, depth, collapsed }) => (
+          <TaskRow
+            key={task.id}
+            task={task}
+            depth={depth}
+            progress={model.progress.get(task.id)}
+            collapsed={collapsed}
+            onToggle={() => toggle(task.id, collapsed)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
 
-/** One task row: status icon + name, then a TRAILING collapse chevron for
- *  parents (leaf rows render nothing after the name — no leading spacer needed,
- *  the label's `flex-1` pushes the chevron to the row's right edge). */
+/** "3 of 8 done" over a hairline progress bar. Static: no motion. */
+function ProgressHeader({ done, total }: { done: number; total: number }) {
+  return (
+    <div className="mb-2 px-2">
+      <div className="flex items-baseline justify-between text-[11px] text-muted-foreground/60">
+        <span>Tasks</span>
+        <span className="tabular-nums">
+          {done} of {total} done
+        </span>
+      </div>
+      <div className="mt-1.5 h-[2px] overflow-hidden rounded-full bg-foreground/8">
+        <div
+          className="h-full rounded-full bg-(--ok)"
+          style={{ width: `${String((done / Math.max(total, 1)) * 100)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Row geometry, in px: horizontal padding, per-level indent, icon box. */
+const PAD = 8
+const INDENT = 16
+const ICON = 14
+
+/**
+ * One task row: status icon, name (wraps; first line aligned on the icon),
+ * and for parents a trailing "done/total" count + chevron. Nested rows draw a
+ * hairline guide under each ancestor's icon so the tree reads at a glance.
+ */
 function TaskRow({
   task,
   depth,
-  hasChildren,
+  progress,
   collapsed,
   onToggle,
 }: {
   task: AgentTask
   depth: number
-  hasChildren: boolean
+  progress: Progress | undefined
   collapsed: boolean
   onToggle: () => void
 }) {
-  // The label is a TIGHT-leading text line (`leading-none`) centered in a 16px
-  // (`min-h-4`) flex box — the SAME height the status/chevron icons are centered
-  // in. Centering a tight line box (whose box centre ≈ glyph optical centre)
-  // against the icon well makes the check and the text share a true optical
-  // centreline; a `text-…/4` line box would centre its 16px *box* but leave the
-  // glyphs sitting optically low (the check then reads as "too high").
-  const label = (
-    <span className="flex min-h-4 min-w-0 flex-1 items-center">
-      <span
-        className={
-          task.status === "done"
-            ? "text-[13.5px]/none text-muted-foreground/50"
-            : "text-[13.5px]/none text-foreground/85 group-hover:text-foreground"
-        }
-      >
-        {task.name}
-      </span>
-    </span>
-  )
+  const parent = progress !== undefined
+  const text =
+    task.status === "done"
+      ? "text-muted-foreground/55"
+      : task.status === "in_progress"
+        ? "font-medium text-foreground"
+        : "text-foreground/80"
 
   return (
     <div
       className={
-        "group flex items-start gap-1.5 rounded-lg px-2 py-1.5" +
-        (hasChildren ? " cursor-pointer" : "")
+        "relative flex items-start gap-2 rounded-md py-[5px] pr-2" +
+        (parent ? " cursor-pointer hover:bg-muted/45" : "")
       }
-      style={{ paddingLeft: `${0.5 + depth * 0.85}rem` }}
-      {...(hasChildren
+      style={{ paddingLeft: PAD + depth * INDENT }}
+      title={task.description ?? undefined}
+      {...(parent
         ? {
             role: "button" as const,
             tabIndex: 0,
+            "aria-expanded": !collapsed,
             onClick: onToggle,
             onKeyDown: (e: KeyboardEvent) => {
               if (e.key !== "Enter" && e.key !== " ") return
@@ -120,15 +139,26 @@ function TaskRow({
           }
         : {})}
     >
-      <span className="flex h-4 shrink-0 items-center">
+      {Array.from({ length: depth }, (_, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className="absolute inset-y-0 w-px bg-foreground/8"
+          style={{ left: PAD + i * INDENT + ICON / 2 }}
+        />
+      ))}
+      <span className="flex h-[18px] shrink-0 items-center">
         <StatusIcon status={task.status} />
       </span>
-      {label}
-      {hasChildren && (
-        <span className="flex h-4 shrink-0 items-center">
+      <span className={"min-w-0 flex-1 text-[12.5px]/[18px] wrap-break-word " + text}>
+        {task.name}
+      </span>
+      {parent && (
+        <span className="flex h-[18px] shrink-0 items-center gap-1 text-[10.5px] text-muted-foreground/50 tabular-nums">
+          {progress.done}/{progress.total}
           <ChevronRight
             className={
-              "size-3 text-muted-foreground/45 transition-transform" +
+              "size-3 text-muted-foreground/45 transition-transform duration-150" +
               (collapsed ? "" : " rotate-90")
             }
           />
@@ -138,66 +168,74 @@ function TaskRow({
   )
 }
 
-/** The lucide status glyph for a task, colour-keyed to the app palette. */
+/**
+ * The status glyph: ONE family for all three states — the same 14px circle,
+ * same 1.5 stroke, differing only in fill. Planned = empty ring, in progress =
+ * ring with a half-filled core, done = filled disc with a check.
+ */
 function StatusIcon({ status }: { status: AgentTask["status"] }) {
-  if (status === "done") {
-    return <SquareCheckBig className="size-3 shrink-0 text-(--ok)" />
-  }
-  if (status === "in_progress") {
-    // A lit segment (the "snake") travels clockwise around a FIXED square
-    // outline — the square and its centre dot never move (the old animate-spin
-    // rotated the whole glyph, corners and all, which is not what "the border
-    // turns around the square" means). Built with SVG stroke-dashoffset
-    // marching: `pathLength={100}` normalises the perimeter to 100 units, so the
-    // dash `80 20` is an 80%-of-perimeter lit snake + 20% gap, and the
-    // `snake-border` keyframe runs the offset 0→-100 for one clockwise lap.
-    // A dim full outline underneath is the "track" the snake runs on. The dot
-    // is an SVG <circle> so it dodges the global `border-radius:0` reset (a
-    // CSS-rounded element would render square). `motion-reduce` drops the snake,
-    // leaving the static track + dot.
-    return (
-      <svg viewBox="0 0 12 12" className="size-3 shrink-0" fill="none" aria-hidden="true">
-        <rect
-          x="1.25"
-          y="1.25"
-          width="9.5"
-          height="9.5"
-          stroke="var(--signal)"
-          strokeOpacity="0.25"
-          strokeWidth="1.5"
-        />
-        <rect
-          x="1.25"
-          y="1.25"
-          width="9.5"
-          height="9.5"
-          stroke="var(--signal)"
-          strokeWidth="1.5"
-          pathLength={100}
-          strokeDasharray="80 20"
-          className="motion-reduce:hidden"
-          style={{ animation: "snake-border 1.2s linear infinite" }}
-        />
-        <circle cx="6" cy="6" r="1.25" fill="var(--signal)" />
-      </svg>
-    )
-  }
-  return <Square className="size-3 shrink-0 text-(--linear-purple)" />
+  const ring = { cx: 7, cy: 7, r: 5.75, strokeWidth: 1.5 }
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      className="size-[14px] shrink-0"
+      fill="none"
+      aria-label={STATUS_LABEL[status]}
+      role="img"
+    >
+      {status === "planned" && (
+        <circle {...ring} stroke="currentColor" className="text-muted-foreground/45" />
+      )}
+      {status === "in_progress" && (
+        <>
+          <circle {...ring} stroke="var(--signal)" />
+          <path d="M7 3.5 A3.5 3.5 0 0 1 7 10.5 Z" fill="var(--signal)" />
+        </>
+      )}
+      {status === "done" && (
+        <>
+          <circle {...ring} stroke="var(--ok)" fill="var(--ok)" />
+          <path
+            d="M4.5 7.2 L6.25 8.9 L9.5 5.4"
+            stroke="var(--background)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
+    </svg>
+  )
+}
+
+const STATUS_LABEL: Record<AgentTask["status"], string> = {
+  planned: "Planned",
+  in_progress: "In progress",
+  done: "Done",
 }
 
 const ROOT_KEY = "\u{0}root"
 
+/** Finished vs total descendants of a parent task. */
+interface Progress {
+  done: number
+  total: number
+}
+
 interface TaskModel {
   /** parentKey → ordered children (ROOT_KEY for top-level). */
   childrenOf: Map<string, AgentTask[]>
-  /** ids of parents whose entire subtree is done/cancelled (default-collapsed). */
+  /** parent id → done/total over its whole subtree. */
+  progress: Map<string, Progress>
+  /** ids of parents whose subtree is all done, or all planned (default-collapsed). */
   defaultCollapsed: Set<string>
 }
 
 /**
- * Build the parent→children map (insertion order preserved) and flag every
- * parent whose whole subtree is finished (done/cancelled) as default-collapsed.
- * A task whose `parentId` is absent or points outside this agent is a root.
+ * Build the parent→children map (insertion order preserved), each parent's
+ * subtree progress, and the default-collapsed set: a parent folds away when its
+ * whole subtree is done (finished work) or all planned (untouched work). A
+ * task whose `parentId` is absent or points outside this agent is a root.
  */
 function buildModel(tasks: AgentTask[]): TaskModel {
   const ids = new Set(tasks.map((t) => t.id))
@@ -209,26 +247,36 @@ function buildModel(tasks: AgentTask[]): TaskModel {
     else childrenOf.set(key, [t])
   }
 
+  const progress = new Map<string, Progress>()
   const defaultCollapsed = new Set<string>()
-  // Cancelled tasks are excluded upstream by the agent, so a finished leaf here
-  // is simply `done`.
-  const closed = (status: AgentTask["status"]) => status === "done"
-  const allClosed = (id: string): boolean => {
-    const kids = childrenOf.get(id)
-    if (!kids) return false // leaf — not a collapsible parent
-    return kids.every((k) => closed(k.status) && (!childrenOf.has(k.id) || allClosed(k.id)))
+  // Returns the subtree's counts plus whether every descendant is done / planned.
+  const visit = (id: string): Progress & { allDone: boolean; allPlanned: boolean } => {
+    let done = 0
+    let total = 0
+    let allDone = true
+    let allPlanned = true
+    const kids = childrenOf.get(id) ?? []
+    for (const k of kids) {
+      total += 1
+      if (k.status === "done") done += 1
+      allDone &&= k.status === "done"
+      allPlanned &&= k.status === "planned"
+      if (childrenOf.has(k.id)) {
+        const sub = visit(k.id)
+        done += sub.done
+        total += sub.total
+        allDone &&= sub.allDone
+        allPlanned &&= sub.allPlanned
+      }
+    }
+    if (id !== ROOT_KEY) {
+      progress.set(id, { done, total })
+      if (allDone || allPlanned) defaultCollapsed.add(id)
+    }
+    return { done, total, allDone, allPlanned }
   }
-  // A branch with NO started work either (every descendant still `planned`, no
-  // done, no in_progress) also folds away — a not-yet-touched group reads calm.
-  const allPlanned = (id: string): boolean => {
-    const kids = childrenOf.get(id)
-    if (!kids) return false // leaf — not a collapsible parent
-    return kids.every((k) => k.status === "planned" && (!childrenOf.has(k.id) || allPlanned(k.id)))
-  }
-  for (const t of tasks) {
-    if (childrenOf.has(t.id) && (allClosed(t.id) || allPlanned(t.id))) defaultCollapsed.add(t.id)
-  }
-  return { childrenOf, defaultCollapsed }
+  visit(ROOT_KEY)
+  return { childrenOf, progress, defaultCollapsed }
 }
 
 /**
@@ -355,7 +403,7 @@ function NoteRow({
           <StickyNote className="size-3 shrink-0 text-(--linear-purple)" />
         </span>
         <span className="flex min-h-4 min-w-0 flex-1 items-center">
-          <span className="truncate text-[13.5px]/none text-foreground/85 group-hover:text-foreground">
+          <span className="truncate text-[12.5px]/none text-foreground/85 group-hover:text-foreground">
             {note.title}
           </span>
         </span>
