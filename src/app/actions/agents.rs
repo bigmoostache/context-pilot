@@ -21,10 +21,28 @@ pub(crate) fn editing_new_agent_title(state: &State) -> bool {
     focus.selected_agent_idx >= AgentsState::get(state).visible_indices(false).len()
 }
 
-/// The textarea keystrokes currently edit: the new-thread title on that row,
-/// otherwise the executing agent's composer.
+/// True while a Ctrl+R rename is pending in the Agents view.
+pub(crate) fn renaming(state: &State) -> bool {
+    state.view_mode == cp_base::state::data::config::ViewMode::Agents
+        && FocusState::get(state).renaming_agent_id.is_some()
+}
+
+/// The title buffer keystrokes edit: the pending rename's draft when `rename`,
+/// else the "+ New Agent" row's draft.
+const fn title_buffer(focus: &mut FocusState, rename: bool) -> &mut cp_base::state::runtime::textarea::TextArea {
+    if rename { &mut focus.rename_title } else { &mut focus.new_agent_title }
+}
+
+/// The textarea keystrokes currently edit: the rename draft or new-thread
+/// title when active, otherwise the executing agent's composer.
 pub(crate) fn active_textarea(state: &State) -> &cp_base::state::runtime::textarea::TextArea {
-    if editing_new_agent_title(state) { &FocusState::get(state).new_agent_title } else { &state.agent().composer }
+    if renaming(state) {
+        &FocusState::get(state).rename_title
+    } else if editing_new_agent_title(state) {
+        &FocusState::get(state).new_agent_title
+    } else {
+        &state.agent().composer
+    }
 }
 
 /// Actions that read or mutate the focused textarea (and so must target the
@@ -58,20 +76,23 @@ pub(super) const fn is_title_edit(action: &Action) -> bool {
     )
 }
 
-/// Run `run` with the new-thread title swapped into `state.composer`, then swap
-/// it back, so the shared editing handlers apply unchanged. Pastes become plain
-/// inserts: a title has no paste-sentinel buffers.
+/// Run `run` with the active title buffer (rename draft or new-thread title)
+/// swapped into `state.composer`, then swap it back, so the shared editing
+/// handlers apply unchanged. The target is fixed before `run`: a rename submit
+/// clears `renaming_agent_id`, and the draft must not land in the new-agent
+/// title. Pastes become plain inserts: a title has no paste-sentinel buffers.
 pub(super) fn with_new_agent_title(
     state: &mut State,
     action: Action,
     run: fn(&mut State, Action) -> ActionResult,
 ) -> ActionResult {
-    let parked_title = core::mem::take(&mut FocusState::get_mut(state).new_agent_title);
+    let rename = FocusState::get(state).renaming_agent_id.is_some();
+    let parked_title = core::mem::take(title_buffer(FocusState::get_mut(state), rename));
     let draft = core::mem::replace(&mut state.agent_mut().composer, parked_title);
     let edit = if let Action::PasteText(text) = action { Action::InsertText(text) } else { action };
     let result = run(state, edit);
     let edited_title = core::mem::replace(&mut state.agent_mut().composer, draft);
-    FocusState::get_mut(state).new_agent_title = edited_title;
+    *title_buffer(FocusState::get_mut(state), rename) = edited_title;
     result
 }
 
@@ -88,7 +109,40 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
     if let Some(result) = dispatch_drill(state, action) {
         return result;
     }
+    if matches!(action, Action::AgentRenameStart) {
+        return rename_start(state);
+    }
+    if matches!(action, Action::AgentRenameCancel) {
+        return rename_cancel(state);
+    }
     dispatch_archive(state, action)
+}
+
+/// Arm a rename of the agent under the list cursor (Ctrl+R): the prompt opens
+/// prefilled with its current name. No-op off a real agent row.
+fn rename_start(state: &mut State) -> ActionResult {
+    let focus = FocusState::get(state);
+    let visible = AgentsState::get(state).visible_indices(focus.viewing_archived);
+    let Some(agent) = visible.get(focus.selected_agent_idx).and_then(|&i| AgentsState::get(state).agents.get(i)) else {
+        return ActionResult::Nothing;
+    };
+    let (id, name) = (agent.id.clone(), agent.name.clone());
+    let draft = FocusState::get_mut(state);
+    draft.rename_title.reset();
+    draft.rename_title.cursor = name.len();
+    draft.rename_title.text = name;
+    draft.renaming_agent_id = Some(id);
+    state.flags.ui.dirty = true;
+    ActionResult::Nothing
+}
+
+/// Drop the pending rename (Esc) without touching the agent.
+fn rename_cancel(state: &mut State) -> ActionResult {
+    let focus = FocusState::get_mut(state);
+    focus.renaming_agent_id = None;
+    focus.rename_title.reset();
+    state.flags.ui.dirty = true;
+    ActionResult::Nothing
 }
 
 /// Handle the selection/creation `Agent*` variants (next/prev/create-start/

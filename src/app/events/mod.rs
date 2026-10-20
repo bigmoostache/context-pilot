@@ -192,6 +192,8 @@ fn handle_agents_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
             Some(if within_window { Action::AgentArchiveConfirm } else { Action::AgentArchiveStart })
         }
         KeyCode::Char('u') => Some(Action::AgentToggleArchivedView),
+        // Ctrl+R renames the agent under the cursor (no-op off a real row).
+        KeyCode::Char('r') => Some(Action::AgentRenameStart),
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Left
@@ -247,6 +249,19 @@ const fn drilled_agents_nav(key: &KeyEvent) -> Dispatch {
     }
 }
 
+/// Agents-list keys while a Ctrl+R rename is pending: Esc cancels, selection
+/// keys are inert (the target must not move under the draft), everything else
+/// (Enter, editing) falls through to the rename draft.
+const fn renaming_agents_nav(key: &KeyEvent) -> Dispatch {
+    if matches!(key.code, KeyCode::Esc) {
+        Dispatch::Act(Action::AgentRenameCancel)
+    } else if matches!(key.code, KeyCode::Up | KeyCode::Down | KeyCode::Tab | KeyCode::BackTab) {
+        Dispatch::Act(Action::None)
+    } else {
+        Dispatch::Fallthrough
+    }
+}
+
 /// True when the list cursor sits on a real agent row (not the virtual
 /// "+ New Agent" entry, not an empty list) — i.e. drill-in has a target.
 fn selection_is_real_agent(focus: &cp_mod_agents::types::FocusState, state: &State) -> bool {
@@ -263,6 +278,9 @@ fn handle_agents_nav(key: &KeyEvent, state: &State) -> Dispatch {
 
     if focus.drilled_agent_id.is_some() {
         return drilled_agents_nav(key);
+    }
+    if focus.renaming_agent_id.is_some() {
+        return renaming_agents_nav(key);
     }
 
     match key.code {

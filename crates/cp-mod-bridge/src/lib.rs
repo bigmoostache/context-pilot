@@ -181,6 +181,10 @@ pub struct BridgeState {
     /// actual change — mirrors the archived chokepoint (T371).
     pub agent_paused_memo: std::collections::HashMap<String, bool>,
 
+    /// Per-agent display name as last emitted/seeded. The rename chokepoint
+    /// emits `AgentRenamed` when an agent's live name differs from it.
+    pub agent_name_memo: std::collections::HashMap<String, String>,
+
     /// Per-thread projected task list as last emitted/seeded, keyed by agent
     /// id. The task chokepoint ([`emit_task_lists`]) projects each agent's
     /// cancelled-excluded todo items into `WireTask`s, diffs the result against

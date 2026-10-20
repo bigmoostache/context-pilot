@@ -10,13 +10,16 @@
 
 /// Message area rendering: messages, input, question form.
 pub(super) mod messages;
+/// Name-entry prompts (new agent, rename).
+mod prompt;
 /// Virtualized agent-list entries.
 mod visible;
+use prompt::{NEW_AGENT_PROMPT, RENAME_PROMPT, render_title_prompt};
 use visible::push_visible_entries;
 
 use ratatui::Frame;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect, Style};
-use ratatui::widgets::{Block as RBlock, Borders, Paragraph};
+use ratatui::widgets::{Block as RBlock, Paragraph};
 
 use cp_render::{Block as IrBlock, Semantic, Span as S};
 
@@ -61,8 +64,11 @@ pub(crate) fn render_agents_view(frame: &mut Frame<'_>, state: &mut State, area:
             let _g = crate::profile!("tv_list");
             render_agent_list(frame, state, &visible, list_area);
         }
-        if on_virtual_new {
-            render_new_agent_prompt(frame, state, msg_area);
+        let focus = FocusState::get(state);
+        if focus.renaming_agent_id.is_some() {
+            render_title_prompt(frame, &RENAME_PROMPT, &focus.rename_title.text, msg_area);
+        } else if on_virtual_new {
+            render_title_prompt(frame, &NEW_AGENT_PROMPT, &focus.new_agent_title.text, msg_area);
         } else if let Some(&real_idx) = visible.get(selected_idx) {
             messages::render_message_area_with_input(frame, state, real_idx, msg_area);
         } else {
@@ -334,6 +340,8 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" view  ".to_owned()),
             S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" restore  ".to_owned()),
+            S::styled("Ctrl+R".to_owned(), Semantic::KeyHint),
+            S::muted(" ren  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" active  ".to_owned()),
             S::styled("Esc".to_owned(), Semantic::KeyHint),
@@ -347,6 +355,8 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" view  ".to_owned()),
             S::styled("Ctrl+X".to_owned(), Semantic::KeyHint),
             S::muted(" arch  ".to_owned()),
+            S::styled("Ctrl+R".to_owned(), Semantic::KeyHint),
+            S::muted(" ren  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
             S::styled("Esc".to_owned(), Semantic::KeyHint),
@@ -442,36 +452,6 @@ fn render_agent_list(frame: &mut Frame<'_>, state: &State, visible: &[usize], ar
     let mut lines = ir::blocks_to_lines(&ir_blocks);
     apply_selection_highlight(&mut lines, &sel, inner.width);
 
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
-}
-
-/// Render the right pane when the virtual "New Agent" entry is selected.
-///
-/// Shows a prompt inviting the user to type an agent name in the input area.
-/// Border + title are layout chrome; content goes through IR pipeline.
-fn render_new_agent_prompt(frame: &mut Frame<'_>, state: &State, area: Rect) {
-    let border = RBlock::default()
-        .borders(Borders::ALL)
-        .border_style(ir::semantic_to_style(Semantic::Border))
-        .title(ratatui::text::Span::styled(" New Agent ", ir::semantic_to_style(Semantic::Accent)))
-        .style(Style::default().bg(theme::bg_base()));
-
-    let inner = border.inner(area);
-    frame.render_widget(border, area);
-
-    let title = &FocusState::get(state).new_agent_title.text;
-    let input_preview = if title.is_empty() { "\u{2026}".to_owned() } else { title.clone() };
-
-    let ir_blocks = vec![
-        IrBlock::Empty,
-        IrBlock::Line(vec![S::muted("Type a name for the new agent below,".to_owned())]),
-        IrBlock::Line(vec![S::muted("then press Enter to create it.".to_owned())]),
-        IrBlock::Empty,
-        IrBlock::Line(vec![S::accent("  \u{279c} ".to_owned()), S::new(input_preview)]),
-    ];
-
-    let lines = ir::blocks_to_lines(&ir_blocks);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
 }

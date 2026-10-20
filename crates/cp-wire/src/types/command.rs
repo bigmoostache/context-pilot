@@ -135,6 +135,15 @@ pub enum Kind {
         agent_id: String,
     },
 
+    /// Rename an agent. A blank name is rejected agent-side (no-op).
+    #[serde(rename = "rename_agent")]
+    RenameAgent {
+        /// Agent to rename.
+        agent_id: String,
+        /// New display name (trimmed agent-side).
+        name: String,
+    },
+
     /// Resume a previously paused agent.
     #[serde(rename = "resume_agent", alias = "resume_thread")]
     ResumeAgent {

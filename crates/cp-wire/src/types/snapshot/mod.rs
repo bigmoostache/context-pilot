@@ -243,6 +243,13 @@ impl RosterAgent {
         }
     }
 
+    /// Set the display `name` for `agent_id`, if present (a no-op otherwise).
+    pub fn fold_renamed(roster: &mut [Self], agent_id: &str, name: &str) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
+            name.clone_into(&mut existing.name);
+        }
+    }
+
     /// Remove `agent_id` from the roster entirely (permanent delete).
     pub fn fold_deleted(roster: &mut Vec<Self>, agent_id: &str) {
         roster.retain(|e| e.agent_id != agent_id);

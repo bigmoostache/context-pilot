@@ -244,7 +244,7 @@ fn cycle_view_mode(state: &mut State) {
 /// Apply an `Action`. Text-editing actions on the virtual "+ New Agent" row
 /// edit that row's own title textarea instead of the executing agent's composer.
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
-    if agents::is_title_edit(&action) && agents::editing_new_agent_title(state) {
+    if agents::is_title_edit(&action) && (agents::renaming(state) || agents::editing_new_agent_title(state)) {
         return agents::with_new_agent_title(state, action, dispatch_action);
     }
     dispatch_action(state, action)
@@ -449,6 +449,8 @@ fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
         | Action::AgentArchiveStart
         | Action::AgentArchiveConfirm
         | Action::AgentArchiveCancel
+        | Action::AgentRenameStart
+        | Action::AgentRenameCancel
         | Action::AgentDrillIn
         | Action::AgentDrillOut
         | Action::AgentToggleArchivedView => return agents::dispatch(state, &action),

@@ -147,6 +147,9 @@ fn create_user_notification(state: &mut State, user_id: &str, content_preview: &
 /// When `creating_agent` is active, creates a new agent with the
 /// input text as the agent name instead.
 fn handle_agent_input_submit(state: &mut State) -> ActionResult {
+    if let Some(agent_id) = FocusState::get_mut(state).renaming_agent_id.take() {
+        return handle_agent_rename(state, &agent_id);
+    }
     // `selected_agent_idx` indexes into the VISIBLE (view-filtered) agent
     // slice, not the raw storage vec — resolve it through `visible_indices`
     // for the current view (T9 archive refactor). The virtual "+ New Agent"
@@ -203,6 +206,18 @@ fn handle_agent_input_submit(state: &mut State) -> ActionResult {
     }
 
     ActionResult::Save
+}
+
+/// Apply the Ctrl+R rename typed in the title buffer (swapped into the
+/// composer by `with_new_agent_title`). A blank name keeps the old one.
+fn handle_agent_rename(state: &mut State, agent_id: &str) -> ActionResult {
+    let name = core::mem::take(&mut state.agent_mut().composer.text);
+    state.agent_mut().composer.reset();
+    state.flags.ui.dirty = true;
+    match AgentsState::get_mut(state).rename(agent_id, &name) {
+        Ok(()) => ActionResult::Save,
+        Err(_) => ActionResult::Nothing,
+    }
 }
 
 /// Create a new agent from the input text (used as agent name).

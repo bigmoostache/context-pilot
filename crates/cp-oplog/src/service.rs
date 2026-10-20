@@ -112,6 +112,7 @@ impl Durability {
             | OpEntryKind::AgentRestored { .. }
             | OpEntryKind::AgentPaused { .. }
             | OpEntryKind::AgentResumed { .. }
+            | OpEntryKind::AgentRenamed { .. }
             | OpEntryKind::AgentDeleted { .. }
             | OpEntryKind::AgentStatusChanged { .. }
             | OpEntryKind::TaskListChanged { .. }

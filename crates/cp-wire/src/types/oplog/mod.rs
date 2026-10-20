@@ -184,6 +184,15 @@ pub enum OpEntryKind {
         agent_id: String,
     },
 
+    /// An agent's display name changed (TUI, web or `Agent` tool).
+    #[serde(rename = "agent_renamed")]
+    AgentRenamed {
+        /// The renamed agent.
+        agent_id: String,
+        /// Its new display name.
+        name: String,
+    },
+
     /// An agent was permanently deleted — removed from the roster and all
     /// its messages discarded. Irreversible.
     #[serde(rename = "agent_deleted", alias = "thread_deleted")]

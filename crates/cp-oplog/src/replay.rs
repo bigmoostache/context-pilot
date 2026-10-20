@@ -101,6 +101,9 @@ pub(crate) fn fold_entry(state: &mut Recovered, entry: &OpEntry) {
         OpEntryKind::AgentResumed { ref agent_id } => {
             RosterAgent::fold_paused(&mut state.roster, agent_id, false);
         }
+        OpEntryKind::AgentRenamed { ref agent_id, ref name } => {
+            RosterAgent::fold_renamed(&mut state.roster, agent_id, name);
+        }
         OpEntryKind::AgentDeleted { ref agent_id } => {
             RosterAgent::fold_deleted(&mut state.roster, agent_id);
         }
