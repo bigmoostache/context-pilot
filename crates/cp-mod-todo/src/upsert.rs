@@ -9,8 +9,11 @@
 //! Two properties make this safe to drive blind:
 //!
 //!   * **Merge, never replace.** Tasks absent from the payload are left
-//!     untouched. Removal is an explicit `status: cancelled`, never an omission
-//!     — so a partial call can't silently wipe the roadmap.
+//!     untouched. Removal is explicit (`status: cancelled` soft-deletes,
+//!     `status: deleted` hard-removes the subtree), never an omission — so a
+//!     partial call can't silently wipe the roadmap.
+//!   * **Auto-clean.** After every call, a task whose children are all
+//!     finished (done/cancelled, recursively) loses those children.
 //!   * **Validate-then-apply.** [`upsert`] collects *every* problem before
 //!     mutating anything, so a bad call is a hard error that leaves the task
 //!     list exactly as it was (atomic, like the diff-based tool it replaces).
@@ -94,8 +97,20 @@ pub fn upsert(state: &mut State, agent_id: &str, items: &[Item]) -> Result<Vec<S
     validate(state, agent_id, items)?;
     let mut created: Vec<String> = Vec::new();
     apply_group(state, items, Loc { agent_id, parent: None }, &mut created);
+    let doomed: std::collections::BTreeSet<String> =
+        items.iter().filter(|i| is_delete(i)).filter_map(|i| i.id.clone()).collect();
+    let _deleted = crate::tools::delete_subtrees(state, &doomed);
+    let _pruned = crate::tools::prune_finished(state, agent_id);
     renumber_orders(state, agent_id);
     Ok(created)
+}
+
+/// Wire value of the hard-delete pseudo-status (not a stored [`TodoStatus`]).
+const DELETED: &str = "deleted";
+
+/// Whether `item` asks for a hard delete (`status: deleted`).
+fn is_delete(item: &Item) -> bool {
+    item.status.as_deref().map(str::trim) == Some(DELETED)
 }
 
 // =============================================================================
@@ -165,13 +180,25 @@ fn validate_create(ctx: &mut Ctx<'_>, item: &Item) {
     }
 }
 
-/// A provided `status` must be one of the four accepted wire values.
+/// A provided `status` must be one of the accepted wire values; `deleted`
+/// only on an existing task (with an `id`) and without `children`.
 fn validate_status(ctx: &mut Ctx<'_>, item: &Item) {
     let Some(raw) = item.status.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
         return;
     };
+    if raw == DELETED {
+        if item.id.is_none() {
+            ctx.errors.push("status `deleted` needs an `id` \u{2014} only existing tasks can be deleted".to_owned());
+        }
+        if !item.children.is_empty() {
+            ctx.errors.push("a `deleted` item cannot carry `children`".to_owned());
+        }
+        return;
+    }
     if parse_status(raw).is_none() {
-        ctx.errors.push(format!("invalid status `{raw}` \u{2014} use one of: planned, in_progress, done, cancelled"));
+        ctx.errors.push(format!(
+            "invalid status `{raw}` \u{2014} use one of: planned, in_progress, done, cancelled, deleted"
+        ));
     }
 }
 
@@ -191,6 +218,9 @@ struct Loc<'loc> {
 /// Apply one sibling group, then recurse into each item's children.
 fn apply_group(state: &mut State, items: &[Item], loc: Loc<'_>, created: &mut Vec<String>) {
     for item in items {
+        if is_delete(item) {
+            continue;
+        }
         let Some(id) = apply_one(state, item, loc, created) else {
             continue;
         };
