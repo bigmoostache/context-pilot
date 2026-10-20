@@ -180,12 +180,11 @@ export function parseDraft(key: string | undefined): Draft {
 }
 
 /**
- * A agent's status-dot colour: green while focused or active, the signal
- * accent when it is your turn, muted otherwise. A flat if-chain rather than
- * nested ternaries — four outcomes read as four lines.
+ * A agent's status-dot colour: the orange signal accent while the agent is
+ * working (`MY_TURN` / `ACTIVE`), muted otherwise.
  */
 export function dotColor(status: AgentDetail["status"]): string {
-  if (status === "MY_TURN" || status === "ACTIVE") return "var(--ok)"
+  if (status === "MY_TURN" || status === "ACTIVE") return "var(--signal)"
   return "var(--muted-foreground)"
 }
 

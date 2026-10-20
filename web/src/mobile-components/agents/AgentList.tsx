@@ -254,13 +254,13 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 
 /**
  * The leading status dot colour, encoding whose turn it is (T627). First match
- * wins: yellow (--warn) paused; green (--ok) agent working (MY_TURN / ACTIVE);
+ * wins: yellow (--warn) paused; orange (--signal) agent working (MY_TURN / ACTIVE);
  * grey (muted) the user's turn, or any archived row (inactive).
  */
 function statusTint(t: AgentDetail, archived: boolean): string {
   if (archived) return "var(--muted-foreground)"
   if (t.paused) return "var(--warn)"
-  if (t.status === "MY_TURN" || t.status === "ACTIVE") return "var(--ok)"
+  if (t.status === "MY_TURN" || t.status === "ACTIVE") return "var(--signal)"
   return "var(--muted-foreground)"
 }
 
