@@ -474,7 +474,7 @@ function RowAction({
         }}
         aria-label={copy.title}
         className={cn(
-          "flex size-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors",
+          "flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors",
           danger ? "hover:text-(--danger)" : "hover:text-foreground",
         )}
       >
