@@ -283,6 +283,12 @@ html.mobile.standalone .mobile-shell {
     @apply border-border;
   }
 
+  /* Tailwind v4 dropped the pointer cursor on buttons; restore it. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
 
