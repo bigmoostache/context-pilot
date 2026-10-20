@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react"
 
+import { saveSvg } from "@/lib/api/finder"
 import { animateCloseToOrigin, cn } from "@/lib/utils"
 
 /** The mermaid API surface (the dynamic import's default export). */
@@ -26,7 +27,7 @@ type MermaidApi = Awaited<typeof import("mermaid")>["default"]
  * diagram, pure waste). Held on a const object (fields mutated, binding never
  * reassigned) to keep module state without a reassigned top-level `let`.
  */
-const memo: { mod: Promise<MermaidApi> | null; theme: "dark" | "light" | null } = {
+const memo: { mod: Promise<MermaidApi> | null; theme: string | null } = {
   mod: null,
   theme: null,
 }
@@ -43,15 +44,16 @@ const svgCache = new Map<string, string>()
  * changed since the last call, and return the API. The first diagram on the
  * page pays the chunk load; every diagram after reuses this.
  */
-async function loadMermaid(dark: boolean): Promise<MermaidApi> {
+async function loadMermaid(dark: boolean, htmlLabels: boolean): Promise<MermaidApi> {
   memo.mod ??= import("mermaid").then((m) => m.default)
   const mermaid = await memo.mod
-  const theme = dark ? "dark" : "light"
+  const theme = `${dark ? "dark" : "light"}:${String(htmlLabels)}`
   if (memo.theme !== theme) {
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",
       theme: dark ? "dark" : "default",
+      htmlLabels,
     })
     memo.theme = theme
   }
@@ -70,12 +72,17 @@ const queue: { tail: Promise<unknown> } = { tail: Promise.resolve() }
  * `parse` with `suppressErrors` rejects bad input without touching the DOM, and
  * the `finally` sweeps the temp div should `render` itself still fail.
  */
-function renderSerialized(dark: boolean, id: string, code: string): Promise<string> {
+function renderSerialized(
+  dark: boolean,
+  id: string,
+  code: string,
+  htmlLabels = true,
+): Promise<string> {
   const prev = queue.tail
   const run = (async () => {
     await prev
     try {
-      const mermaid = await loadMermaid(dark)
+      const mermaid = await loadMermaid(dark, htmlLabels)
       if (!(await mermaid.parse(code, { suppressErrors: true }))) {
         throw new Error("Invalid mermaid syntax")
       }
@@ -198,6 +205,8 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
       {open && (
         <MermaidViewer
           svg={svg}
+          code={code}
+          dark={dark}
           origin={origin}
           onClose={() => {
             setOpen(false)
@@ -217,7 +226,7 @@ const INLINE_SCALE = 1.5
  * `INLINE_SCALE` while staying within the message column; in the viewer the
  * SVG gets its intrinsic width and no cap, so the CSS transform owns the scale.
  */
-function resizeSvg(svg: string, mode: "inline" | "viewer", background = ""): string {
+function resizeSvg(svg: string, mode: "inline" | "viewer"): string {
   // The viewer mounts a SECOND copy of the inline SVG: give it its own root id
   // (mermaid scopes its <style> and arrow markers by that id), else both copies
   // share ids and the markers / styles resolve against the wrong element.
@@ -227,7 +236,7 @@ function resizeSvg(svg: string, mode: "inline" | "viewer", background = ""): str
     const px = Number(raw)
     return mode === "inline"
       ? `max-width: min(100%, ${Math.round(px * INLINE_SCALE)}px);`
-      : `width: ${px}px; max-width: none;${background && ` background-color: ${background};`}`
+      : `width: ${px}px; max-width: none;`
   })
 }
 
@@ -347,40 +356,25 @@ function useViewerGestures(
     pinchRef.current = null
   }
 
+  const zoomIn = (): void => {
+    zoomAt(ZOOM.step)
+  }
+  const zoomOut = (): void => {
+    zoomAt(1 / ZOOM.step)
+  }
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const factor = { "+": ZOOM.step, "=": ZOOM.step, "-": 1 / ZOOM.step, _: 1 / ZOOM.step }[e.key]
-    if (factor !== undefined) {
-      zoomAt(factor)
-    } else if (e.key === "0") {
-      fit()
-    } else {
-      return
+    const action = { "+": zoomIn, "=": zoomIn, "-": zoomOut, _: zoomOut, "0": fit }[e.key]
+    if (action) {
+      action()
+      e.preventDefault()
     }
-    e.preventDefault()
   }
 
-  return { view, zoomAt, fit, onPointerDown, onPointerMove, onPointerUp, onKeyDown }
+  return { view, fit, zoomIn, zoomOut, onPointerDown, onPointerMove, onPointerUp, onKeyDown }
 }
 
 const TOOL_BTN =
   "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-foreground"
-
-/**
- * Save the diagram as a standalone `.svg`: intrinsic size (viewer variant) with
- * the viewer's background baked in — mermaid's dark theme draws light text on a
- * transparent canvas, unreadable once opened on a white page.
- */
-function downloadSvg(svg: string, popup: HTMLElement | null): void {
-  const background = popup ? getComputedStyle(popup).backgroundColor : "white"
-  const blob = new Blob([resizeSvg(svg, "viewer", background)], { type: "image/svg+xml" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = "diagram.svg"
-  a.click()
-  // Deferred revoke: a synchronous one can abort the download (as in finder.ts).
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
 
 /** Floating top-right toolbar: zoom out / level / zoom in / fit / download / close. */
 type Gestures = ReturnType<typeof useViewerGestures>
@@ -394,15 +388,11 @@ function ViewerToolbar({ g, onDownload }: { g: Gestures; onDownload: () => void 
   )
   return (
     <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded-lg bg-popover/90 p-1 shadow-(--shadow-pop) backdrop-blur-sm">
-      {btn("Zoom out", ZoomOut, () => {
-        g.zoomAt(1 / ZOOM.step)
-      })}
+      {btn("Zoom out", ZoomOut, g.zoomOut)}
       <span className="w-12 text-center text-[12px] text-muted-foreground tabular-nums">
         {Math.round(k * 100)}%
       </span>
-      {btn("Zoom in", ZoomIn, () => {
-        g.zoomAt(ZOOM.step)
-      })}
+      {btn("Zoom in", ZoomIn, g.zoomIn)}
       {btn("Fit to screen", Maximize2, g.fit)}
       {btn("Download SVG", Download, onDownload)}
       <DialogPrimitive.Close className={TOOL_BTN} aria-label="Close" title="Close">
@@ -424,10 +414,14 @@ function ViewerToolbar({ g, onDownload }: { g: Gestures; onDownload: () => void 
  */
 function MermaidViewer({
   svg,
+  code,
+  dark,
   origin,
   onClose,
 }: {
   svg: string
+  code: string
+  dark: boolean
   origin: HTMLElement | null
   onClose: () => void
 }): ReactNode {
@@ -466,7 +460,14 @@ function MermaidViewer({
           <ViewerToolbar
             g={g}
             onDownload={() => {
-              downloadSvg(svg, popupRef.current)
+              // Export = re-render with native <text> labels: the on-screen HTML
+              // <foreignObject> labels are clipped/dropped by Quick Look, Figma…
+              const bg = popupRef.current
+                ? getComputedStyle(popupRef.current).backgroundColor
+                : "white"
+              void renderSerialized(dark, "cp-mermaid-export", code, false).then((raw) => {
+                saveSvg(raw, bg, "diagram.svg")
+              })
             }}
           />
           <div

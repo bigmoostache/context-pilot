@@ -122,14 +122,32 @@ export async function downloadFile(fleetId: string, path: string): Promise<void>
     res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1] ??
     path.split("/").pop() ??
     "download"
+  saveBlob(blob, filename)
+}
+
+/** Hand a client-side blob to the browser as a file download named `filename`. */
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
   a.download = filename
   a.click()
   // Defer the revoke: revoking synchronously after click() can race the
-  // browser's own read of the blob and abort the download in some browsers
-  // (same fix downloadCaCert applies in maint.ts). 10s is comfortably past the
-  // navigation the click kicks off.
+  // browser's own read of the blob and abort the download in some browsers.
+  // 10s is comfortably past the navigation the click kicks off.
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/**
+ * Download a browser-rendered SVG string as a standalone file: the root's
+ * responsive `width="100%"` becomes the viewBox's fixed size (standalone
+ * viewers otherwise pick an arbitrary one) and `background` is baked into the
+ * root style, replacing mermaid's `max-width` cap.
+ */
+export function saveSvg(svg: string, background: string, filename: string): void {
+  const vb = /viewBox="([^"]+)"/.exec(svg)?.[1]?.split(/\s+/) ?? []
+  const out = svg
+    .replace(/\swidth="100%"/, () => ` width="${vb[2] ?? 0}" height="${vb[3] ?? 0}"`)
+    .replace(/max-width:\s*[\d.]+px;?/, () => `background-color: ${background};`)
+  saveBlob(new Blob([out], { type: "image/svg+xml" }), filename)
 }
