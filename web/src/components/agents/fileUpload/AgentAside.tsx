@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   Paperclip,
   ListChecks,
@@ -16,7 +16,7 @@ import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { downloadFile } from "@/lib/api"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { AgentFile } from "./FileSidebar"
-import { TaskList, NoteList } from "./AgentAsideTasks"
+import { TaskList, NoteList, NotePreview } from "./AgentAsideTasks"
 import type { AgentTask, AgentNote } from "@/lib/types"
 
 /**
@@ -69,6 +69,26 @@ function clampTab(
   return "files"
 }
 
+/** Rail width class: sidebar width for lists, 40vw (50vw with the left rail hidden) for a preview. */
+function railWidth(previewing: boolean, leftRailHidden: boolean): string {
+  if (!previewing) return "w-(--sidebar-w)"
+  return leftRailHidden ? "w-[50vw] max-w-[50vw]" : "w-[40vw] max-w-[40vw]"
+}
+
+/**
+ * The open note id for the Notes tab, reset to none when the agent changes
+ * ("adjust state while rendering": the aside is reused across agents).
+ */
+function useOpenNote(agentId: string): [string | null, (id: string | null) => void] {
+  const [noteId, setNoteId] = useState<string | null>(null)
+  const [noteAgent, setNoteAgent] = useState(agentId)
+  if (noteAgent !== agentId) {
+    setNoteAgent(agentId)
+    setNoteId(null)
+  }
+  return [noteId, setNoteId]
+}
+
 export function AgentAside({
   files,
   tasks,
@@ -106,6 +126,8 @@ export function AgentAside({
   // Per-section presence gates (T666): a tab is shown only when its section has
   // content, and the whole rail disappears when BOTH are empty (the conversation
   // then takes the full width).
+  // Open note (Notes tab list → preview).
+  const [noteId, setNoteId] = useOpenNote(agentId)
   const hasFiles = files.length > 0
   const hasTasks = tasks.length > 0
   const hasNotes = notes.length > 0
@@ -114,17 +136,19 @@ export function AgentAside({
   // Clamp the active tab to a VISIBLE one (helper hoisted to module scope so
   // this component stays under the cyclomatic-complexity budget).
   const activeTab = clampTab(tab, { hasFiles, hasTasks, hasNotes })
-  const previewing = activeTab === "files" && selectedFile !== null
+  const openNote = activeTab === "notes" ? notes.find((n) => n.id === noteId) : undefined
+  // A note preview takes the same widened rail as a file preview.
+  const previewing = (activeTab === "files" && selectedFile !== null) || openNote !== undefined
+  const back = () => {
+    onSelectFile(null)
+    setNoteId(null)
+  }
 
   return (
     <div
       className={
         "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
-        (previewing
-          ? leftRailHidden
-            ? "w-[50vw] max-w-[50vw]"
-            : "w-[40vw] max-w-[40vw]"
-          : "w-(--sidebar-w)")
+        railWidth(previewing, leftRailHidden)
       }
     >
       <TooltipProvider>
@@ -144,8 +168,8 @@ export function AgentAside({
             hasNotes={hasNotes}
             previewing={previewing}
             fleetId={fleetId}
-            file={selectedFile}
-            onBack={() => onSelectFile(null)}
+            file={activeTab === "files" ? selectedFile : null}
+            onBack={back}
             onHide={onHide}
             hintShown={hintShown}
           />
@@ -157,10 +181,14 @@ export function AgentAside({
             </TabsContent>
           )}
 
-          {/* Notes tab — the focused agent's scratchpad cells (list → expand) */}
+          {/* Notes tab — the agent's scratchpad cells: list, or the open note */}
           {hasNotes && (
-            <TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto">
-              <NoteList notes={notes} storageKey={`cp-notes-open-${fleetId}-${agentId}`} />
+            <TabsContent value="notes" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {openNote ? (
+                <NotePreview note={openNote} />
+              ) : (
+                <NoteList notes={notes} onSelect={setNoteId} />
+              )}
             </TabsContent>
           )}
 
@@ -230,7 +258,7 @@ function AsideTabBar({
           </TabsTrigger>
         )}
         {hasNotes && (
-          <TabsTrigger value="notes" className="border-0 px-2 text-[13.5px]">
+          <TabsTrigger value="notes" onClick={onBack} className="border-0 px-2 text-[13.5px]">
             <StickyNote className="size-3.5" />
             Notes
           </TabsTrigger>
