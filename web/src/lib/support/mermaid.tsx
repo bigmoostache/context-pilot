@@ -215,7 +215,12 @@ const INLINE_SCALE = 1.5
  * SVG gets its intrinsic width and no cap, so the CSS transform owns the scale.
  */
 function resizeSvg(svg: string, mode: "inline" | "viewer"): string {
-  return svg.replace(/max-width:\s*([\d.]+)px;?/, (_m, raw: string) => {
+  // The viewer mounts a SECOND copy of the inline SVG: give it its own root id
+  // (mermaid scopes its <style> and arrow markers by that id), else both copies
+  // share ids and the markers / styles resolve against the wrong element.
+  const id = /<svg[^>]*\sid="([^"]+)"/.exec(svg)?.[1]
+  const own = mode === "viewer" && id ? svg.split(id).join(`${id}-viewer`) : svg
+  return own.replace(/max-width:\s*([\d.]+)px;?/, (_m, raw: string) => {
     const px = Number(raw)
     return mode === "inline"
       ? `max-width: min(100%, ${Math.round(px * INLINE_SCALE)}px);`
@@ -248,6 +253,7 @@ function centred(el: Element, clientX: number, clientY: number): { x: number; y:
 function useViewerGestures(
   stageRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
+  stage: HTMLDivElement | null,
 ) {
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 })
   const pointersRef = useRef(new Map<number, { x: number; y: number }>())
@@ -289,8 +295,11 @@ function useViewerGestures(
   // Wheel zoom needs a NON-passive listener to preventDefault the page scroll;
   // React's onWheel is passive, hence the manual subscription. Trackpad pinch
   // arrives as ctrl+wheel with small deltas, hence the steeper factor.
+  // Keyed on the `stage` ELEMENT (state, not the ref): the popup mounts through
+  // a portal after this hook's first effect pass, when the ref is still null —
+  // a ref-read effect never re-ran, so wheel/trackpad-pinch fell through to the
+  // browser (page zoom) instead of zooming the diagram.
   useEffect(() => {
-    const stage = stageRef.current
     if (!stage) {
       return
     }
@@ -303,7 +312,7 @@ function useViewerGestures(
     return () => {
       stage.removeEventListener("wheel", onWheel)
     }
-  }, [stageRef, zoomAt])
+  }, [stage, zoomAt])
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>): void => {
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -413,7 +422,8 @@ function ViewerToolbar({
 function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }): ReactNode {
   const stageRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
-  const g = useViewerGestures(stageRef, contentRef)
+  const [stage, setStage] = useState<HTMLDivElement | null>(null)
+  const g = useViewerGestures(stageRef, contentRef, stage)
 
   return (
     <DialogPrimitive.Root
@@ -433,7 +443,10 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }): 
           <DialogPrimitive.Title className="sr-only">Diagram</DialogPrimitive.Title>
           <ViewerToolbar k={g.view.k} zoomAt={g.zoomAt} fit={g.fit} />
           <div
-            ref={stageRef}
+            ref={(el) => {
+              stageRef.current = el
+              setStage(el)
+            }}
             className="relative flex-1 cursor-grab touch-none overflow-hidden select-none active:cursor-grabbing"
             onPointerDown={g.onPointerDown}
             onPointerMove={g.onPointerMove}
