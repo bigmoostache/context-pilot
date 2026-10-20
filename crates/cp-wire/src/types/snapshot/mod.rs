@@ -138,6 +138,12 @@ pub struct RosterAgent {
     /// disk config has not flushed yet. `#[serde(default)]`: N-1 compatible.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_agent_id: Option<String>,
+
+    /// Sidebar light, folded from
+    /// [`AgentLitChanged`](super::oplog::OpEntryKind::AgentLitChanged).
+    /// `#[serde(default)]`: N-1 compatible.
+    #[serde(default)]
+    pub lit: bool,
 }
 
 /// The facts a `AgentCreated` oplog delta carries — the borrowed payload of
@@ -225,6 +231,7 @@ impl RosterAgent {
                 tasks: Vec::new(),
                 notes: Vec::new(),
                 parent_agent_id: created.parent_agent_id.map(str::to_owned),
+                lit: false,
             });
         }
     }
@@ -240,6 +247,13 @@ impl RosterAgent {
     pub fn fold_paused(roster: &mut [Self], agent_id: &str, paused: bool) {
         if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
             existing.paused = paused;
+        }
+    }
+
+    /// Set the sidebar light for `agent_id`, if present (a no-op otherwise).
+    pub fn fold_lit(roster: &mut [Self], agent_id: &str, lit: bool) {
+        if let Some(existing) = roster.iter_mut().find(|e| e.agent_id == agent_id) {
+            existing.lit = lit;
         }
     }
 

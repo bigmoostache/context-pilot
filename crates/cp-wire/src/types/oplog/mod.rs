@@ -212,6 +212,17 @@ pub enum OpEntryKind {
         status: AgentTurn,
     },
 
+    /// An agent's sidebar light flipped. Lit = the TUI agents list shows a
+    /// working spinner OR a green (human's turn, not paused) circle; the web
+    /// sidebar renders it as-is (brown lit, grey unlit), deriving nothing.
+    #[serde(rename = "agent_lit_changed")]
+    AgentLitChanged {
+        /// The affected agent.
+        agent_id: String,
+        /// The agent's new light.
+        lit: bool,
+    },
+
     /// An agent's projected task list changed — the read-only todo items the
     /// web agent view renders. Carries the agent's **complete** current
     /// (cancelled-excluded) task list as a whole-list snapshot, so an observer

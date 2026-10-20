@@ -83,6 +83,7 @@ pub(crate) fn overlay_roster(details: &mut Vec<serde_json::Value>, roster: &[Ros
                     drop(obj.insert("status".to_owned(), roster_status_value(entry.status)));
                     drop(obj.insert("archived".to_owned(), serde_json::Value::Bool(entry.archived)));
                     drop(obj.insert("paused".to_owned(), serde_json::Value::Bool(entry.paused)));
+                    drop(obj.insert("lit".to_owned(), serde_json::Value::Bool(entry.lit)));
                     // Activity is the later of the two: disk has real message
                     // timestamps; the view bumps on creation/restore.
                     let disk_activity = obj.get("lastActivity").and_then(serde_json::Value::as_u64).unwrap_or(0);
@@ -143,6 +144,7 @@ fn synthesize_from_roster(entry: &RosterEntry, fleet_id: &str) -> serde_json::Va
         "unread": 0,
         "archived": entry.archived,
         "paused": entry.paused,
+        "lit": entry.lit,
         "parentAgentId": entry.parent_agent_id,
         "log": serde_json::Value::Array(Vec::new()),
         "tasks": roster_tasks_value(entry),

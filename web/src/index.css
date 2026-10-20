@@ -134,6 +134,7 @@
   --interactive: #4e7a82; /* links / info */
   --ok: #6f9a77;
   --warn: #c2904f;
+  --lit: #8b5a3c; /* brown — sidebar agent light */
   --danger: #c0685c;
   --shadow-color: 30deg 30% 60%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 12%), 0 4px 12px hsl(var(--shadow-color) / 8%);
@@ -214,6 +215,7 @@
   --interactive: #c98f6b; /* warm tan — links / info, lighter & calmer than the primary torch */
   --ok: #86bc6f; /* forest green (TUI success) */
   --warn: #e5c07b; /* gold / amber (TUI warning) */
+  --lit: #a8714a; /* brown — sidebar agent light */
   --danger: #c85050; /* blood red (TUI error) */
   --shadow-color: 45deg 10% 3%;
   --shadow-card:

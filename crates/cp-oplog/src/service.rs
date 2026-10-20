@@ -115,6 +115,7 @@ impl Durability {
             | OpEntryKind::AgentRenamed { .. }
             | OpEntryKind::AgentDeleted { .. }
             | OpEntryKind::AgentStatusChanged { .. }
+            | OpEntryKind::AgentLitChanged { .. }
             | OpEntryKind::TaskListChanged { .. }
             | OpEntryKind::Lifecycle { .. }
             | OpEntryKind::NotesChanged { .. }

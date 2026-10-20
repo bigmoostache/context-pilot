@@ -19,7 +19,7 @@ import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottom
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
-import { previewOf, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
+import { litColor, previewOf, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { PendingSpinner } from "@/mobile-components/ui/pending"
 import { RenameInput } from "./dialogs/RenameInput"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
@@ -252,18 +252,6 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 
 // ── row ──────────────────────────────────────────────────────────────
 
-/**
- * The leading status dot colour, encoding whose turn it is (T627). First match
- * wins: yellow (--warn) paused; orange (--signal) agent working (MY_TURN / ACTIVE);
- * grey (muted) the user's turn, or any archived row (inactive).
- */
-function statusTint(t: AgentDetail, archived: boolean): string {
-  if (archived) return "var(--muted-foreground)"
-  if (t.paused) return "var(--warn)"
-  if (t.status === "MY_TURN" || t.status === "ACTIVE") return "var(--signal)"
-  return "var(--muted-foreground)"
-}
-
 /** One-line conversation row: tree indent by `depth` (guide line per level),
  *  status dot, title, unread badge at the end. Sits above the swipe-revealed
  *  action strip ({@link SwipeRow}). */
@@ -292,10 +280,7 @@ function AgentRow({
     >
       <TreeGuides depth={t.depth ?? 0} guide={guide} />
       <span className="flex min-w-0 flex-1 items-center gap-2 py-3">
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ background: statusTint(t, archived) }}
-        />
+        <span className="size-2.5 shrink-0" style={{ background: litColor(t, archived) }} />
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-[16px] text-foreground",

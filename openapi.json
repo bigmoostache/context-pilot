@@ -85,6 +85,9 @@
           "lastActivityMs": {
             "type": "integer"
           },
+          "lit": {
+            "type": "boolean"
+          },
           "log": {
             "items": {
               "$ref": "#/components/schemas/AgentMsg"
@@ -1877,6 +1880,9 @@
           },
           "kind": {
             "type": "string"
+          },
+          "lit": {
+            "type": "boolean"
           },
           "message_id": {
             "type": "string"

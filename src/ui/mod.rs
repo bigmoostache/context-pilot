@@ -16,6 +16,8 @@ pub(crate) mod perf;
 pub(crate) mod search_overlay;
 /// Theme color constants re-exported from the infra layer.
 pub(crate) use crate::infra::constants::theme;
+/// Web sidebar light, shared with the bridge emitter.
+pub(crate) use agents_view::agent_lit;
 /// Typewriter animation buffer re-exported from helpers.
 pub(crate) use helpers::TypewriterBuffer;
 

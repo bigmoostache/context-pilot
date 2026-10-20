@@ -8,7 +8,7 @@ import { Tip } from "@/components/ui/tip"
 import type { AgentDetail } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { clickable, useLoopNav } from "@/lib/support/a11y"
-import { dotColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
+import { litColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useAgentReadState } from "@/lib/live/agentView"
 import { AgentSearchPalette } from "./dialogs/AgentSearchPalette"
@@ -306,23 +306,10 @@ function AgentRow({
   )
 }
 
-/** Leading status dot: grey archived, warn paused, else {@link dotColor}; pulses
- *  while the agent is working (its turn). */
+/** Leading status square: brown when the backend's `lit` is set (TUI spinner
+ *  or green circle), grey otherwise and on archived rows. */
 function StatusDot({ t, archived }: { t: AgentDetail; archived: boolean }) {
-  const isPaused = !archived && Boolean(t.paused)
-  const live = !archived && !isPaused
-  const pulse = live && (t.status === "MY_TURN" || t.status === "ACTIVE")
-  const background = archived
-    ? "var(--muted-foreground)"
-    : isPaused
-      ? "var(--warn)"
-      : dotColor(t.status)
-  return (
-    <span
-      className={cn("size-2 shrink-0 rounded-full", pulse && "animate-pulse")}
-      style={{ background }}
-    />
-  )
+  return <span className="size-2 shrink-0" style={{ background: litColor(t, archived) }} />
 }
 
 /** Tree indent for a row: one 12px column per depth level. Ancestor columns

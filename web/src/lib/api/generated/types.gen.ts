@@ -29,6 +29,7 @@ export type AgentDetail = {
     id: string;
     lastActivity?: string;
     lastActivityMs?: number;
+    lit?: boolean;
     log: Array<AgentMsg>;
     name: string;
     notes?: Array<AgentNote>;
@@ -662,6 +663,7 @@ export type OpEntryKind = {
     inline_body?: string;
     input_tokens?: number;
     kind: string;
+    lit?: boolean;
     message_id?: string;
     message_ts?: number;
     miss_tokens?: number;

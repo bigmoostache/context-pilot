@@ -146,6 +146,11 @@ pub struct BridgeState {
     /// milliseconds, not on the next disk flush.
     pub agent_statuses: std::collections::HashMap<String, cp_wire::types::AgentTurn>,
 
+    /// Last per-agent sidebar light emitted as an `AgentLitChanged` delta. Never
+    /// seeded: the first pass emits every agent's light, so a restart self-heals
+    /// the view.
+    pub agent_lits: std::collections::HashMap<String, bool>,
+
     /// Last focused-thread id emitted as a `AgentFocusChanged` delta. The
     /// focus chokepoint diffs the live `FocusState.focused_agent_id` against
     /// this memo every tick and emits only on an actual change (the same

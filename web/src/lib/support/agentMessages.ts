@@ -179,13 +179,10 @@ export function parseDraft(key: string | undefined): Draft {
   return { text: raw, selStart: raw.length, selEnd: raw.length }
 }
 
-/**
- * A agent's status-dot colour: the orange signal accent while the agent is
- * working (`MY_TURN` / `ACTIVE`), muted otherwise.
- */
-export function dotColor(status: AgentDetail["status"]): string {
-  if (status === "MY_TURN" || status === "ACTIVE") return "var(--signal)"
-  return "var(--muted-foreground)"
+/** A sidebar row's status-square colour: brown when the backend lights it,
+ *  grey otherwise (always grey once archived). */
+export function litColor(t: AgentDetail, archived: boolean): string {
+  return !archived && t.lit ? "var(--lit)" : "var(--muted-foreground)"
 }
 
 /** Where a sidebar row's hierarchy lines run (see {@link treeGuides}). */

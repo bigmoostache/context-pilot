@@ -252,6 +252,16 @@ function foldMessageCreated(prev: AgentDetail[], k: Kind, entry: OpEntry): Agent
 
 // ── Reducers ──────────────────────────────────────────────────────────
 
+/** Deltas that only patch one agent's fields, keyed by `kind`. */
+const FLAG_PATCH: Partial<Record<string, (k: Kind) => Partial<AgentDetail>>> = {
+  agent_archived: () => ({ archived: true }),
+  agent_restored: () => ({ archived: false }),
+  agent_paused: () => ({ paused: true }),
+  agent_resumed: () => ({ paused: false }),
+  agent_status_changed: (k) => ({ status: turnToStatus(k.status) }),
+  agent_lit_changed: (k) => ({ lit: Boolean(k.lit) }),
+}
+
 /**
  * Fold one oplog delta into the live agent roster (the agents cache).
  *
@@ -266,21 +276,11 @@ export function applyAgentDelta(
 ): AgentDetail[] | null {
   if (!prev) return null // not loaded yet → invalidate/hydrate
   const k = entry.kind
+  const flag = FLAG_PATCH[k.kind]
+  if (flag) return foldAgentFlag(prev, k.agent_id, flag(k))
   switch (k.kind) {
     case "agent_created": {
       return foldAgentCreated(prev, k)
-    }
-    case "agent_archived": {
-      return foldAgentFlag(prev, k.agent_id, { archived: true })
-    }
-    case "agent_restored": {
-      return foldAgentFlag(prev, k.agent_id, { archived: false })
-    }
-    case "agent_paused": {
-      return foldAgentFlag(prev, k.agent_id, { paused: true })
-    }
-    case "agent_resumed": {
-      return foldAgentFlag(prev, k.agent_id, { paused: false })
     }
     case "agent_renamed": {
       return foldAgentRenamed(prev, k)
@@ -290,9 +290,6 @@ export function applyAgentDelta(
     }
     case "message_deleted": {
       return foldMessageDeleted(prev, k)
-    }
-    case "agent_status_changed": {
-      return foldAgentFlag(prev, k.agent_id, { status: turnToStatus(k.status) })
     }
     case "task_list_changed": {
       return foldTaskList(prev, k)

@@ -424,6 +424,8 @@ pub(super) fn transport() -> Value {
                 "agent_id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string" },
+                // agent_lit_changed payload: the sidebar light.
+                "lit": { "type": "boolean" },
                 "timestamp_ms": { "type": "integer" },
                 // agent_created delta payload: the parent agent id when the new
                 // agent was branched out of another one (absent otherwise).

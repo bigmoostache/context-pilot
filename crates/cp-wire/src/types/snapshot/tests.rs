@@ -94,6 +94,7 @@ fn snapshot_round_trip_with_roster() {
         tasks: Vec::new(),
         notes: Vec::new(),
         parent_agent_id: Some("T0".into()),
+        lit: true,
     });
     let json = serde_json::to_string(&snapshot).expect("serialize");
     let back: Snapshot = serde_json::from_str(&json).expect("deserialize");

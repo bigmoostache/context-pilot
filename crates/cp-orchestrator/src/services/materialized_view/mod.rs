@@ -191,6 +191,9 @@ impl FleetView {
             OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
                 RosterAgent::fold_status(&mut self.roster, agent_id, status);
             }
+            OpEntryKind::AgentLitChanged { ref agent_id, lit } => {
+                RosterAgent::fold_lit(&mut self.roster, agent_id, lit);
+            }
             OpEntryKind::TaskListChanged { ref agent_id, ref tasks } => {
                 RosterAgent::fold_tasks(&mut self.roster, agent_id, tasks.clone());
             }
