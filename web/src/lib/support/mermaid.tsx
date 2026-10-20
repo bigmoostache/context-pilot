@@ -1,5 +1,5 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Maximize2, XIcon, ZoomIn, ZoomOut } from "lucide-react"
+import { Download, Maximize2, XIcon, ZoomIn, ZoomOut } from "lucide-react"
 import {
   useCallback,
   useEffect,
@@ -217,7 +217,7 @@ const INLINE_SCALE = 1.5
  * `INLINE_SCALE` while staying within the message column; in the viewer the
  * SVG gets its intrinsic width and no cap, so the CSS transform owns the scale.
  */
-function resizeSvg(svg: string, mode: "inline" | "viewer"): string {
+function resizeSvg(svg: string, mode: "inline" | "viewer", background = ""): string {
   // The viewer mounts a SECOND copy of the inline SVG: give it its own root id
   // (mermaid scopes its <style> and arrow markers by that id), else both copies
   // share ids and the markers / styles resolve against the wrong element.
@@ -227,7 +227,7 @@ function resizeSvg(svg: string, mode: "inline" | "viewer"): string {
     const px = Number(raw)
     return mode === "inline"
       ? `max-width: min(100%, ${Math.round(px * INLINE_SCALE)}px);`
-      : `width: ${px}px; max-width: none;`
+      : `width: ${px}px; max-width: none;${background && ` background-color: ${background};`}`
   })
 }
 
@@ -254,7 +254,6 @@ function centred(el: Element, clientX: number, clientY: number): { x: number; y:
  * anchored at the cursor, one-pointer drag pan, `+`/`-`/`0` keys, fit-to-stage.
  */
 function useViewerGestures(
-  stageRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
   stage: HTMLDivElement | null,
 ) {
@@ -273,7 +272,6 @@ function useViewerGestures(
 
   /** Fit the whole diagram in the stage with a small margin, centred. */
   const fit = useCallback(() => {
-    const stage = stageRef.current
     const svgEl = contentRef.current?.querySelector("svg")
     if (!stage || !svgEl) {
       return
@@ -285,7 +283,7 @@ function useViewerGestures(
       y: 0,
       k: clampK(Math.min((stage.clientWidth * 0.92) / w, (stage.clientHeight * 0.92) / h)),
     })
-  }, [stageRef, contentRef])
+  }, [stage, contentRef])
 
   // Fit once the popup is mounted and measurable.
   useLayoutEffect(() => {
@@ -367,45 +365,47 @@ function useViewerGestures(
 const TOOL_BTN =
   "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-foreground"
 
-/** Floating top-right toolbar: zoom out / level / zoom in / fit / close. */
-function ViewerToolbar({
-  k,
-  zoomAt,
-  fit,
-}: {
-  k: number
-  zoomAt: (factor: number) => void
-  fit: () => void
-}): ReactNode {
+/**
+ * Save the diagram as a standalone `.svg`: intrinsic size (viewer variant) with
+ * the viewer's background baked in — mermaid's dark theme draws light text on a
+ * transparent canvas, unreadable once opened on a white page.
+ */
+function downloadSvg(svg: string, popup: HTMLElement | null): void {
+  const background = popup ? getComputedStyle(popup).backgroundColor : "white"
+  const blob = new Blob([resizeSvg(svg, "viewer", background)], { type: "image/svg+xml" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "diagram.svg"
+  a.click()
+  // Deferred revoke: a synchronous one can abort the download (as in finder.ts).
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/** Floating top-right toolbar: zoom out / level / zoom in / fit / download / close. */
+type Gestures = ReturnType<typeof useViewerGestures>
+
+function ViewerToolbar({ g, onDownload }: { g: Gestures; onDownload: () => void }): ReactNode {
+  const { k } = g.view
+  const btn = (label: string, Icon: typeof ZoomIn, onClick: () => void): ReactNode => (
+    <button type="button" className={TOOL_BTN} aria-label={label} title={label} onClick={onClick}>
+      <Icon className="size-4" />
+    </button>
+  )
   return (
     <div className="absolute top-3 right-3 z-10 flex items-center gap-0.5 rounded-lg bg-popover/90 p-1 shadow-(--shadow-pop) backdrop-blur-sm">
-      <button
-        type="button"
-        className={TOOL_BTN}
-        aria-label="Zoom out"
-        onClick={() => {
-          zoomAt(1 / ZOOM.step)
-        }}
-      >
-        <ZoomOut className="size-4" />
-      </button>
+      {btn("Zoom out", ZoomOut, () => {
+        g.zoomAt(1 / ZOOM.step)
+      })}
       <span className="w-12 text-center text-[12px] text-muted-foreground tabular-nums">
         {Math.round(k * 100)}%
       </span>
-      <button
-        type="button"
-        className={TOOL_BTN}
-        aria-label="Zoom in"
-        onClick={() => {
-          zoomAt(ZOOM.step)
-        }}
-      >
-        <ZoomIn className="size-4" />
-      </button>
-      <button type="button" className={TOOL_BTN} aria-label="Fit to screen" onClick={fit}>
-        <Maximize2 className="size-4" />
-      </button>
-      <DialogPrimitive.Close className={TOOL_BTN} aria-label="Close">
+      {btn("Zoom in", ZoomIn, () => {
+        g.zoomAt(ZOOM.step)
+      })}
+      {btn("Fit to screen", Maximize2, g.fit)}
+      {btn("Download SVG", Download, onDownload)}
+      <DialogPrimitive.Close className={TOOL_BTN} aria-label="Close" title="Close">
         <XIcon className="size-4" />
       </DialogPrimitive.Close>
     </div>
@@ -434,10 +434,9 @@ function MermaidViewer({
   const popupRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
   const closingRef = useRef(false)
-  const stageRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
-  const g = useViewerGestures(stageRef, contentRef, stage)
+  const g = useViewerGestures(contentRef, stage)
 
   return (
     <DialogPrimitive.Root
@@ -464,12 +463,14 @@ function MermaidViewer({
           onKeyDown={g.onKeyDown}
         >
           <DialogPrimitive.Title className="sr-only">Diagram</DialogPrimitive.Title>
-          <ViewerToolbar k={g.view.k} zoomAt={g.zoomAt} fit={g.fit} />
-          <div
-            ref={(el) => {
-              stageRef.current = el
-              setStage(el)
+          <ViewerToolbar
+            g={g}
+            onDownload={() => {
+              downloadSvg(svg, popupRef.current)
             }}
+          />
+          <div
+            ref={setStage}
             className="relative flex-1 cursor-grab touch-none overflow-hidden select-none active:cursor-grabbing"
             onPointerDown={g.onPointerDown}
             onPointerMove={g.onPointerMove}
