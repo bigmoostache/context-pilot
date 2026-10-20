@@ -235,33 +235,34 @@ function AssistantMessage({
 }: MessageProps) {
   return (
     <div className="flex flex-col gap-1.5 py-2">
-      <div className="flex items-center gap-2">
-        <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/15">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-(--signal)/15">
           <span className="size-2 rounded-full bg-(--signal)" />
         </span>
-        <span className="text-[12px] font-semibold text-foreground/85">Context Pilot</span>
-        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+        <div className="max-w-[88%] min-w-0 text-[13.5px] leading-relaxed text-foreground/90">
+          <MessageBody
+            text={msg.text ?? ""}
+            variant="default"
+            fleetId={fleetId}
+            onOpenFile={onOpenFile}
+            onShowInFinder={onShowInFinder}
+            renderForm={renderForm}
+          />
+          {msg.streaming && (
+            <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-(--signal)" />
+          )}
+        </div>
       </div>
-      <div className="max-w-[88%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
-        <MessageBody
-          text={msg.text ?? ""}
-          variant="default"
-          fleetId={fleetId}
-          onOpenFile={onOpenFile}
-          onShowInFinder={onShowInFinder}
-          renderForm={renderForm}
-        />
-        {msg.streaming && (
-          <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-(--signal)" />
+      <div className="flex items-center gap-2 pl-7">
+        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+        {!msg.streaming && (
+          <>
+            <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+            {onBranch && <BranchButton align="start" onBranch={onBranch} />}
+            {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
+          </>
         )}
       </div>
-      {!msg.streaming && (
-        <div className="flex items-center gap-2 pl-7">
-          <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
-          {onBranch && <BranchButton align="start" onBranch={onBranch} />}
-          {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
-        </div>
-      )}
     </div>
   )
 }
