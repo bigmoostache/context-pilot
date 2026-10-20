@@ -89,7 +89,7 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
   const [mounted, setMounted] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const chevronRef = useRef<SVGSVGElement>(null)
-  const anim = useRef<JSAnimation | null>(null)
+  const heightAnim = useRef<Animation | null>(null)
   const rowAnims = useRef<JSAnimation[]>([])
   const first = useRef(true)
   const n = msgs.length
@@ -109,37 +109,34 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
     }
     const el = bodyRef.current
     if (!el) return
-    anim.current?.pause()
+    // Read the live height BEFORE cancelling, so a mid-flight toggle reverses
+    // from where the body is on screen, not from the cancelled tween's target.
+    const from = el.getBoundingClientRect().height
+    heightAnim.current?.cancel()
     if (reduced) {
       el.style.height = open ? "auto" : "0px"
       if (!open) setMounted(false)
       return
     }
     for (const a of rowAnims.current) a.pause()
-    const from = el.offsetHeight
     rowAnims.current = animateRows(el, open, from === 0)
-    // Closing mirrors opening: rows fade out bottom-up while the height eases shut.
-    anim.current = animate(
-      el,
-      open
-        ? {
-            height: [from, el.scrollHeight],
-            duration: 420,
-            ease: "outQuint",
-            onComplete: () => {
-              el.style.height = "auto"
-            },
-          }
-        : {
-            height: [from, 0],
-            duration: 340,
-            delay: 60,
-            ease: "inOutQuart",
-            onComplete: () => {
-              setMounted(false)
-            },
-          },
-    )
+    // Height runs on WAAPI with explicit px keyframes: anime.js left the body
+    // pinned at `auto` for the whole close, so the chat only moved when the
+    // rows unmounted (measured frame by frame). The inline height is set to
+    // the end value up front; the animation overrides it while it runs.
+    const to = open ? el.scrollHeight : 0
+    el.style.height = `${String(to)}px`
+    const h = el.animate([{ height: `${String(from)}px` }, { height: `${String(to)}px` }], {
+      duration: open ? 420 : 340,
+      delay: open ? 0 : 60,
+      easing: open ? "cubic-bezier(0.22, 1, 0.36, 1)" : "cubic-bezier(0.76, 0, 0.24, 1)",
+      fill: "backwards",
+    })
+    h.onfinish = () => {
+      if (open) el.style.height = "auto"
+      else setMounted(false)
+    }
+    heightAnim.current = h
   }, [open])
 
   const toggle = () => {
