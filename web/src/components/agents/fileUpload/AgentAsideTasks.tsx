@@ -70,7 +70,7 @@ export function TaskList({ tasks }: { tasks: AgentTask[] }) {
 function ProgressHeader({ done, total }: { done: number; total: number }) {
   return (
     <div className="mb-2 px-2">
-      <div className="flex items-baseline justify-between text-[11px] text-muted-foreground/60">
+      <div className="flex items-baseline justify-between text-[11px] text-foreground/75">
         <span>Tasks</span>
         <span className="tabular-nums">
           {done} of {total} done
@@ -110,12 +110,8 @@ function TaskRow({
   onToggle: () => void
 }) {
   const parent = progress !== undefined
-  const text =
-    task.status === "done"
-      ? "text-muted-foreground/55"
-      : task.status === "in_progress"
-        ? "font-medium text-foreground"
-        : "text-foreground/80"
+  // No greying: every state stays fully readable; the icon carries the status.
+  const text = task.status === "in_progress" ? "font-medium text-foreground" : "text-foreground/90"
 
   return (
     <div
@@ -154,11 +150,11 @@ function TaskRow({
         {task.name}
       </span>
       {parent && (
-        <span className="flex h-[18px] shrink-0 items-center gap-1 text-[10.5px] text-muted-foreground/50 tabular-nums">
+        <span className="flex h-[18px] shrink-0 items-center gap-1 text-[10.5px] text-foreground/65 tabular-nums">
           {progress.done}/{progress.total}
           <ChevronRight
             className={
-              "size-3 text-muted-foreground/45 transition-transform duration-150" +
+              "size-3 text-foreground/55 transition-transform duration-150" +
               (collapsed ? "" : " rotate-90")
             }
           />
@@ -184,7 +180,7 @@ function StatusIcon({ status }: { status: AgentTask["status"] }) {
       role="img"
     >
       {status === "planned" && (
-        <circle {...ring} stroke="currentColor" className="text-muted-foreground/45" />
+        <circle {...ring} stroke="currentColor" className="text-foreground/45" />
       )}
       {status === "in_progress" && (
         <>
@@ -403,14 +399,14 @@ function NoteRow({
           <StickyNote className="size-3 shrink-0 text-(--linear-purple)" />
         </span>
         <span className="flex min-h-4 min-w-0 flex-1 items-center">
-          <span className="truncate text-[12.5px]/none text-foreground/85 group-hover:text-foreground">
+          <span className="truncate text-[12.5px]/none text-foreground/90 group-hover:text-foreground">
             {note.title}
           </span>
         </span>
         <span className="flex h-4 shrink-0 items-center">
           <ChevronRight
             className={
-              "size-3 text-muted-foreground/45 transition-transform" + (open ? " rotate-90" : "")
+              "size-3 text-foreground/55 transition-transform" + (open ? " rotate-90" : "")
             }
           />
         </span>
