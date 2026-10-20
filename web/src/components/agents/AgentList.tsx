@@ -3,9 +3,10 @@ import { useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { PendingSpinner } from "@/components/ui/pending"
 import { SelectionGlide } from "@/components/ui/selectionGlide"
+import { useDepartures, useTitleMarquee } from "@/components/ui/rowMotion"
 import { Tip } from "@/components/ui/tip"
 import type { AgentDetail } from "@/lib/types"
-import { cn, prefersReducedMotion } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { clickable, useLoopNav } from "@/lib/support/a11y"
 import { dotColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
@@ -97,6 +98,11 @@ export function AgentList({
     />
   )
 
+  // Archived/deleted rows collapse in place; the rows below slide up.
+  const rows = useDepartures(visible, showArchived ? "archived" : "live", (t) =>
+    row(t, showArchived),
+  )
+
   // `bg-surface-2` (`--card` is the selected row on top). Flush, no h-margin.
   return (
     <aside className="card-shadow my-2 flex w-(--sidebar-w) shrink-0 flex-col overflow-hidden rounded-none border border-border bg-surface-2">
@@ -122,7 +128,7 @@ export function AgentList({
             />
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
-            {visible.map((t) => row(t, showArchived))}
+            {rows}
           </div>
         </ScrollArea>
 
@@ -184,31 +190,6 @@ function ListHeader({
 function EmptyState({ showArchived }: { showArchived: boolean }) {
   const message = showArchived ? "No archived agents." : "No agents yet."
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
-}
-
-/** Row-hover title marquee (WAA): dwell, scroll left ~10 chars/s, dwell, reset. No-op if it fits / reduced-motion. */
-function useTitleMarquee() {
-  const trackRef = useRef<HTMLSpanElement>(null)
-  const animRef = useRef<Animation | null>(null)
-  const onMouseEnter = () => {
-    const el = trackRef.current
-    if (!el || prefersReducedMotion()) return
-    const dist = Math.max(0, el.scrollWidth - el.clientWidth)
-    if (dist === 0) return
-    const scrollS = dist / (el.scrollWidth / Math.max(1, el.textContent.length)) / 10
-    const total = 0.6 + scrollS
-    animRef.current = el.animate(
-      [
-        { transform: "translateX(0)", offset: 0 },
-        { transform: "translateX(0)", offset: 0.3 / total },
-        { transform: `translateX(-${dist}px)`, offset: (0.3 + scrollS) / total },
-        { transform: `translateX(-${dist}px)`, offset: 1 },
-      ],
-      { duration: total * 1000, iterations: Infinity, easing: "linear" },
-    )
-  }
-  const onMouseLeave = () => animRef.current?.cancel()
-  return { trackRef, onMouseEnter, onMouseLeave }
 }
 
 /** Agent title markup — ellipsis at rest, brightens + un-clips on row hover; motion via {@link useTitleMarquee}. */
