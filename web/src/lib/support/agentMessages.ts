@@ -264,10 +264,9 @@ export interface Banner {
  * Resolve the composer's turn-status banner from the agent state (T39/T371).
  *
  * A flat precedence chain (not a nested ternary): a paused agent shows the
- * amber pause notice; otherwise, only when the agent owes this agent a
- * response, an active spinner while streaming / working the FOCUSED agent, or
- * a static "will pick up soon" clock for a queued (non-focused) agent-turn
- * agent. Returns null on the user's turn (no banner).
+ * amber pause notice; otherwise, on the agent's turn, a spinner reading
+ * "streaming" or "working" (focus plays no part). Returns null on the user's
+ * turn (no banner).
  *
  * Lives here, beside {@link ROW_ACTION_COPY}, for the same reason: it is a pure
  * agent-state → copy derivation with no JSX in it, and the sentences it picks
@@ -277,7 +276,6 @@ export function resolveComposerBanner(
   paused: boolean,
   fleetBusy: boolean,
   streaming: boolean,
-  focused: boolean,
 ): Banner | null {
   if (paused) {
     return {
@@ -291,18 +289,5 @@ export function resolveComposerBanner(
   if (streaming) {
     return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
   }
-  if (focused) {
-    return {
-      working: true,
-      paused: false,
-      color: "var(--signal)",
-      text: "Agent is working…",
-    }
-  }
-  return {
-    working: false,
-    paused: false,
-    color: undefined,
-    text: "Agent will pick this up soon.",
-  }
+  return { working: true, paused: false, color: "var(--signal)", text: "Agent is working…" }
 }

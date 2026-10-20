@@ -25,7 +25,6 @@ export type { CommandSuggestion } from "@/mobile-components/agents/fileUpload/he
  */
 export function AgentComposer({
   status,
-  focused = false,
   paused = false,
   onSend,
   onAttach,
@@ -39,8 +38,6 @@ export function AgentComposer({
   commandKey,
 }: {
   status: AgentStatus
-  /** true when this is the single agent the agent is currently focused on */
-  focused?: boolean | undefined
   /** true when this agent has been paused by the user (T371) */
   paused?: boolean | undefined
   onSend?: ((text: string) => Promise<boolean>) | undefined
@@ -69,7 +66,7 @@ export function AgentComposer({
   const userTurn = status === "THEIR_TURN"
   const streaming = status === "ACTIVE"
   const fleetBusy = !userTurn
-  const banner = resolveComposerBanner(paused, fleetBusy, streaming, focused)
+  const banner = resolveComposerBanner(paused, fleetBusy, streaming)
 
   const sendable = composer.canSend(pendingFiles.length)
 

@@ -316,7 +316,6 @@ export function AgentConversation({
         <AgentComposer
           key={agent.id}
           status={agent.status}
-          focused={agent.focused}
           paused={agent.paused}
           onSend={onSend}
           onAttach={onAttach}
