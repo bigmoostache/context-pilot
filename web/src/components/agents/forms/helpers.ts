@@ -237,23 +237,28 @@ function parseFormBody(body: string): FormSpec | null {
   return spec
 }
 
-/** Parse every ` ```form ` block in a message body into {@link FormSpec}s (a
- *  malformed block is skipped, matching the send-time guard). */
-export function parseFormBlocks(text: string): FormSpec[] {
-  const out: FormSpec[] = []
-  FORM_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = FORM_RE.exec(text)) !== null) {
-    const spec = parseFormBody(m[1] ?? "")
-    if (spec) out.push(spec)
-  }
-  return out
-}
+/** An ordered render segment of a form-bearing body: a run of prose, or one
+ *  parsed form at the exact position its ` ```form ` block appeared. */
+export type FormSegment = { type: "text"; text: string } | { type: "form"; spec: FormSpec }
 
-/** Remove every ` ```form ` block from a message body so the prose can render
- *  without the raw YAML (the widget is drawn separately). */
-export function stripFormBlocks(text: string): string {
-  return text.replaceAll(FORM_RE, "").trim()
+/** Split a body into ordered prose / form segments so the widget renders where
+ *  the LLM placed it, not after the prose. Malformed blocks and blank prose runs
+ *  are dropped. */
+export function splitFormSegments(text: string): FormSegment[] {
+  const out: FormSegment[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  FORM_RE.lastIndex = 0
+  while ((m = FORM_RE.exec(text)) !== null) {
+    const before = text.slice(last, m.index)
+    if (before.trim().length > 0) out.push({ type: "text", text: before })
+    const spec = parseFormBody(m[1] ?? "")
+    if (spec) out.push({ type: "form", spec })
+    last = m.index + m[0].length
+  }
+  const tail = text.slice(last)
+  if (tail.trim().length > 0) out.push({ type: "text", text: tail })
+  return out
 }
 
 /**

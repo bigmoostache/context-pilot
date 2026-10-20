@@ -16,13 +16,7 @@ import type { AgentMsg } from "@/lib/types"
 import type { UploadedFile } from "../fileUpload/helpers"
 import { toChatMessage } from "@/lib/support/agentMessages"
 import { FormWidget } from "./FormWidget"
-import {
-  parseFormAnswerBlock,
-  parseFormBlocks,
-  stripFormBlocks,
-  type FormAnswer,
-  type FormAnswerEntry,
-} from "./helpers"
+import { parseFormAnswerBlock, type FormAnswer, type FormAnswerEntry } from "./helpers"
 
 /**
  * One message row that carries form content — NOT memoized, so it re-renders
@@ -33,7 +27,7 @@ import {
  *
  * A `form-answer` message renders ONLY a compact "answered" summary line (never
  * the raw YAML, never a widget — docs/forms.md §5). A `form` message renders its
- * prose (form blocks stripped out) followed by one {@link FormWidget} per block,
+ * prose with one {@link FormWidget} inline at each block's position,
  * each resolving its locked state from `answersByForm` by `form-id`.
  */
 export function FormMessageRow({
@@ -71,34 +65,24 @@ export function FormMessageRow({
     )
   }
 
-  // A form message: prose (form blocks stripped) + one widget per block.
-  const forms = parseFormBlocks(text)
-  const stripped = stripFormBlocks(text)
-  const chatMsg = { ...toChatMessage(msg), text: stripped }
+  // A form message: each widget renders inline where its block sat in the text.
   return (
-    <div>
-      {stripped.length > 0 && (
-        <Message
-          msg={chatMsg}
+    <Message
+      msg={toChatMessage(msg)}
+      fleetId={fleetId}
+      onOpenFile={onOpenFile}
+      onShowInFinder={onShowInFinder}
+      onDelete={() => onDelete(msg)}
+      onBranch={onBranch ? () => onBranch(msg) : undefined}
+      renderForm={(spec) => (
+        <FormWidget
+          spec={spec}
           fleetId={fleetId}
-          onOpenFile={onOpenFile}
-          onShowInFinder={onShowInFinder}
-          onDelete={() => onDelete(msg)}
-          onBranch={onBranch ? () => onBranch(msg) : undefined}
+          answer={answersByForm.get(spec.formId) ?? null}
+          draftKey={`cp-form-${fleetId}-${agentId}-${spec.formId}`}
+          onSubmit={onFormSubmit}
         />
       )}
-      <div className="pl-7">
-        {forms.map((spec) => (
-          <FormWidget
-            key={spec.formId}
-            spec={spec}
-            fleetId={fleetId}
-            answer={answersByForm.get(spec.formId) ?? null}
-            draftKey={`cp-form-${fleetId}-${agentId}-${spec.formId}`}
-            onSubmit={onFormSubmit}
-          />
-        ))}
-      </div>
-    </div>
+    />
   )
 }
