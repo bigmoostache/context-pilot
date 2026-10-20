@@ -7,12 +7,12 @@
 //! One tool: `Send` (post a message into a group). `Read(group_id)` lives
 //! in cp-coordination.
 
-/// Send-time validation of agent-authored ` ```form ` blocks.
-mod forms;
 /// Incoming-message behavior for the focused agent (idle auto-read + streaming push).
 pub mod incoming;
 /// Panel rendering for the agent list.
 mod panel;
+/// Send-time checks: form-block validation and the staleness guard.
+mod send;
 /// Tool execution handler: `Send`.
 pub mod tools;
 /// Agent state types: `Agent`, `AgentMessage`, `AgentsState`, `FocusState`.
@@ -320,7 +320,7 @@ fn preflight_send(tool: &ToolUse, state: &State, pf: &mut Verdict) {
         pf.errors.push("Send requires a non-empty markdown".to_owned());
     }
     if let Some(md) = markdown {
-        for err in forms::validate_form_blocks(md) {
+        for err in send::forms::validate_form_blocks(md) {
             pf.errors.push(err);
         }
     }
