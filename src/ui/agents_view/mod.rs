@@ -185,12 +185,18 @@ fn agent_circle_rgb(agent: &cp_mod_agents::types::Agent, my_turn: bool) -> (u8, 
     if let ratatui::style::Color::Rgb(r, g, b) = color { (r, g, b) } else { (200, 200, 200) }
 }
 
-/// Whether an agent's exec state should show the "working" spinner — the
-/// per-agent analog of the footer badge needing a spinner (STREAMING /
-/// TOOLING / WAITING). `Idle` is READY (void) and `Errored` is parked (void),
-/// exactly like the footer's READY / BLOCKED badges carry no spinner.
+/// Whether an agent's exec state should show the "working" spinner.
+///
+/// Only [`Streaming`](AgentExecState::Streaming) counts: a stream, its tools or
+/// a blocking wait is actually in flight. [`Runnable`](AgentExecState::Runnable)
+/// is deliberately NOT working — it means `MyTurn` + not streaming, i.e. the LLM
+/// owes a turn but nothing is running right now. That is a stall the human
+/// should notice (⚠ in [`leading_slot`]), not a spinner. A refusal/abnormal stop
+/// leaves the agent exactly here (still `MyTurn`, parked), so narrowing the
+/// spinner to `Streaming` is what surfaces the ⚠ on refusal-stopped agents.
+/// `Idle` and `Errored` are likewise void of the spinner.
 const fn agent_is_working(exec: AgentExecState) -> bool {
-    matches!(exec, AgentExecState::Runnable | AgentExecState::Streaming)
+    matches!(exec, AgentExecState::Streaming)
 }
 
 /// The web sidebar light: the row shows the working spinner OR an orange
