@@ -285,9 +285,11 @@ function AgentRow({
     <div
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
-      className="agent-row group relative flex w-full items-stretch rounded-lg px-2.5 text-left select-none"
+      className={cn(
+        "agent-row group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-[background-color,scale] duration-300 ease-out select-none hover:duration-150 active:scale-[0.99]",
+        !selected && "hover:bg-card/55",
+      )}
       data-row-id={t.id}
-      data-selected={selected || undefined}
     >
       {navHint && (
         <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
@@ -339,7 +341,7 @@ function StatusDot({ t, archived }: { t: AgentDetail; archived: boolean }) {
       : dotColor(isFocused, t.status)
   return (
     <span
-      className={cn("agent-dot size-2 shrink-0 rounded-full", pulse && "animate-pulse")}
+      className={cn("size-2 shrink-0 rounded-full", pulse && "animate-pulse")}
       style={{ background }}
     />
   )
