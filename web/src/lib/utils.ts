@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { zip as fflateZip } from "fflate"
+import { animate } from "animejs"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -446,3 +447,46 @@ export function resolveTab(
 }
 
 // Touch: workspace-test CI wiring verified (T518).
+
+/**
+ * Dialog close flourish (anime.js): the popup flies back into the element it
+ * opened from (`origin`'s rect) while shrinking and fading, the backdrop fades with it,
+ * then `done` unmounts. Origin gone / off-screen → plain shrink + fade.
+ * Reduced motion skips straight to `done`.
+ */
+export function animateCloseToOrigin(
+  popup: HTMLElement | null,
+  backdrop: HTMLElement | null,
+  origin: HTMLElement | null,
+  done: () => void,
+): void {
+  if (!popup || prefersReducedMotion()) {
+    done()
+    return
+  }
+  const p = popup.getBoundingClientRect()
+  const o = origin?.getBoundingClientRect()
+  const visible = o && o.bottom > 0 && o.top < innerHeight && o.width > 0
+  const to = visible
+    ? {
+        translateX: o.left + o.width / 2 - (p.left + p.width / 2),
+        translateY: o.top + o.height / 2 - (p.top + p.height / 2),
+        scale: Math.max(0.05, Math.min(o.width / p.width, o.height / p.height)),
+      }
+    : { translateX: 0, translateY: 24, scale: 0.9 }
+  popup.style.animation = "none"
+  if (backdrop) {
+    animate(backdrop, { opacity: 0, duration: 320, ease: "outQuad" })
+  }
+  animate(popup, {
+    ...to,
+    opacity: [
+      { to: 1, duration: 140 },
+      { to: 0, duration: 260 },
+    ],
+    borderRadius: 12 / to.scale,
+    duration: 400,
+    ease: "inOutCubic",
+    onComplete: done,
+  })
+}

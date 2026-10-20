@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react"
 
-import { cn } from "@/lib/utils"
+import { animateCloseToOrigin, cn } from "@/lib/utils"
 
 /** The mermaid API surface (the dynamic import's default export). */
 type MermaidApi = Awaited<typeof import("mermaid")>["default"]
@@ -117,6 +117,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
   const [svg, setSvg] = useState<string | null>(() => svgCache.get(cacheKey) ?? null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [origin, setOrigin] = useState<HTMLButtonElement | null>(null)
   // `useId` gives a stable, globally-unique id per component instance; strip the
   // framework's `:` delimiters so it is a valid DOM/SVG id (mermaid uses it in
   // selectors internally).
@@ -178,6 +179,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
   return (
     <>
       <button
+        ref={setOrigin}
         type="button"
         title="Open diagram"
         aria-label="Open diagram full size"
@@ -196,6 +198,7 @@ export function Mermaid({ code, onAccent }: { code: string; onAccent: boolean })
       {open && (
         <MermaidViewer
           svg={svg}
+          origin={origin}
           onClose={() => {
             setOpen(false)
           }}
@@ -419,7 +422,18 @@ function ViewerToolbar({
  * size and moved with one CSS transform, so zoom stays crisp (vector) and never
  * re-runs mermaid's layout.
  */
-function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }): ReactNode {
+function MermaidViewer({
+  svg,
+  origin,
+  onClose,
+}: {
+  svg: string
+  origin: HTMLElement | null
+  onClose: () => void
+}): ReactNode {
+  const popupRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const closingRef = useRef(false)
   const stageRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
@@ -429,14 +443,23 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }): 
     <DialogPrimitive.Root
       open
       onOpenChange={(next) => {
-        if (!next) {
-          onClose()
+        // Stay mounted (open) while the close flourish plays; Esc / ✕ /
+        // backdrop clicks all land here, the ref ignores repeats mid-flight.
+        if (next || closingRef.current) {
+          return
         }
+
+        closingRef.current = true
+        animateCloseToOrigin(popupRef.current, backdropRef.current, origin, onClose)
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        <DialogPrimitive.Backdrop
+          ref={backdropRef}
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[3px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0"
+        />
         <DialogPrimitive.Popup
+          ref={popupRef}
           className="fixed top-1/2 left-1/2 z-50 flex h-[90vh] w-[90vw] -translate-1/2 animate-[modal-pop_.2s_cubic-bezier(.16,1,.3,1)] flex-col overflow-hidden rounded-2xl bg-popover text-popover-foreground shadow-(--shadow-pop) outline-none"
           onKeyDown={g.onKeyDown}
         >
