@@ -258,7 +258,7 @@ export function NewAgentDialog({
             {/* breadcrumb + close, Linear's popup chrome */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-1">
               <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-[9px] font-bold text-(--signal)">
+                <span className="flex size-[15px] items-center justify-center rounded-sm bg-signal/15 text-[9px] font-bold text-(--signal)">
                   T
                 </span>
                 <span className="text-muted-foreground/50">›</span>
