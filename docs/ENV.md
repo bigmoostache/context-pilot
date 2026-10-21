@@ -185,6 +185,7 @@ Names that use the `CP_` prefix but are consumed by child processes or tooling, 
 | `CP_SHEET_SNAPSHOT` | text | - | child only |  | Test harness (orchestrator sheet save, ignored): the browser snapshot to replay. |
 | `CP_SHEET_NAMES` | text | - | child only |  | Test harness (orchestrator sheet save, ignored): comma-separated sheets to test. |
 | `CP_SHEET_MAY_REFUSE` | text | - | child only |  | Test harness (orchestrator sheet save, ignored): set to accept a refused save. |
+| `CP_PPTX` | text | - | child only |  | Test harness (orchestrator slides smoke, ignored): the deck to convert. |
 | `CP_PORT` | text | - | child only |  | Docker Compose only: the host port the cockpit is published on. |
 | `CP_API_URL` | text | - | child only |  | Playwright only: the orchestrator the end-to-end tests target. |
 | `CP_WEB_URL` | text | - | child only |  | Playwright only: the dev server the end-to-end tests target. |
