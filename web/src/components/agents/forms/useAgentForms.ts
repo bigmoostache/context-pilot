@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo } from "react"
 import { sendCommand } from "@/lib/api"
+import { OPENUI_SEND_EVENT } from "@/lib/support/blocks/openuiKit"
 import { measure } from "@/lib/support/telemetry"
 import type { AgentMsg } from "@/lib/types"
 import {
@@ -50,6 +51,19 @@ export function useAgentForms(log: AgentMsg[], fleetId: string, agentId: string)
     },
     [fleetId, agentId],
   )
+
+  // ```openui``` send-buttons fire OPENUI_SEND_EVENT with the message text; relay
+  // it through the same send path as a form answer (one listener per open agent).
+  useEffect(() => {
+    const onSend = (e: Event): void => {
+      const content = (e as CustomEvent<unknown>).detail
+      if (typeof content === "string" && content.trim().length > 0) {
+        void sendCommand(fleetId, { kind: "send_message", agent_id: agentId, content })
+      }
+    }
+    window.addEventListener(OPENUI_SEND_EVENT, onSend)
+    return () => window.removeEventListener(OPENUI_SEND_EVENT, onSend)
+  }, [fleetId, agentId])
 
   return { answersByForm, onFormSubmit }
 }

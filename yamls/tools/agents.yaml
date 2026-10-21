@@ -213,12 +213,19 @@ tools:
       Lines starting with `#` are comments. Unknown components render as an error
       chip; a malformed block degrades to the raw source instead of throwing.
 
-      Components: Stack([kids], gap) · Row([kids], gap) · Card([kids], title) ·
-      Heading("text", level) · Text("text", muted) · Badge("text", tone) ·
-      Metric(label, value, delta) · Progress(value 0..100, label, tone) ·
-      Button("label", action) · Divider() · BarChart([1,4,2,8], tone).
-      `tone` ∈ signal | ok | warn | danger | interactive (default signal).
-      Buttons are presentational: clicking shows a toast, no message is sent. Example:
+      Layout: Stack([kids], gap) · Row([kids], gap) · Grid([kids], min) ·
+      Card([kids], title, tone) · Tabs(["A","B"], [paneA, paneB]) · Divider().
+      Content: Heading("text", level) · Text("text", muted) · Badge("text", tone) ·
+      Metric(label, value, delta, tone, [trend numbers]) · Progress(value 0..100, label, tone) ·
+      Ring(value 0..100, label, tone) · Sparkline([1,4,2,8], tone) ·
+      BarChart([1,4,2,8], ["Mon","Tue",…], tone) · Table(["h1","h2"], ["a","b"], …).
+      Inputs (value bound to the binding id): Input("placeholder", label, value) ·
+      Select(["prod","staging"], label) · Slider(min, max, step, value, label, unit).
+      Button("label", send: "text {inputId}", tone, variant: ghost): `send` posts the
+      text as a REAL user message to you, `{id}` replaced by that input's value —
+      use it for one-click actions/choices; you answer it like any message.
+      Without `send`, `action: "…"` just flashes a label.
+      `tone` ∈ signal | ok | warn | danger | interactive (default signal). Example:
 
         ```openui
         title = Heading("Deploy status", level: 2)
@@ -229,7 +236,9 @@ tools:
         cpu   = Metric(label: "CPU", value: "64%", delta: -4)
         mem   = Metric(label: "Memory", value: "11.2 GB", delta: 12)
         stats = Row([cpu, mem], gap: 8)
-        root  = Card([title, row, load, stats], title: "prod-eu")
+        env   = Select(["prod", "staging"], label: "Target")
+        ship  = Button("Deploy", send: "Deploy to {env}", tone: ok)
+        root  = Card([title, row, load, stats, env, ship], title: "prod-eu")
         ```
     parameters:
       markdown: "Markdown text content for the message (may embed ```file-upload```, ```form```, ```mermaid``` and ```openui``` blocks)"
