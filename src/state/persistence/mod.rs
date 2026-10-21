@@ -209,6 +209,7 @@ pub(crate) fn boot_assemble_state(cfg: BootConfig, panels: BootPanels, messages:
         .with_selected_context(cfg.shared.selected_context)
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
         .with_draft(draft_text, draft_cursor)
+        .with_last_stop_reason(cfg.worker.last_stop_reason.clone())
         .with_view_mode(cfg.shared.view_mode)
         .with_active_theme(cfg.shared.active_theme)
         .with_cache_engine_json(cache_engine_json)

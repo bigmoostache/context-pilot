@@ -220,6 +220,13 @@ impl State {
         self
     }
 
+    /// Set the last-stream stop reason restored from disk (builder).
+    #[must_use]
+    pub fn with_last_stop_reason(mut self, reason: Option<String>) -> Self {
+        self.agent_mut().last_stop_reason = reason;
+        self
+    }
+
     /// Set the view mode (builder).
     #[must_use]
     pub const fn with_view_mode(mut self, view_mode: ViewMode) -> Self {

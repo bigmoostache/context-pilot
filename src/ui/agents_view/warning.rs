@@ -7,14 +7,21 @@ use cp_mod_agents::view_state::FleetExecMirror;
 
 use crate::state::State;
 
-/// The reason `agent` is stalled owing a turn, or `None` when it is fine.
+/// The reason `agent` carries the ⚠, or `None` when it is fine.
 ///
-/// Only *concrete* stalls are reported: an agent parked as
-/// [`Errored`](AgentExecState::Errored), or a `MyTurn` agent with nothing in
-/// flight whose last LLM turn ended abnormally (refusal, `max_tokens`, content
-/// filter…). A plain idle `MyTurn` agent after a normal stop is transient (the
-/// idle watcher nudges it) and a never-run agent has no stop reason yet, so
-/// neither is flagged — that keeps the web square from flashing red every turn.
+/// This MIRRORS the TUI's `leading_slot` warning EXACTLY (user decision): the
+/// TUI shows ⚠ for every non-paused agent whose turn it is and that is not
+/// currently streaming — the "LLM owes a reply but isn't producing one" state.
+/// So this returns `Some` for that whole set, picking the most specific text it
+/// can:
+/// - [`Errored`](AgentExecState::Errored) — repeated failures, the agent is stuck;
+/// - an abnormal last stop reason (refusal, `max_tokens`, …) when one is known;
+/// - otherwise a generic "owes a reply" message (a normal/absent stop reason,
+///   e.g. a plain between-turns pause the idle watcher has not yet nudged).
+///
+/// A `Streaming` agent (stream/tools in flight) and a `THEIR_TURN` agent are
+/// fine, so both return `None` — matching the TUI, which shows the spinner or
+/// nothing for them.
 pub(crate) fn agent_warning(state: &State, agent: &cp_mod_agents::types::Agent) -> Option<String> {
     if agent.paused || agent.archived {
         return None;
@@ -29,9 +36,16 @@ pub(crate) fn agent_warning(state: &State, agent: &cp_mod_agents::types::Agent) 
     {
         return None;
     }
-    let reason = state.agent_store.get(&agent.id)?.last_stop_reason.as_deref()?;
+    // From here the TUI shows ⚠ (MyTurn, nothing in flight). Pick the most
+    // specific reason available; fall back to the generic "owes a reply" text
+    // for a normal/absent stop reason so the web square still mirrors the ⚠.
+    let generic =
+        || "Waiting on the model: it owes a reply but produced none. Send a message, or switch the model.".to_owned();
+    let Some(reason) = state.agent_store.get(&agent.id).and_then(|rt| rt.last_stop_reason.as_deref()) else {
+        return Some(generic());
+    };
     let text = match reason {
-        "end_turn" | "tool_use" => return None,
+        "end_turn" | "tool_use" => generic(),
         "refusal" => {
             "Stopped: the model refused to continue (safety guardrail). Rephrase, or switch the model.".to_owned()
         }
