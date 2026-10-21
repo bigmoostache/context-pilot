@@ -179,7 +179,7 @@ function TinyBtn({
       className={cn(
         "flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
         disabled && "opacity-30",
-        active && "bg-(--signal)/15 text-(--signal)",
+        active && "bg-signal/15 text-(--signal)",
         danger && !disabled && "active:text-(--danger)",
         !active && !danger && "text-muted-foreground/70 active:bg-muted/60 active:text-foreground",
         danger && !active && "text-muted-foreground/70 active:bg-(--danger)/10",

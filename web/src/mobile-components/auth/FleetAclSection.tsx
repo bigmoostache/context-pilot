@@ -29,7 +29,7 @@ function FleetRoleBadge({ role }: { role: string }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[9.5px] font-semibold",
-        isAdmin ? "bg-(--signal)/15 text-(--signal)" : "bg-muted text-muted-foreground",
+        isAdmin ? "bg-signal/15 text-(--signal)" : "bg-muted text-muted-foreground",
       )}
     >
       {isAdmin ? <ShieldCheck className="size-2.5" /> : <Shield className="size-2.5" />}

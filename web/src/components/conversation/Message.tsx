@@ -236,7 +236,7 @@ function AssistantMessage({
   return (
     <div className="flex flex-col gap-1.5 py-2">
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-(--signal)/15">
+        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-signal/15">
           <span className="size-2 rounded-full bg-(--signal)" />
         </span>
         <div className="max-w-[88%] min-w-0 text-[13.5px] leading-relaxed text-foreground/90">
