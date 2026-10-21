@@ -5,8 +5,8 @@
 
 use super::super::color::Rgba;
 use super::super::model::{Stroke, Table, TableCell, TableRow, TextBody};
+use super::super::part::xml::Node;
 use super::super::text::{self, TextCtx};
-use super::super::xml::Node;
 use super::fill::Paint;
 
 /// Default cell insets (EMU): left, top, right, bottom.

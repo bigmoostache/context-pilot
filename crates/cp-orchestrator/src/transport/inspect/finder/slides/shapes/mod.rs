@@ -15,8 +15,8 @@ pub(super) use inherit::Layers;
 use super::color::Rgba;
 use super::geom;
 use super::model::Shape;
+use super::part::xml::Node;
 use super::text::{self, TextCtx};
-use super::xml::Node;
 
 /// Most shapes emitted per slide; the rest are dropped.
 const MAX_SHAPES: usize = 2_000;

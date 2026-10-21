@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use cp_base::cast::Safe as _;
 use cp_base::cast::float_math as fm;
 
-use super::package::Package;
-use super::xml::Node;
+use super::part::package::Package;
+use super::part::xml::Node;
 
 /// OOXML percentages are expressed in thousandths of a percent.
 const PCT: f64 = 100_000.0;
@@ -264,7 +264,7 @@ fn preset(name: &str) -> Option<Rgba> {
 #[cfg(test)]
 mod tests {
     use super::{Rgba, from_hsl, to_hsl, transform};
-    use crate::transport::inspect::finder::slides::xml::parse;
+    use crate::transport::inspect::finder::slides::part::xml::parse;
 
     #[test]
     fn hex_round_trips() {

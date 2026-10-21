@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use super::color::{Rgba, Theme};
 use super::model::{Bullet, Paragraph, Run, TextBody};
-use super::xml::Node;
+use super::part::xml::Node;
 
 /// Default insets (EMU): 0.1" left/right, 0.05" top/bottom.
 const INSETS: [i64; 4] = [91_440, 45_720, 91_440, 45_720];
@@ -308,7 +308,7 @@ fn roman(value: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::{autonum, plain};
-    use crate::transport::inspect::finder::slides::xml::parse;
+    use crate::transport::inspect::finder::slides::part::xml::parse;
 
     #[test]
     fn autonum_formats() {

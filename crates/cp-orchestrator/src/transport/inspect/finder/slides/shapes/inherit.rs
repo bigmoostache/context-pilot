@@ -6,7 +6,7 @@
 //! type; the master by type only, with `ctrTitle` read as `title` and
 //! `subTitle`/`obj`/untyped read as `body`.
 
-use super::super::xml::Node;
+use super::super::part::xml::Node;
 
 /// The parts a slide inherits from.
 pub(in super::super) struct Layers<'doc> {
@@ -91,7 +91,7 @@ pub(in super::super) fn sp_props<'doc>(own: &'doc Node, chain: &[&'doc Node]) ->
 #[cfg(test)]
 mod tests {
     use super::Layers;
-    use crate::transport::inspect::finder::slides::xml::parse;
+    use crate::transport::inspect::finder::slides::part::xml::parse;
 
     #[test]
     fn layout_by_idx_then_master_by_kind() {

@@ -17,10 +17,9 @@
 mod color;
 mod geom;
 mod model;
-mod package;
+mod part;
 mod shapes;
 mod text;
-mod xml;
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -31,9 +30,9 @@ use crate::transport::rest::HttpReply;
 use super::support::{confined_path, extract_param, fleet_folder};
 use color::Theme;
 use model::{Deck, Shape, Slide};
-use package::Package;
+use part::package::Package;
+use part::xml::Node;
 use shapes::{Ctx, Layers, Paint};
-use xml::Node;
 
 /// Largest pptx previewed (100 MiB).
 const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;

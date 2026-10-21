@@ -23,14 +23,14 @@ const MAX_TOTAL_BYTES: u64 = 96 * 1024 * 1024;
 const MAX_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Every part of the package, by its path inside the zip.
-pub(super) struct Package {
+pub(in crate::transport::inspect::finder::slides) struct Package {
     /// Part bytes keyed by normalised package path (no leading `/`).
     parts: BTreeMap<String, Vec<u8>>,
 }
 
 impl Package {
     /// Open a pptx file; `None` when it is not a readable zip.
-    pub(super) fn open(path: &Path) -> Option<Self> {
+    pub(in crate::transport::inspect::finder::slides) fn open(path: &Path) -> Option<Self> {
         let file = std::fs::File::open(path).ok()?;
         let mut archive = zip::ZipArchive::new(file).ok()?;
         let mut parts = BTreeMap::new();
@@ -53,18 +53,18 @@ impl Package {
 
     /// Build from in-memory parts (tests).
     #[cfg(test)]
-    pub(super) const fn from_parts(parts: BTreeMap<String, Vec<u8>>) -> Self {
+    pub(in crate::transport::inspect::finder::slides) const fn from_parts(parts: BTreeMap<String, Vec<u8>>) -> Self {
         Self { parts }
     }
 
     /// Parse a part as XML.
-    pub(super) fn xml(&self, part: &str) -> Option<Node> {
+    pub(in crate::transport::inspect::finder::slides) fn xml(&self, part: &str) -> Option<Node> {
         xml::parse(self.parts.get(part)?)
     }
 
     /// Relationships of `part` as id → normalised target path. External
     /// targets (hyperlinks) keep their raw URL.
-    pub(super) fn rels(&self, part: &str) -> BTreeMap<String, String> {
+    pub(in crate::transport::inspect::finder::slides) fn rels(&self, part: &str) -> BTreeMap<String, String> {
         let (dir, file) = part.rsplit_once('/').unwrap_or(("", part));
         let rels_path = if dir.is_empty() { format!("_rels/{file}.rels") } else { format!("{dir}/_rels/{file}.rels") };
         let Some(doc) = self.xml(&rels_path) else { return BTreeMap::new() };
@@ -80,7 +80,7 @@ impl Package {
 
     /// The first relationship target of `part` whose type ends with `kind`
     /// (`slideLayout`, `slideMaster`, `theme`, `notesSlide`).
-    pub(super) fn rel_of_type(&self, part: &str, kind: &str) -> Option<String> {
+    pub(in crate::transport::inspect::finder::slides) fn rel_of_type(&self, part: &str, kind: &str) -> Option<String> {
         let (dir, file) = part.rsplit_once('/').unwrap_or(("", part));
         let doc = self.xml(&format!("{dir}/_rels/{file}.rels"))?;
         let rel = doc.all("Relationship").find(|rel| rel.attr("Type").is_some_and(|ty| ty.ends_with(kind)))?;
@@ -89,7 +89,7 @@ impl Package {
 
     /// An image part as a `data:` URI; `None` for formats browsers can't show
     /// (EMF/WMF/TIFF) or images over [`MAX_IMAGE_BYTES`].
-    pub(super) fn data_uri(&self, part: &str) -> Option<String> {
+    pub(in crate::transport::inspect::finder::slides) fn data_uri(&self, part: &str) -> Option<String> {
         let bytes = self.parts.get(part)?;
         if bytes.len() > MAX_IMAGE_BYTES {
             return None;

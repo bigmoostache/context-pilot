@@ -9,8 +9,8 @@ use std::fmt::Write as _;
 
 use super::super::color::{Rgba, Theme};
 use super::super::model::Stroke;
-use super::super::package::Package;
-use super::super::xml::Node;
+use super::super::part::package::Package;
+use super::super::part::xml::Node;
 
 /// Paint lookups for one part.
 pub(in super::super) struct Paint<'doc> {
@@ -143,7 +143,7 @@ fn gradient(theme: &Theme, grad: &Node, ph: Option<Rgba>) -> Option<String> {
 mod tests {
     use super::gradient;
     use crate::transport::inspect::finder::slides::color::Theme;
-    use crate::transport::inspect::finder::slides::xml::parse;
+    use crate::transport::inspect::finder::slides::part::xml::parse;
 
     #[test]
     fn linear_gradient_css() {

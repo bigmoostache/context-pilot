@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use cp_base::cast::Safe as _;
 
-use super::xml::Node;
+use super::part::xml::Node;
 
 /// `adj` values are in 1/100000 of the reference length.
 const ADJ: i64 = 100_000;
@@ -292,7 +292,7 @@ fn unit(angle: i64) -> (i64, i64) {
 #[cfg(test)]
 mod tests {
     use super::outline;
-    use crate::transport::inspect::finder::slides::xml::parse;
+    use crate::transport::inspect::finder::slides::part::xml::parse;
 
     #[test]
     fn rect_and_round_rect() {

@@ -14,7 +14,7 @@ const MAX_DEPTH: usize = 256;
 
 /// One XML element: qualified name, attributes, child elements, direct text.
 #[derive(Debug, Default, Clone)]
-pub(super) struct Node {
+pub(in crate::transport::inspect::finder::slides) struct Node {
     /// Qualified element name (`a:off`).
     pub name: String,
     /// Attributes as (qualified name, unescaped value), document order.
@@ -27,43 +27,46 @@ pub(super) struct Node {
 
 impl Node {
     /// Attribute value by qualified name.
-    pub(super) fn attr(&self, key: &str) -> Option<&str> {
+    pub(in crate::transport::inspect::finder::slides) fn attr(&self, key: &str) -> Option<&str> {
         self.attrs.iter().find(|pair| pair.0 == key).map(|pair| pair.1.as_str())
     }
 
     /// Attribute parsed as an integer.
-    pub(super) fn int(&self, key: &str) -> Option<i64> {
+    pub(in crate::transport::inspect::finder::slides) fn int(&self, key: &str) -> Option<i64> {
         self.attr(key)?.trim().parse().ok()
     }
 
     /// Boolean attribute (`1`/`true`).
-    pub(super) fn flag(&self, key: &str) -> Option<bool> {
+    pub(in crate::transport::inspect::finder::slides) fn flag(&self, key: &str) -> Option<bool> {
         self.attr(key).map(|raw| matches!(raw, "1" | "true"))
     }
 
     /// First child with this name.
-    pub(super) fn child(&self, name: &str) -> Option<&Self> {
+    pub(in crate::transport::inspect::finder::slides) fn child(&self, name: &str) -> Option<&Self> {
         self.children.iter().find(|node| node.name == name)
     }
 
     /// Every child with this name.
-    pub(super) fn all<'node>(&'node self, name: &'node str) -> impl Iterator<Item = &'node Self> + 'node {
+    pub(in crate::transport::inspect::finder::slides) fn all<'node>(
+        &'node self,
+        name: &'node str,
+    ) -> impl Iterator<Item = &'node Self> + 'node {
         self.children.iter().filter(move |node| node.name == name)
     }
 
     /// Descend a `/`-separated child path (`p:spPr/a:xfrm`).
-    pub(super) fn path(&self, route: &str) -> Option<&Self> {
+    pub(in crate::transport::inspect::finder::slides) fn path(&self, route: &str) -> Option<&Self> {
         route.split('/').try_fold(self, |node, step| node.child(step))
     }
 
     /// Name without its prefix (`a:off` → `off`).
-    pub(super) fn local(&self) -> &str {
+    pub(in crate::transport::inspect::finder::slides) fn local(&self) -> &str {
         self.name.rsplit(':').next().unwrap_or(&self.name)
     }
 }
 
 /// Parse a document; `None` when it is not well-formed.
-pub(super) fn parse(bytes: &[u8]) -> Option<Node> {
+pub(in crate::transport::inspect::finder::slides) fn parse(bytes: &[u8]) -> Option<Node> {
     let mut reader = Reader::from_reader(bytes);
     let mut stack: Vec<Node> = vec![Node::default()];
     let mut buf = Vec::new();

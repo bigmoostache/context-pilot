@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use super::convert_package;
-use super::package::Package;
+use super::part::package::Package;
 
 /// Relationship file with one entry.
 fn rel(id: &str, kind: &str, target: &str) -> Vec<u8> {
