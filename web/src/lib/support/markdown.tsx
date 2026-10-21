@@ -7,7 +7,8 @@ import "katex/dist/katex.min.css"
 
 import { CopyButton } from "@/components/conversation/CopyButton"
 import { cn, clipboard } from "@/lib/utils"
-import { Mermaid } from "./mermaid"
+import { Mermaid } from "./blocks/mermaid"
+import { OpenUi } from "./blocks/openui"
 
 /**
  * Full GitHub-flavored markdown renderer for chat/agent messages.
@@ -169,15 +170,16 @@ function CopyableTable({
 }
 
 /**
- * Whether a `<pre>`'s children is a single mermaid code fence. react-markdown
- * hands `pre` its `<code>` element child; we peek at that child's `className`
- * for `language-mermaid` so the `pre` handler can drop its frame and let the
- * diagram (rendered by the `code` handler) stand alone.
+ * Whether a `<pre>`'s children is a single fence of a given language.
+ * react-markdown hands `pre` its `<code>` element child; we peek at that
+ * child's `className` for `language-<lang>` so the `pre` handler can drop its
+ * frame and let a custom renderer (mermaid diagram, openui block) stand alone.
  */
-function isMermaidPre(children: ReactNode): boolean {
+function isLangPre(children: ReactNode, lang: string): boolean {
   if (children == null || typeof children !== "object" || Array.isArray(children)) return false
   const props = (children as { props?: { className?: unknown } }).props
-  return typeof props?.className === "string" && /\blanguage-mermaid\b/.test(props.className)
+  if (typeof props?.className !== "string") return false
+  return props.className.split(/\s+/).includes(`language-${lang}`)
 }
 
 /** Build the element→component style map for a given variant. */
@@ -279,6 +281,11 @@ function components(variant: MarkdownVariant): Components {
       if (typeof className === "string" && /\blanguage-mermaid\b/.test(className)) {
         return <Mermaid code={extractText(children)} onAccent={onAccent} />
       }
+      // ```openui``` fences → render the OpenUI Lang block as live interactive
+      // UI (same pre-frame-dropping dance as mermaid, see `pre` below).
+      if (typeof className === "string" && /\blanguage-openui\b/.test(className)) {
+        return <OpenUi source={extractText(children)} onAccent={onAccent} />
+      }
       // Bare URLs inside backticks → render as clickable links, not code chips.
       const raw = typeof children === "string" ? children : extractText(children)
       const trimmed = raw.trim()
@@ -296,9 +303,9 @@ function components(variant: MarkdownVariant): Components {
       )
     },
     pre: ({ children }) => {
-      // A mermaid fence renders as a standalone diagram (see `code` above);
-      // don't wrap it in the code-block frame or append a "Copy code" button.
-      if (isMermaidPre(children)) {
+      // A mermaid diagram or openui block renders standalone (see `code`
+      // above); don't wrap it in the code-block frame or append "Copy code".
+      if (isLangPre(children, "mermaid") || isLangPre(children, "openui")) {
         return <>{children}</>
       }
       return (

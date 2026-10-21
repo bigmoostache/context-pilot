@@ -203,8 +203,36 @@ tools:
       MATH RENDERING:
       Single `$` is treated as a literal dollar sign (NOT inline math).
       For LaTeX math, use `$$...$$` (display block) or `\(...\)` (inline).
+
+      GENERATIVE UI — ```openui``` BLOCKS:
+      An ```openui``` fenced block is parsed as OpenUI Lang and RENDERED as live,
+      themed, interactive UI. Use it for dashboards, stat cards, status panels —
+      anything where a visual beats prose. One binding per line: `id = Comp(args)`;
+      `root` names the entrypoint (required). Containers list child ids in `[…]`.
+      Strings are `"quoted"`, numbers bare, booleans `true`/`false`, props `key: value`.
+      Lines starting with `#` are comments. Unknown components render as an error
+      chip; a malformed block degrades to the raw source instead of throwing.
+
+      Components: Stack([kids], gap) · Row([kids], gap) · Card([kids], title) ·
+      Heading("text", level) · Text("text", muted) · Badge("text", tone) ·
+      Metric(label, value, delta) · Progress(value 0..100, label, tone) ·
+      Button("label", action) · Divider() · BarChart([1,4,2,8], tone).
+      `tone` ∈ signal | ok | warn | danger | interactive (default signal).
+      Buttons are presentational: clicking shows a toast, no message is sent. Example:
+
+        ```openui
+        title = Heading("Deploy status", level: 2)
+        ok    = Badge("3 healthy", tone: ok)
+        warn  = Badge("1 degraded", tone: warn)
+        row   = Row([ok, warn], gap: 8)
+        load  = Progress(value: 72, label: "Rollout", tone: signal)
+        cpu   = Metric(label: "CPU", value: "64%", delta: -4)
+        mem   = Metric(label: "Memory", value: "11.2 GB", delta: 12)
+        stats = Row([cpu, mem], gap: 8)
+        root  = Card([title, row, load, stats], title: "prod-eu")
+        ```
     parameters:
-      markdown: "Markdown text content for the message (may embed ```file-upload``` and ```form``` blocks)"
+      markdown: "Markdown text content for the message (may embed ```file-upload```, ```form```, ```mermaid``` and ```openui``` blocks)"
 
       group_id: "Group to post into (G<n>). Your human group for the user."
 
