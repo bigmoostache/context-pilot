@@ -16,6 +16,7 @@ import { segmentLog, toChatMessage } from "@/lib/support/agentMessages"
 import { AgentAsideRail } from "./fileUpload/AgentAsideRail"
 import { useAgentAside } from "./fileUpload/useAgentAside"
 import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
+import { FleetIdContext } from "@/lib/support/blocks/openuiKit"
 import type { AgentDetail, AgentMsg } from "@/lib/types"
 
 /**
@@ -320,119 +321,121 @@ export function AgentConversation({
   const { answersByForm, onFormSubmit } = useAgentForms(agent.log, fleetId, agent.id)
 
   return (
-    <main
-      className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
-      // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
-      // idle value) is still a non-`none` filter, so it promotes the ENTIRE
-      // conversation to a single GPU compositor layer. On a very tall agent
-      // (scrollHeight can hit ~100k px) that layer exceeds Firefox's max GPU
-      // texture size; a repaint triggered by any interaction (e.g. ticking a
-      // form checkbox) then fails to allocate the texture and Firefox paints
-      // the whole <main> BLANK while the DOM stays intact — recovered only by a
-      // scroll-resetting refresh. Chromium/WebKit tile differently and never
-      // hit it. Using `undefined` when idle drops the layer entirely (T644).
-      style={
-        dragging
-          ? { filter: "blur(2px)", transition: "filter 300ms ease" }
-          : { transition: "filter 300ms ease" }
-      }
-      onDragEnter={dropHandlers.onDragEnter}
-      onDragOver={dropHandlers.onDragOver}
-      onDragLeave={dropHandlers.onDragLeave}
-      onDrop={dropHandlers.onDrop}
-    >
-      {/* Upload progress (T471) */}
-      {uploading && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
-          <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
-            <Loader2 className="size-4 animate-spin text-(--signal)" />
-            Uploading…
+    <FleetIdContext value={fleetId}>
+      <main
+        className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
+        // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
+        // idle value) is still a non-`none` filter, so it promotes the ENTIRE
+        // conversation to a single GPU compositor layer. On a very tall agent
+        // (scrollHeight can hit ~100k px) that layer exceeds Firefox's max GPU
+        // texture size; a repaint triggered by any interaction (e.g. ticking a
+        // form checkbox) then fails to allocate the texture and Firefox paints
+        // the whole <main> BLANK while the DOM stays intact — recovered only by a
+        // scroll-resetting refresh. Chromium/WebKit tile differently and never
+        // hit it. Using `undefined` when idle drops the layer entirely (T644).
+        style={
+          dragging
+            ? { filter: "blur(2px)", transition: "filter 300ms ease" }
+            : { transition: "filter 300ms ease" }
+        }
+        onDragEnter={dropHandlers.onDragEnter}
+        onDragOver={dropHandlers.onDragOver}
+        onDragLeave={dropHandlers.onDragLeave}
+        onDrop={dropHandlers.onDrop}
+      >
+        {/* Upload progress (T471) */}
+        {uploading && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/40 backdrop-blur-[1px]">
+            <div className="card-shadow flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[12.5px] text-foreground/90">
+              <Loader2 className="size-4 animate-spin text-(--signal)" />
+              Uploading…
+            </div>
+          </div>
+        )}
+
+        {/* ── Conversation column ── */}
+        <div className="mx-2 flex min-w-0 flex-1 flex-col pb-2">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
+              <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />
+
+              {segments.map((seg) =>
+                seg.type === "auto" ? (
+                  <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+                ) : isFormMessage(seg.msg.text ?? "") ? (
+                  <FormMessageRow
+                    key={seg.msg.id}
+                    msg={seg.msg}
+                    fleetId={fleetId}
+                    agentId={agent.id}
+                    answersByForm={answersByForm}
+                    onFormSubmit={onFormSubmit}
+                    onOpenFile={aside.openFile}
+                    onShowInFinder={onShowInFinder}
+                    onDelete={handleDelete}
+                    onBranch={handleBranch}
+                  />
+                ) : (
+                  <MessageRow
+                    key={seg.msg.id}
+                    msg={seg.msg}
+                    fleetId={fleetId}
+                    onOpenFile={aside.openFile}
+                    onShowInFinder={onShowInFinder}
+                    onDelete={handleDelete}
+                    onBranch={handleBranch}
+                  />
+                ),
+              )}
+              {/* scroll anchor — keeps the latest message in view */}
+              <div ref={bottomRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="mx-auto w-full max-w-[720px]">
+            {agent.archived && onUnarchive && <UnarchiveBar onUnarchive={onUnarchive} />}
+            <AgentComposer
+              key={agent.id}
+              status={agent.status}
+              paused={agent.paused}
+              warning={agent.warning}
+              onSend={onSend}
+              onAttach={onAttach}
+              pendingFiles={pendingFiles}
+              onRemoveFile={onRemoveFile}
+              suggestions={suggestions}
+              firstMessage={agent.log.length === 0}
+              onCreateCommand={() => setCreateCmdOpen(true)}
+              onEditCommand={(s) => setEditCmd(s)}
+              draftKey={`cp-draft-${fleetId}-${agent.id}`}
+              commandKey={`cp-cmd-${fleetId}-${agent.id}`}
+            />
           </div>
         </div>
-      )}
 
-      {/* ── Conversation column ── */}
-      <div className="mx-2 flex min-w-0 flex-1 flex-col pb-2">
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
-            <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />
-
-            {segments.map((seg) =>
-              seg.type === "auto" ? (
-                <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
-              ) : isFormMessage(seg.msg.text ?? "") ? (
-                <FormMessageRow
-                  key={seg.msg.id}
-                  msg={seg.msg}
-                  fleetId={fleetId}
-                  agentId={agent.id}
-                  answersByForm={answersByForm}
-                  onFormSubmit={onFormSubmit}
-                  onOpenFile={aside.openFile}
-                  onShowInFinder={onShowInFinder}
-                  onDelete={handleDelete}
-                  onBranch={handleBranch}
-                />
-              ) : (
-                <MessageRow
-                  key={seg.msg.id}
-                  msg={seg.msg}
-                  fleetId={fleetId}
-                  onOpenFile={aside.openFile}
-                  onShowInFinder={onShowInFinder}
-                  onDelete={handleDelete}
-                  onBranch={handleBranch}
-                />
-              ),
-            )}
-            {/* scroll anchor — keeps the latest message in view */}
-            <div ref={bottomRef} />
-          </div>
-        </ScrollArea>
-
-        <div className="mx-auto w-full max-w-[720px]">
-          {agent.archived && onUnarchive && <UnarchiveBar onUnarchive={onUnarchive} />}
-          <AgentComposer
-            key={agent.id}
-            status={agent.status}
-            paused={agent.paused}
-            warning={agent.warning}
-            onSend={onSend}
-            onAttach={onAttach}
-            pendingFiles={pendingFiles}
-            onRemoveFile={onRemoveFile}
-            suggestions={suggestions}
-            firstMessage={agent.log.length === 0}
-            onCreateCommand={() => setCreateCmdOpen(true)}
-            onEditCommand={(s) => setEditCmd(s)}
-            draftKey={`cp-draft-${fleetId}-${agent.id}`}
-            commandKey={`cp-cmd-${fleetId}-${agent.id}`}
-          />
-        </div>
-      </div>
-
-      {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
+        {/* ── Unified right rail: Files + Tasks tabs, inline preview + show/hide
           chrome (T662/T677). Extracted to AgentAsideRail to keep this render
           body under the 500-line file budget. */}
-      <AgentAsideRail
-        fleetId={fleetId}
-        agentId={agent.id}
-        files={agentFiles}
-        tasks={agent.tasks ?? []}
-        notes={agent.notes ?? []}
-        aside={aside}
-        leftRailHidden={leftRailHidden}
-      />
+        <AgentAsideRail
+          fleetId={fleetId}
+          agentId={agent.id}
+          files={agentFiles}
+          tasks={agent.tasks ?? []}
+          notes={agent.notes ?? []}
+          aside={aside}
+          leftRailHidden={leftRailHidden}
+        />
 
-      <CreateCommandDialog
-        open={createCmdOpen}
-        onClose={() => setCreateCmdOpen(false)}
-        fleetId={fleetId}
-      />
+        <CreateCommandDialog
+          open={createCmdOpen}
+          onClose={() => setCreateCmdOpen(false)}
+          fleetId={fleetId}
+        />
 
-      {editCmd && (
-        <CommandEditDialog sugg={editCmd} fleetId={fleetId} onClose={() => setEditCmd(null)} />
-      )}
-    </main>
+        {editCmd && (
+          <CommandEditDialog sugg={editCmd} fleetId={fleetId} onClose={() => setEditCmd(null)} />
+        )}
+      </main>
+    </FleetIdContext>
   )
 }

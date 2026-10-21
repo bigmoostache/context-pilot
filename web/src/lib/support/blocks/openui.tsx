@@ -27,6 +27,7 @@ import {
   Sparkline,
   Table,
 } from "./openuiWidgets"
+import { SqlTable } from "./openuiSql"
 
 // ── OpenUI Lang — layout + entry (see the ```openui``` block in the Send tool) ──
 //
@@ -151,6 +152,7 @@ const RENDERERS: Record<string, Renderer> = {
   },
   BarChart: (_id, node) => <BarChart node={node} />,
   Table: (_id, node) => <Table node={node} />,
+  SqlTable: (_id, node) => <SqlTable node={node} />,
   Button: (_id, node) => <ActionButton node={node} />,
   Input: (id, node) => <Input id={id} node={node} />,
   Select: (id, node) => <Select id={id} node={node} />,

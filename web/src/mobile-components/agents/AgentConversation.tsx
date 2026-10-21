@@ -12,6 +12,7 @@ import { FormMessageRow } from "@/mobile-components/agents/forms/FormMessageRow"
 import { isFormMessage } from "@/mobile-components/agents/forms/helpers"
 import { useScrollPin, useAgentForms } from "@/mobile-components/agents/forms/useAgentForms"
 import { segmentLog, toChatMessage } from "@/lib/support/agentMessages"
+import { FleetIdContext } from "@/lib/support/blocks/openuiKit"
 import type { AgentDetail, AgentMsg } from "@/lib/types"
 
 /**
@@ -258,99 +259,101 @@ export function AgentConversation({
   const { answersByForm, onFormSubmit } = useAgentForms(agent.log, fleetId, agent.id)
 
   return (
-    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
-      <ScrollArea className="min-h-0 flex-1">
-        {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
+    <FleetIdContext value={fleetId}>
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+        <ScrollArea className="min-h-0 flex-1">
+          {/* Tight horizontal gutter (WhatsApp/Messenger convention) — px-2 not
             p-4 so bubbles claim nearly the full phone width; vertical padding
             stays roomier for scroll breathing room. The TOP pad carries
             env(safe-area-inset-top) (T639) so the first message sits below the
             iOS status bar at rest but scrolls edge-to-edge UNDER it — the shell
             no longer pads the viewport down, each scroller owns its inset. */}
-        <div className="flex flex-col px-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3">
-          <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />
+          <div className="flex flex-col px-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3">
+            <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />
 
-          {segments.map((seg) =>
-            seg.type === "auto" ? (
-              <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
-            ) : isFormMessage(seg.msg.text ?? "") ? (
-              <FormMessageRow
-                key={seg.msg.id}
-                msg={seg.msg}
-                fleetId={fleetId}
-                agentId={agent.id}
-                answersByForm={answersByForm}
-                onFormSubmit={onFormSubmit}
-                onOpenFile={openInFinder}
-                onShowInFinder={onShowInFinder}
-                onDelete={handleDelete}
-                onBranch={handleBranch}
-              />
-            ) : (
-              <MessageRow
-                key={seg.msg.id}
-                msg={seg.msg}
-                fleetId={fleetId}
-                onOpenFile={openInFinder}
-                onShowInFinder={onShowInFinder}
-                onDelete={handleDelete}
-                onBranch={handleBranch}
-                fresh={seg.msg.id === freshId}
-              />
-            ),
-          )}
-          {/* Fixed "ghost message" spacer — a tall block of dead space so the
+            {segments.map((seg) =>
+              seg.type === "auto" ? (
+                <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+              ) : isFormMessage(seg.msg.text ?? "") ? (
+                <FormMessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  fleetId={fleetId}
+                  agentId={agent.id}
+                  answersByForm={answersByForm}
+                  onFormSubmit={onFormSubmit}
+                  onOpenFile={openInFinder}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                  onBranch={handleBranch}
+                />
+              ) : (
+                <MessageRow
+                  key={seg.msg.id}
+                  msg={seg.msg}
+                  fleetId={fleetId}
+                  onOpenFile={openInFinder}
+                  onShowInFinder={onShowInFinder}
+                  onDelete={handleDelete}
+                  onBranch={handleBranch}
+                  fresh={seg.msg.id === freshId}
+                />
+              ),
+            )}
+            {/* Fixed "ghost message" spacer — a tall block of dead space so the
               last real message can always scroll clear of the floating glass
               composer that overlays the bottom (T639). Fixed (not measured) so
               it never depends on ResizeObserver timing vs the scroll-pin; sized
               taller than the resting composer + the home-indicator safe area. */}
-          <div aria-hidden style={{ height: "calc(16rem + env(safe-area-inset-bottom))" }} />
-          {/* scroll anchor — keeps the latest message in view */}
-          <div ref={bottomRef} />
-        </div>
-      </ScrollArea>
+            <div aria-hidden style={{ height: "calc(16rem + env(safe-area-inset-bottom))" }} />
+            {/* scroll anchor — keeps the latest message in view */}
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
 
-      {/* Floating glass composer — absolutely positioned over the bottom of the
+        {/* Floating glass composer — absolutely positioned over the bottom of the
           conversation so its backdrop-blur frosts the messages scrolling beneath
           it (T637). The reserved spacer above keeps the last message reachable. */}
-      <div className="absolute inset-x-0 bottom-0 z-10">
-        <AgentComposer
-          key={agent.id}
-          status={agent.status}
-          paused={agent.paused}
-          warning={agent.warning}
-          onSend={onSend}
-          onAttach={onAttach}
-          pendingFiles={pendingFiles}
-          onRemoveFile={onRemoveFile}
-          suggestions={suggestions}
-          firstMessage={agent.log.length === 0}
-          onCreateCommand={() => setCreateCmdOpen(true)}
-          onEditCommand={(s) => setEditCmd(s)}
-          draftKey={`cp-draft-${fleetId}-${agent.id}`}
-          commandKey={`cp-cmd-${fleetId}-${agent.id}`}
-        />
-      </div>
+        <div className="absolute inset-x-0 bottom-0 z-10">
+          <AgentComposer
+            key={agent.id}
+            status={agent.status}
+            paused={agent.paused}
+            warning={agent.warning}
+            onSend={onSend}
+            onAttach={onAttach}
+            pendingFiles={pendingFiles}
+            onRemoveFile={onRemoveFile}
+            suggestions={suggestions}
+            firstMessage={agent.log.length === 0}
+            onCreateCommand={() => setCreateCmdOpen(true)}
+            onEditCommand={(s) => setEditCmd(s)}
+            draftKey={`cp-draft-${fleetId}-${agent.id}`}
+            commandKey={`cp-cmd-${fleetId}-${agent.id}`}
+          />
+        </div>
 
-      <CreateCommandDialog
-        open={createCmdOpen}
-        onClose={() => setCreateCmdOpen(false)}
-        fleetId={fleetId}
-      />
-
-      {editCmd && (
-        <SystemEditorDialog
-          open
-          onClose={() => setEditCmd(null)}
+        <CreateCommandDialog
+          open={createCmdOpen}
+          onClose={() => setCreateCmdOpen(false)}
           fleetId={fleetId}
-          variant="command"
-          mode={{ kind: "edit", itemId: editCmd.command.slice(1), builtin: false }}
-          initial={{
-            name: editCmd.name,
-            description: editCmd.description,
-            body: editCmd.body ?? "",
-          }}
         />
-      )}
-    </main>
+
+        {editCmd && (
+          <SystemEditorDialog
+            open
+            onClose={() => setEditCmd(null)}
+            fleetId={fleetId}
+            variant="command"
+            mode={{ kind: "edit", itemId: editCmd.command.slice(1), builtin: false }}
+            initial={{
+              name: editCmd.name,
+              description: editCmd.description,
+              body: editCmd.body ?? "",
+            }}
+          />
+        )}
+      </main>
+    </FleetIdContext>
   )
 }

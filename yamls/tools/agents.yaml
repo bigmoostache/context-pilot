@@ -225,6 +225,10 @@ tools:
       text as a REAL user message to you, `{id}` replaced by that input's value —
       use it for one-click actions/choices; you answer it like any message.
       Without `send`, `action: "…"` just flashes a label.
+      Data: SqlTable("SELECT … FROM my_table ORDER BY …", page_size: 25, title, tone)
+      shows a LIVE, server-paginated table over your entity database (the one
+      entity_sql writes). Single read-only SELECT only; prefer it over pasting
+      rows into a Table when the data lives in entities or is more than a screen.
       `tone` ∈ signal | ok | warn | danger | interactive (default signal). Example:
 
         ```openui

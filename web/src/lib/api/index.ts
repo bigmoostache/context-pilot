@@ -63,6 +63,7 @@ import {
   postApiFleetByIdLibraryCommand,
   putApiFleetByIdLibraryCommandByItem,
   postApiFleetByIdConversationsSearch,
+  postApiFleetByIdSql,
   postApiTicket,
 } from "./generated"
 import { buildCommandEnvelope, sdk } from "./client"
@@ -345,6 +346,16 @@ export function searchConversations(
       },
     }),
   ).then((r) => r.hits)
+}
+
+/** One page of a read-only entity SQL query, answered by the agent (openui `SqlTable`). */
+export function fetchSqlPage(
+  fleetId: string,
+  body: { sql: string; offset: number; limit: number },
+): Promise<import("./generated/types.gen").SqlPage> {
+  return sdk<import("./generated/types.gen").SqlPage>(
+    postApiFleetByIdSql({ path: { id: fleetId }, body }),
+  )
 }
 
 // ── Claude Code usage (SDK) ───────────────────────────────────────────

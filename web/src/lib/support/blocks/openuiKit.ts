@@ -21,6 +21,12 @@ const noopSet = (): undefined => undefined
 
 export const StoreContext = createContext<Store>({ vals: {}, set: noopSet, onAccent: false })
 
+/**
+ * The fleet (agent) whose conversation renders this block — lets data widgets
+ * (`SqlTable`) call that agent's API. Provided by AgentConversation (both twins).
+ */
+export const FleetIdContext = createContext<string | undefined>(undefined)
+
 /** Window event a send-button fires; `useAgentForms` relays it to `send_message`. */
 export const OPENUI_SEND_EVENT = "openui:send"
 
