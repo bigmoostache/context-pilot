@@ -77,6 +77,7 @@ pub(crate) fn search_conversations(state: &Mutex<Backend>, id: &str, body_bytes:
     match FleetHandle::from_entry(&entry).query(query) {
         Ok(response) => match response.result {
             Outcome::Hits { hits } => HttpReply::ok(&SearchResponse { hits }),
+            Outcome::Rows { .. } => HttpReply::error(502, "agent answered with the wrong reply kind"),
             Outcome::Error { reason } => {
                 crate::oerr!("conversation search failed on agent {id}: {reason}");
                 HttpReply::error(502, "conversation search unavailable")

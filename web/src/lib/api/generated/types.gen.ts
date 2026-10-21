@@ -897,6 +897,28 @@ export type SlideTextBody = {
     wrap: boolean;
 };
 
+/**
+ * One page of a read-only SQL query, cells already stringified for display.
+ */
+export type SqlPage = {
+    /**
+     * Column names, in result order.
+     */
+    columns: Array<string>;
+    /**
+     * Offset of the first row in this page.
+     */
+    offset: number;
+    /**
+     * Row cells as display text; `None` is SQL `NULL`.
+     */
+    rows: Array<Array<unknown>>;
+    /**
+     * Total rows the whole query yields (for the pager).
+     */
+    total: number;
+};
+
 export type TicketResponse = {
     ticket: string;
 };
@@ -2780,6 +2802,37 @@ export type PostApiFleetByIdRetireResponses = {
 };
 
 export type PostApiFleetByIdRetireResponse = PostApiFleetByIdRetireResponses[keyof PostApiFleetByIdRetireResponses];
+
+export type PostApiFleetByIdSqlData = {
+    body: {
+        limit?: number;
+        offset?: number;
+        sql: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/fleet/{id}/sql';
+};
+
+export type PostApiFleetByIdSqlErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdSqlError = PostApiFleetByIdSqlErrors[keyof PostApiFleetByIdSqlErrors];
+
+export type PostApiFleetByIdSqlResponses = {
+    /**
+     * Success
+     */
+    200: SqlPage;
+};
+
+export type PostApiFleetByIdSqlResponse = PostApiFleetByIdSqlResponses[keyof PostApiFleetByIdSqlResponses];
 
 export type PostApiFleetByIdUnretireData = {
     body?: never;

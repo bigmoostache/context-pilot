@@ -90,14 +90,20 @@ fn sync_query_responder(state: &State) {
     let Some(server) = state.get_ext::<BridgeState>().and_then(|bs| bs.intake.as_ref()) else {
         return;
     };
-    let creds: Option<super::query::SearchCreds> = cp_mod_search::meili_credentials(state)
+    let search: Option<super::query::SearchCreds> = cp_mod_search::meili_credentials(state)
         .and_then(|(port, key)| cp_mod_search::project_hash(state).map(|hash| (port, key, hash)));
-    let wanted = creds.as_ref().map(|c| format!("{}:{}", c.0, c.2));
+    let entities_db = state.get_ext::<cp_mod_entities::types::EntitiesState>().map(|es| es.db_path.clone());
+    let wanted = (search.is_some() || entities_db.is_some()).then(|| {
+        let s = search.as_ref().map(|c| format!("{}:{}", c.0, c.2)).unwrap_or_default();
+        let e = entities_db.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
+        format!("{s}|{e}")
+    });
     if server.responder_key() == wanted {
         return;
     }
-    server.set_responder(creds.zip(wanted).map(|(owned, key)| {
-        let respond: SharedResponder = Arc::new(move |query: &Query| super::query::answer(Some(&owned), query));
+    let ctx = super::query::QueryCtx::new(search, entities_db);
+    server.set_responder(wanted.map(|key| {
+        let respond: SharedResponder = Arc::new(move |query: &Query| super::query::answer(&ctx, query));
         (key, respond)
     }));
 }

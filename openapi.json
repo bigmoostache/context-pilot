@@ -2607,6 +2607,50 @@
         ],
         "type": "object"
       },
+      "SqlPage": {
+        "description": "One page of a read-only SQL query, cells already stringified for display.",
+        "properties": {
+          "columns": {
+            "description": "Column names, in result order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "offset": {
+            "description": "Offset of the first row in this page.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rows": {
+            "description": "Row cells as display text; `None` is SQL `NULL`.",
+            "items": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Total rows the whole query yields (for the pager).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "total",
+          "offset"
+        ],
+        "type": "object"
+      },
       "TicketResponse": {
         "properties": {
           "ticket": {
@@ -5919,6 +5963,72 @@
           }
         },
         "summary": "Retire agent",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/fleet/{id}/sql": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "limit": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "sql": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sql"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SqlPage"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "One page of a read-only entity SQL query",
         "tags": [
           "agent"
         ]

@@ -40,6 +40,7 @@ mod create;
 mod lifecycle;
 mod releases;
 pub(crate) use agents::conversations::search_conversations;
+pub(crate) use agents::sql::sql_page;
 use agents::{attach_disk_notes, attach_disk_tasks, order_tree, overlay_roster, reshape_agent};
 pub(crate) use backend::Backend;
 pub(crate) use claude_oauth::accounts::{delete_account, list_accounts, store_account, switch_account};

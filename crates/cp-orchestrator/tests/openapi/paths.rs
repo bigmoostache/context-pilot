@@ -298,6 +298,15 @@ pub(super) fn paths() -> Value {
             },
             "required": ["query"]
         })), r("ConversationSearchResult"))),
+        "/api/fleet/{id}/sql": with_agent(post("agent", "One page of a read-only entity SQL query", Some(json!({
+            "type": "object",
+            "properties": {
+                "sql": { "type": "string" },
+                "offset": { "type": "integer", "format": "int64" },
+                "limit": { "type": "integer", "format": "int32" }
+            },
+            "required": ["sql"]
+        })), r("SqlPage"))),
         "/api/fleet/{id}/restart": with_agent(post("agent", "Restart agent", None, r("RestartReceipt"))),
         "/api/fleet/{id}/retire": with_agent(post("agent", "Retire agent", None, r("RetireReceipt"))),
         "/api/fleet/{id}/unretire": with_agent(post("agent", "Unretire agent", None, r("UnretireReceipt"))),

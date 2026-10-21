@@ -82,6 +82,19 @@ pub enum Kind {
         agent_id: Option<String>,
     },
 
+    /// One page of a read-only SQL query against the agent's entity database
+    /// (the `openui` `SqlTable` component). The agent rejects anything but a
+    /// single read-only statement.
+    #[serde(rename = "sql_page")]
+    SqlPage {
+        /// The `SELECT` (or `WITH … SELECT`) to page through.
+        sql: String,
+        /// Rows to skip.
+        offset: u64,
+        /// Maximum rows in the page.
+        limit: u32,
+    },
+
     /// Catch-all for variants added in a newer protocol version.
     ///
     /// An N-1 receiver deserialises any unrecognised `"kind"` tag here rather
@@ -193,6 +206,29 @@ impl ConvHit {
     }
 }
 
+/// One page of a read-only SQL query, cells already stringified for display.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[non_exhaustive]
+pub struct SqlPage {
+    /// Column names, in result order.
+    pub columns: Vec<String>,
+    /// Row cells as display text; `None` is SQL `NULL`.
+    pub rows: Vec<Vec<Option<String>>>,
+    /// Total rows the whole query yields (for the pager).
+    pub total: u64,
+    /// Offset of the first row in this page.
+    pub offset: u64,
+}
+
+impl SqlPage {
+    /// Build a page (keeps the struct `#[non_exhaustive]` cross-crate).
+    #[must_use]
+    pub const fn new(columns: Vec<String>, rows: Vec<Vec<Option<String>>>, total: u64, offset: u64) -> Self {
+        Self { columns, rows, total, offset }
+    }
+}
+
 /// The outcome of a [`Query`], returned on the same stream as the request.
 ///
 /// Internally-tagged so a `Hits` reply and an `Error` reply are distinguished
@@ -211,6 +247,13 @@ pub enum Outcome {
     Hits {
         /// Matching conversation documents, best-scored first.
         hits: Vec<ConvHit>,
+    },
+
+    /// One page of SQL rows (reply to [`Kind::SqlPage`]).
+    #[serde(rename = "rows")]
+    Rows {
+        /// The page, with the query's total row count.
+        page: SqlPage,
     },
 
     /// The query failed; `reason` explains why (backend down, bad request).

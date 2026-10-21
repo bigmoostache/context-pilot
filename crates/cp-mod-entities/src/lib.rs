@@ -7,7 +7,7 @@
 /// SQLite connection factory, bootstrap, introspection, dump, and restore.
 mod db;
 /// SQL preprocessing + error enrichment: classification, UTF-8-safe splitting, fuzzy errors.
-mod sql;
+pub mod sql;
 pub(crate) use sql::{errors, parse};
 /// Auto-capture DDL as numbered migration files + sequential replay for recovery.
 mod migrations;

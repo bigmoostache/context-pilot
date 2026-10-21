@@ -393,6 +393,7 @@ mod tests {
         assert_eq!(response.query_id, "q-1", "the reply echoes the query id");
         match response.result {
             Outcome::Hits { hits } => assert_eq!(hits.len(), 1),
+            Outcome::Rows { .. } => panic!("expected hits, got rows"),
             Outcome::Error { reason } => panic!("expected hits, got error: {reason}"),
         }
 

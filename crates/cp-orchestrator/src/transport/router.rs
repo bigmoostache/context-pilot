@@ -144,6 +144,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Post, &["api", "fleet", id, "conversations", "search"]) => {
             rest::search_conversations(state, id, body_bytes)
         }
+        (&Method::Post, &["api", "fleet", id, "sql"]) => rest::sql_page(state, id, body_bytes),
         (&Method::Post, &["api", "fleet", id, "library", "command"]) => rest::create_command(state, id, body_bytes),
         (&Method::Put, &["api", "fleet", id, "library", "command", item]) => {
             rest::upsert_library_command(state, id, item, body_bytes)

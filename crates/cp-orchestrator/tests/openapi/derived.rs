@@ -11,7 +11,7 @@ use serde_json::{Map, Value};
 use utoipa::PartialSchema;
 
 /// Names of every derived schema, in the order of [`derived`].
-pub(crate) const NAMES: &[&str] = &["ConvHit"];
+pub(crate) const NAMES: &[&str] = &["ConvHit", "SqlPage"];
 
 /// Serialize one derived schema to JSON.
 fn schema_of<T>() -> Value
@@ -25,5 +25,6 @@ where
 pub(crate) fn derived() -> Value {
     let mut m = Map::new();
     drop(m.insert("ConvHit".into(), schema_of::<cp_wire::types::payload::query::ConvHit>()));
+    drop(m.insert("SqlPage".into(), schema_of::<cp_wire::types::payload::query::SqlPage>()));
     Value::Object(m)
 }

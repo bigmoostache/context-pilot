@@ -5,5 +5,7 @@
 
 /// SQL error enrichment: fuzzy suggestions and schema context.
 pub(crate) mod errors;
+/// Paged read-only queries for the web `SqlTable` (bridge intake thread).
+pub mod page;
 /// SQL statement parsing: classification + UTF-8-safe statement splitting.
 pub(crate) mod parse;
