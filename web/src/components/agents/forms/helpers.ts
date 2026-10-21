@@ -62,8 +62,20 @@ export interface FormAnswer {
   submittedAt?: string | number
 }
 
-const FORM_RE = /```form\n([\s\S]*?)```/g
-const FORM_ANSWER_RE = /```form-answer\n([\s\S]*?)```/
+// ── Fence scanning (CommonMark-correct) ──────────────────────────────────
+//
+// The closing fence MUST sit on its own line: it is anchored to a preceding
+// newline and must be followed by nothing but optional trailing blanks then
+// end-of-line. A naive non-greedy `/```form\n([\s\S]*?)```/` instead closes on
+// the FIRST triple-backtick anywhere in the body — so a block whose prose or
+// option label merely *mentions* a fence inline (a label reading "emit an
+// ```openui``` block") is truncated mid-YAML, and the remainder spills out as
+// loose text full of stray fences that then corrupt the surrounding markdown.
+// Requiring an own-line close leaves such inline runs alone, as CommonMark
+// specifies. `[ \t]*` before the lookahead cannot overlap `\r?\n`, so the close
+// scan stays linear (no super-linear backtracking window).
+const FORM_RE = /```form\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/g
+const FORM_ANSWER_RE = /```form-answer\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/
 
 /** Whether a message body carries a ` ```form ` or ` ```form-answer ` block —
  *  i.e. it must render through the form row (fresh every render) rather than the
