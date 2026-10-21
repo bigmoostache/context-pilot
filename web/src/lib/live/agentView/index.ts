@@ -18,10 +18,16 @@ import { sendCommand } from "@/lib/live"
 import { uploadUnique } from "@/lib/api"
 import type { UploadedFile } from "@/lib/live/agentUpload"
 import type { AgentDetail } from "@/lib/types"
-import { buildCombinedContent, describeCommandError, type CreateAgentOpts } from "./commands"
+import { describeCommandError, type CreateAgentOpts } from "./commands"
 import { useAgentBranch, type BranchActions } from "./branch"
+import { useOptimisticCommands } from "./optimistic"
 
-export { buildCombinedContent, describeCommandError, type CreateAgentOpts } from "./commands"
+export {
+  buildCombinedContent,
+  describeCommandError,
+  newAgentDraftKey,
+  type CreateAgentOpts,
+} from "./commands"
 export type { BranchTarget } from "./branch"
 export { useAgentReadState } from "./readState"
 
@@ -86,7 +92,22 @@ export function useAgentSelection(
   const [ownSelectedId, setOwnSelectedId] = useState(() => localStorage.getItem(agentKey) ?? "")
   const controlled = controlledSelection !== undefined
   const selectedId = controlled ? controlledSelection.selectedId : ownSelectedId
-  const setSelectedId = controlled ? controlledSelection.setSelectedId : setOwnSelectedId
+  const setRawSelectedId = controlled ? controlledSelection.setSelectedId : setOwnSelectedId
+  // Selecting an agent also moves the human's focus agent-side, so the footer
+  // (status, context, cost — all built from the focused agent) follows the
+  // sidebar. Fire-and-forget: a lost focus command only leaves the footer on
+  // the previous agent.
+  const setSelectedId = useCallback(
+    (id: string) => {
+      setRawSelectedId(id)
+      if (id) {
+        sendCommand(activeFleetId, { kind: "focus_agent", agent_id: id }).catch((e: unknown) => {
+          console.warn("focus_agent failed", e)
+        })
+      }
+    },
+    [activeFleetId, setRawSelectedId],
+  )
   const [query, setQuery] = useState("")
   const [showArchived, setShowArchived] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([])
@@ -184,11 +205,16 @@ export interface Notice {
 /** The command handlers + transient notice returned by {@link useAgentActions}. */
 export interface Actions extends BranchActions {
   notice: Notice | null
+  /** the roster with optimistic (pending) agents + messages overlaid — render this */
+  agents: AgentDetail[]
   handleArchive: (id: string) => void
   handlePause: (id: string) => void
+  /** rename an agent; the `agent_renamed` delta updates the list */
+  handleRename: (id: string, name: string) => void
   handleDelete: (id: string) => void
   handleCreate: (opts: CreateAgentOpts) => void
-  handleSend: (text: string) => void
+  /** resolves false when the send failed, so the composer restores its text */
+  handleSend: (text: string) => Promise<boolean>
   handleAttach: (files: File[]) => void | Promise<void>
 }
 
@@ -206,8 +232,7 @@ export function useAgentActions(
   agents: AgentDetail[],
   sel: Selection,
 ): Actions {
-  const { selectedId, setSelectedId, effectiveSelectedId, pendingFiles, setPendingFiles } = sel
-
+  const { selectedId, setSelectedId, effectiveSelectedId, setPendingFiles } = sel
   const [notice, setNotice] = useState<Notice | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
   // Show a toast, replacing any current one, and auto-dismiss it. An undo
@@ -287,6 +312,15 @@ export function useAgentActions(
     [agents, activeFleetId, flash, offerUndo],
   )
 
+  const handleRename = useCallback(
+    (id: string, name: string) => {
+      sendCommand(activeFleetId, { kind: "rename_agent", agent_id: id, name }).catch((e: unknown) =>
+        flash(describeCommandError("rename the agent", e)),
+      )
+    },
+    [activeFleetId, flash],
+  )
+
   const handleDelete = useCallback(
     (id: string) => {
       if (id === selectedId) setSelectedId("")
@@ -297,61 +331,11 @@ export function useAgentActions(
     [activeFleetId, flash, selectedId, setSelectedId],
   )
 
-  const handleCreate = useCallback(
-    (opts: CreateAgentOpts) => {
-      // Close the dialog + reset the browse state immediately; the create is
-      // fire-and-forget with its own failure notice (T121).
-      sel.setNewOpen(false)
-      sel.setQuery("")
-      sel.setShowArchived(false)
-      // ONE atomic command carries the whole intent — name, first message, and
-      // paused — applied in-process by the agent in strict create -> pause ->
-      // send order (T687). This deliberately replaces the former frontend
-      // orchestration (create name-only, then guess the new agent's id from a
-      // roster set-diff, then fire pause / send from a volatile ref). That
-      // orchestration LOST DATA: the first message lived only in a ref, and any
-      // derailment — a mis-guessed id, a coalesced/missed roster delta, a
-      // second create clobbering the ref, or a pause that never reflected —
-      // dropped the message silently. Here the message content rides the
-      // durable, deduped command payload and the agent applies it atomically,
-      // so it can never vanish. Same upload-on-attach + `file-upload` block
-      // path as the composer (buildCombinedContent -> buildUploadMessage);
-      // `filesFirst` prepends the blocks so attachments lead the message.
-      const content = buildCombinedContent(opts.firstMessage, opts.files, true)
-      // Arm the visual auto-select so the new agent opens once it appears
-      // (selection only — it no longer gates message delivery, so a mis-select
-      // is a harmless view glitch, never data loss).
-      sel.armAutoSelect()
-      void (async () => {
-        try {
-          await sendCommand(activeFleetId, {
-            kind: "create_agent",
-            name: opts.title.trim() || "Untitled agent",
-            ...(content && { initial_message: content }),
-            paused: opts.paused,
-          })
-        } catch (e) {
-          sel.disarmAutoSelect()
-          flash(describeCommandError("create the agent", e))
-        }
-      })()
-    },
-    [activeFleetId, flash, sel],
-  )
-
-  const handleSend = useCallback(
-    (text: string) => {
-      if (!effectiveSelectedId) return
-      const content = buildCombinedContent(text, pendingFiles)
-      if (!content) return
-      sendCommand(activeFleetId, {
-        kind: "send_message",
-        agent_id: effectiveSelectedId,
-        content,
-      }).catch((e: unknown) => flash(describeCommandError("send your message", e)))
-      setPendingFiles([])
-    },
-    [activeFleetId, effectiveSelectedId, flash, pendingFiles, setPendingFiles],
+  const { view, handleCreate, handleSend } = useOptimisticCommands(
+    activeFleetId,
+    agents,
+    sel,
+    flash,
   )
 
   const handleAttach = useCallback(
@@ -385,8 +369,10 @@ export function useAgentActions(
   return {
     ...branch,
     notice,
+    agents: view,
     handleArchive,
     handlePause,
+    handleRename,
     handleDelete,
     handleCreate,
     handleSend,

@@ -11,7 +11,9 @@
 import { useEffect, useRef } from "react"
 import { animate, createSpring } from "animejs"
 import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
+import type { ReactNode } from "react"
 import type { ChatMessage } from "@/lib/types"
+import { splitFormSegments, type FormSpec } from "@/mobile-components/agents/forms/helpers"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
 import { MessageFileChip } from "@/mobile-components/agents/fileUpload"
@@ -20,6 +22,7 @@ import {
   type UploadedFile,
 } from "@/mobile-components/agents/fileUpload/helpers"
 import { cn, prefersReducedMotion } from "@/lib/utils"
+import { PendingSpinner } from "@/mobile-components/ui/pending"
 
 /**
  * Props every message renderer accepts.
@@ -43,6 +46,8 @@ interface MessageProps {
   onDelete?: (() => void) | undefined
   /** branch a new agent out of the conversation at this message */
   onBranch?: (() => void) | undefined
+  /** render a ` ```form ` block's widget in place (form-bearing rows only) */
+  renderForm?: ((spec: FormSpec) => ReactNode) | undefined
   /** true for a message that just APPENDED (not part of the initial load) —
    *  drives the anime.js spring pop that reads as send/receive confirmation. */
   fresh?: boolean | undefined
@@ -55,6 +60,7 @@ export function Message({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
   fresh,
 }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
@@ -67,6 +73,7 @@ export function Message({
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
         onBranch={onBranch}
+        renderForm={renderForm}
         fresh={fresh}
       />
     )
@@ -78,6 +85,7 @@ export function Message({
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
       onBranch={onBranch}
+      renderForm={renderForm}
       fresh={fresh}
     />
   )
@@ -117,6 +125,26 @@ function useBubblePop(fresh: boolean | undefined) {
  * align with their author for free.
  */
 function MessageBody({
+  renderForm,
+  ...prose
+}: Parameters<typeof ProseBody>[0] & { renderForm?: ((spec: FormSpec) => ReactNode) | undefined }) {
+  if (!renderForm) return <ProseBody {...prose} />
+  // Form-bearing row: each widget renders where its block sat in the text.
+  return (
+    <>
+      {splitFormSegments(prose.text).map((seg, i) =>
+        seg.type === "text" ? (
+          <ProseBody key={i} {...prose} text={seg.text} />
+        ) : (
+          <div key={i}>{renderForm(seg.spec)}</div>
+        ),
+      )}
+    </>
+  )
+}
+
+/** Prose renderer: markdown with ` ```file-upload ` chips spliced in place. */
+function ProseBody({
   text,
   variant,
   fleetId,
@@ -215,6 +243,7 @@ function UserMessage({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
   fresh,
 }: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
@@ -231,9 +260,11 @@ function UserMessage({
           fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
+          renderForm={renderForm}
         />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
+        {msg.pending && <PendingSpinner />}
         <User className="size-2.5" />
         {msg.ts}
       </span>
@@ -253,6 +284,7 @@ function AssistantMessage({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
   fresh,
 }: MessageProps) {
   const bubbleRef = useBubblePop(fresh)
@@ -273,6 +305,7 @@ function AssistantMessage({
           fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
+          renderForm={renderForm}
         />
         {msg.streaming && (
           <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-(--signal)" />

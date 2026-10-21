@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { Paperclip, X, CornerDownLeft, Loader2, GitBranch } from "lucide-react"
 import { uploadUnique } from "@/lib/api"
-import type { CreateAgentOpts } from "@/lib/live/agentView"
+import { newAgentDraftKey, type CreateAgentOpts } from "@/lib/live/agentView"
 import type { UploadedFile } from "@/lib/live/agentUpload"
 import { cn } from "@/lib/utils"
 
@@ -20,9 +20,7 @@ interface Draft {
 const EMPTY_DRAFT: Draft = { title: "", firstMessage: "", files: [], paused: false }
 
 /** Per-agent localStorage key for the in-progress new-agent draft. */
-function draftKey(fleetId: string): string {
-  return `cp-newagent-${fleetId}`
-}
+const draftKey = newAgentDraftKey
 
 /** Hydrate the persisted draft for an agent, falling back to an empty draft on a
  *  missing / malformed entry (never throws into render). */
@@ -260,7 +258,7 @@ export function NewAgentDialog({
             {/* breadcrumb + close, Linear's popup chrome */}
             <div className="flex items-center gap-2 px-4 pt-3 pb-1">
               <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                <span className="flex size-[15px] items-center justify-center rounded-sm bg-(--signal)/15 text-[9px] font-bold text-(--signal)">
+                <span className="flex size-[15px] items-center justify-center rounded-sm bg-signal/15 text-[9px] font-bold text-(--signal)">
                   T
                 </span>
                 <span className="text-muted-foreground/50">›</span>

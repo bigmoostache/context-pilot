@@ -18,7 +18,16 @@ import type { UploadedFile } from "@/lib/live/agentUpload"
 // shared composer hook can use it; re-exported here for existing importers.
 export type { CommandSuggestion } from "@/lib/live/agentUpload"
 
-const BLOCK_RE = /```file-upload\n([\s\S]*?)```/g
+// ── Fence scanning (CommonMark-correct) ──────────────────────────────────
+//
+// The closing fence must sit on its OWN line (anchored to a preceding newline,
+// followed by only optional blanks to end-of-line). A naive non-greedy
+// `/```file-upload\n([\s\S]*?)```/` would instead close on the first
+// triple-backtick anywhere in the body — so a block whose note or filename
+// merely mentions a fence inline gets truncated mid-YAML and the remainder
+// spills out as loose text full of stray fences. The own-line close leaves
+// inline runs alone, matching the form parser's scanner (forms/helpers.ts).
+const BLOCK_RE = /```file-upload\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/g
 
 /** One `key: value` line inside a `file-upload` block body (indented under
  *  `file:`). A SINGLE literal regex, applied per line — no per-key dynamic

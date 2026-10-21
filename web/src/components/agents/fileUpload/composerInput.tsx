@@ -1,7 +1,8 @@
 import { useRef } from "react"
-import { ArrowUp, Paperclip, Loader2, Clock, Pause } from "lucide-react"
+import { ArrowUp, Paperclip, Loader2, Clock, Pause, TriangleAlert } from "lucide-react"
 import { Tip } from "@/components/ui/tip"
 import type { Banner } from "@/lib/support/agentMessages"
+import { handleComposerPaste } from "@/lib/live/agentUpload"
 
 /**
  * The composer's input row: the file-picker + paperclip, the auto-growing
@@ -56,17 +57,7 @@ export function ComposerInputRow({
         onChange={onChange}
         onSelect={onSelect}
         onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const items = [...e.clipboardData.items]
-          const images = items
-            .filter((i) => i.kind === "file" && i.type.startsWith("image/"))
-            .map((i) => i.getAsFile())
-            .filter((f): f is File => f !== null)
-          if (images.length > 0 && onAttach) {
-            e.preventDefault()
-            void onAttach(images)
-          }
-        }}
+        onPaste={(e) => handleComposerPaste(e, onAttach)}
         placeholder="Reply to this agent…"
         rows={1}
         className="max-h-[200px] min-h-[24px] w-full resize-none bg-transparent px-1 pt-1 text-[13.5px] leading-relaxed text-foreground/90 outline-none placeholder:text-muted-foreground/60"
@@ -131,19 +122,29 @@ export function ComposerInputRow({
   )
 }
 
+/** Banner chrome per kind: amber pause, red ⚠ stall, neutral otherwise. */
+function bannerTone(banner: Banner): string {
+  if (banner.paused) return "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+  if (banner.warning) return "border-(--alarm)/40 bg-(--alarm)/10 text-(--alarm)"
+  return "border-border bg-muted/40 text-muted-foreground"
+}
+
+/** The leading icon per banner kind. */
+function BannerIcon({ banner, className }: { banner: Banner; className: string }) {
+  if (banner.paused) return <Pause className={className} />
+  if (banner.warning) return <TriangleAlert className={className} />
+  if (banner.working)
+    return <Loader2 className={`${className} animate-spin`} style={{ color: banner.color }} />
+  return <Clock className={className} />
+}
+
 /** The turn-status banner element, or null (see `resolveComposerBanner`). */
 export function ComposerBanner({ banner }: { banner: Banner }) {
   return (
     <div
-      className={`mb-2 flex cursor-default items-center justify-center gap-2 rounded-xl border px-4 py-1.5 text-[13px] font-medium select-none ${banner.paused ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border bg-muted/40 text-muted-foreground"}`}
+      className={`mb-2 flex cursor-default items-center justify-center gap-2 rounded-xl border px-4 py-1.5 text-[13px] font-medium select-none ${bannerTone(banner)}`}
     >
-      {banner.paused ? (
-        <Pause className="size-4" />
-      ) : banner.working ? (
-        <Loader2 className="size-4 animate-spin" style={{ color: banner.color }} />
-      ) : (
-        <Clock className="size-4" />
-      )}
+      <BannerIcon banner={banner} className="size-4 shrink-0" />
       <span>{banner.text}</span>
     </div>
   )

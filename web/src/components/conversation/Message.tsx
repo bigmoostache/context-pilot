@@ -1,10 +1,13 @@
 import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
+import type { ReactNode } from "react"
 import type { ChatMessage } from "@/lib/types"
+import { splitFormSegments, type FormSpec } from "@/components/agents/forms/helpers"
 import { Markdown, type MarkdownVariant } from "@/lib/support/markdown"
 import { CopyButton } from "./CopyButton"
 import { MessageFileChip } from "@/components/agents/fileUpload"
 import { splitMessageSegments, type UploadedFile } from "@/components/agents/fileUpload/helpers"
 import { cn } from "@/lib/utils"
+import { PendingSpinner } from "@/components/ui/pending"
 
 /**
  * Props every message renderer accepts.
@@ -28,6 +31,8 @@ interface MessageProps {
   onDelete?: (() => void) | undefined
   /** branch a new agent out of the conversation at this message */
   onBranch?: (() => void) | undefined
+  /** render a ` ```form ` block's widget in place (form-bearing rows only) */
+  renderForm?: ((spec: FormSpec) => ReactNode) | undefined
 }
 
 export function Message({
@@ -37,6 +42,7 @@ export function Message({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
 }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
   if (msg.role === "user")
@@ -48,6 +54,7 @@ export function Message({
         onShowInFinder={onShowInFinder}
         onDelete={onDelete}
         onBranch={onBranch}
+        renderForm={renderForm}
       />
     )
   return (
@@ -58,6 +65,7 @@ export function Message({
       onShowInFinder={onShowInFinder}
       onDelete={onDelete}
       onBranch={onBranch}
+      renderForm={renderForm}
     />
   )
 }
@@ -73,6 +81,26 @@ export function Message({
  * align with their author for free.
  */
 function MessageBody({
+  renderForm,
+  ...prose
+}: Parameters<typeof ProseBody>[0] & { renderForm?: ((spec: FormSpec) => ReactNode) | undefined }) {
+  if (!renderForm) return <ProseBody {...prose} />
+  // Form-bearing row: each widget renders where its block sat in the text.
+  return (
+    <>
+      {splitFormSegments(prose.text).map((seg, i) =>
+        seg.type === "text" ? (
+          <ProseBody key={i} {...prose} text={seg.text} />
+        ) : (
+          <div key={i}>{renderForm(seg.spec)}</div>
+        ),
+      )}
+    </>
+  )
+}
+
+/** Prose renderer: markdown with ` ```file-upload ` chips spliced in place. */
+function ProseBody({
   text,
   variant,
   fleetId,
@@ -168,6 +196,7 @@ function UserMessage({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
 }: MessageProps) {
   return (
     <div className="flex flex-col items-end gap-1 py-2">
@@ -178,9 +207,11 @@ function UserMessage({
           fleetId={fleetId}
           onOpenFile={onOpenFile}
           onShowInFinder={onShowInFinder}
+          renderForm={renderForm}
         />
       </div>
       <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
+        {msg.pending && <PendingSpinner />}
         <User className="size-2.5" />
         {msg.ts}
       </span>
@@ -200,35 +231,38 @@ function AssistantMessage({
   onShowInFinder,
   onDelete,
   onBranch,
+  renderForm,
 }: MessageProps) {
   return (
     <div className="flex flex-col gap-1.5 py-2">
-      <div className="flex items-center gap-2">
-        <span className="flex size-5 items-center justify-center rounded-full bg-(--signal)/15">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-signal/15">
           <span className="size-2 rounded-full bg-(--signal)" />
         </span>
-        <span className="text-[12px] font-semibold text-foreground/85">Context Pilot</span>
-        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+        <div className="max-w-[88%] min-w-0 text-[13.5px] leading-relaxed text-foreground/90">
+          <MessageBody
+            text={msg.text ?? ""}
+            variant="default"
+            fleetId={fleetId}
+            onOpenFile={onOpenFile}
+            onShowInFinder={onShowInFinder}
+            renderForm={renderForm}
+          />
+          {msg.streaming && (
+            <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-(--signal)" />
+          )}
+        </div>
       </div>
-      <div className="max-w-[88%] pl-7 text-[13.5px] leading-relaxed text-foreground/90">
-        <MessageBody
-          text={msg.text ?? ""}
-          variant="default"
-          fleetId={fleetId}
-          onOpenFile={onOpenFile}
-          onShowInFinder={onShowInFinder}
-        />
-        {msg.streaming && (
-          <span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] translate-y-0.5 bg-(--signal)" />
+      <div className="flex items-center gap-2 pl-7">
+        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+        {!msg.streaming && (
+          <>
+            <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+            {onBranch && <BranchButton align="start" onBranch={onBranch} />}
+            {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
+          </>
         )}
       </div>
-      {!msg.streaming && (
-        <div className="flex items-center gap-2 pl-7">
-          <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
-          {onBranch && <BranchButton align="start" onBranch={onBranch} />}
-          {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
-        </div>
-      )}
     </div>
   )
 }

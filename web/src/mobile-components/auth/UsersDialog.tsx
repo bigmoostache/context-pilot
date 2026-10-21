@@ -38,7 +38,7 @@ const ROLE_BADGE: Record<Role, { className: string; Icon?: typeof Shield }> = {
     className: "bg-(--danger)/15 text-(--danger) ring-1 ring-(--danger)/25 ring-inset",
     Icon: ShieldAlert,
   },
-  admin: { className: "bg-(--signal)/15 text-(--signal)", Icon: Shield },
+  admin: { className: "bg-signal/15 text-(--signal)", Icon: Shield },
   manager: { className: "bg-(--warn)/15 text-(--warn)", Icon: ShieldHalf },
   user: { className: "bg-muted text-muted-foreground" },
 }

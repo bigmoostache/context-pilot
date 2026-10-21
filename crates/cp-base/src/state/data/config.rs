@@ -185,6 +185,15 @@ pub struct WorkerState {
     #[serde(default)]
     pub draft_cursor: usize,
 
+    // === Last stream outcome (per-agent, survives reload) ===
+    /// Stop reason of this agent's last completed stream (`"end_turn"`,
+    /// `"refusal"`, `"max_tokens"`, …). Persisted so the TUI warning sign and
+    /// the web red-square warning survive a reload or an orchestrator restart;
+    /// the runtime copy on `AgentRuntime` is in-memory only. `None` in files
+    /// saved before this field existed.
+    #[serde(default)]
+    pub last_stop_reason: Option<String>,
+
     // === Module data (keyed by module ID) ===
     /// Per-module persistent worker data, keyed by module ID string.
     #[serde(default)]
@@ -202,6 +211,7 @@ impl Default for WorkerState {
             next_result_id: 1,
             draft_input: None,
             draft_cursor: 0,
+            last_stop_reason: None,
             modules: HashMap::new(),
         }
     }
@@ -240,6 +250,13 @@ impl WorkerState {
     pub fn with_draft(mut self, text: String, cursor: usize) -> Self {
         self.draft_input = Some(text);
         self.draft_cursor = cursor;
+        self
+    }
+
+    /// Set the last-stream stop reason to persist (builder).
+    #[must_use]
+    pub fn with_last_stop_reason(mut self, reason: Option<String>) -> Self {
+        self.last_stop_reason = reason;
         self
     }
 

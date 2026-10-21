@@ -256,6 +256,7 @@ pub(crate) fn boot_load_agent_runtime(
         .with_messages(messages)
         .with_id_counters((next_user_id, next_assistant_id, cfg.worker.next_tool_id, cfg.worker.next_result_id))
         .with_draft(cfg.worker.draft_input.clone().unwrap_or_default(), cfg.worker.draft_cursor)
+        .with_last_stop_reason(cfg.worker.last_stop_reason.clone())
         .with_cache_engine_json(cache_engine_json);
     boot_init_agent_modules(&mut bg, &cfg.worker.modules);
     // Ensure this agent owns the fixed base panels (Todo, Overview, Memory,

@@ -39,6 +39,7 @@ use nix as _;
 use notify as _;
 use openssl as _;
 use portable_pty as _;
+use quick_xml as _;
 use reqwest as _;
 use rusqlite as _;
 use serde as _;
@@ -46,6 +47,7 @@ use serde_yaml as _;
 use sha2 as _;
 use umya_spreadsheet as _;
 use utoipa as _;
+use zip as _;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};

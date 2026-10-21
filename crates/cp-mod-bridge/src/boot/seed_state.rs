@@ -35,6 +35,18 @@ impl MemoSeeds {
     const TASKS: u16 = 1 << 7;
     /// Bit position: note-list memo.
     const NOTES: u16 = 1 << 8;
+    /// Bit position: display-name memo.
+    const NAMES: u16 = 1 << 9;
+
+    /// Display-name memo seeded (`emit_agent_renamed`).
+    #[must_use]
+    pub const fn names(self) -> bool {
+        self.0 & Self::NAMES != 0
+    }
+    /// Mark display names as seeded.
+    pub const fn seed_names(&mut self) {
+        self.0 |= Self::NAMES;
+    }
 
     /// Messages memo seeded (`emit_messages`).
     #[must_use]

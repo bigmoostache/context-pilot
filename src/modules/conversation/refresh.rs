@@ -1,4 +1,23 @@
 use crate::state::{Kind, MsgStatus, State, estimate_tokens};
+use cp_base::config::constants::CHARS_PER_TOKEN;
+
+/// Serialized JSON byte length of `value`, counted without building the string.
+fn json_len(value: &serde_json::Value) -> usize {
+    /// `io::Write` sink that only tallies bytes.
+    struct Counter(usize);
+    impl std::io::Write for Counter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0 = self.0.saturating_add(buf.len());
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter(0);
+    let _r = serde_json::to_writer(&mut counter, value);
+    counter.0
+}
 
 /// Estimate total tokens for a single message, including content, tool uses, and tool results.
 pub(crate) fn estimate_message_tokens(m: &crate::state::Message) -> usize {
@@ -9,8 +28,8 @@ pub(crate) fn estimate_message_tokens(m: &crate::state::Message) -> usize {
         .tool_uses
         .iter()
         .map(|tu| {
-            let input_str = serde_json::to_string(&tu.input).unwrap_or_default();
-            estimate_tokens(&tu.name).saturating_add(estimate_tokens(&input_str))
+            let input_tokens = cp_base::cast::float_math::ceil_ratio(json_len(&tu.input), CHARS_PER_TOKEN);
+            estimate_tokens(&tu.name).saturating_add(input_tokens)
         })
         .sum();
 

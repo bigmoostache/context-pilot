@@ -308,7 +308,7 @@ function Tool({
         "flex size-9 shrink-0 items-center justify-center rounded-md transition-colors",
         disabled && "opacity-30",
         on
-          ? "bg-(--signal)/15 text-(--signal)"
+          ? "bg-signal/15 text-(--signal)"
           : "text-muted-foreground/80 active:bg-muted/70 active:text-foreground",
       )}
     >

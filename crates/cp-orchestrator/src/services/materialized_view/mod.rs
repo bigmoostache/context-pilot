@@ -177,17 +177,12 @@ impl FleetView {
                         .with_parent(parent_agent_id.as_deref()),
                 );
             }
-            OpEntryKind::AgentArchived { ref agent_id } => {
-                RosterAgent::fold_archived(&mut self.roster, agent_id, true);
-            }
-            OpEntryKind::AgentRestored { ref agent_id } => {
-                RosterAgent::fold_archived(&mut self.roster, agent_id, false);
-            }
-            OpEntryKind::AgentPaused { ref agent_id } => {
-                RosterAgent::fold_paused(&mut self.roster, agent_id, true);
-            }
-            OpEntryKind::AgentResumed { ref agent_id } => {
-                RosterAgent::fold_paused(&mut self.roster, agent_id, false);
+            OpEntryKind::AgentArchived { ref agent_id } => RosterAgent::fold_archived(&mut self.roster, agent_id, true),
+            OpEntryKind::AgentRestored { ref agent_id } => RosterAgent::fold_archived(&mut self.roster, agent_id, false),
+            OpEntryKind::AgentPaused { ref agent_id } => RosterAgent::fold_paused(&mut self.roster, agent_id, true),
+            OpEntryKind::AgentResumed { ref agent_id } => RosterAgent::fold_paused(&mut self.roster, agent_id, false),
+            OpEntryKind::AgentRenamed { ref agent_id, ref name } => {
+                RosterAgent::fold_renamed(&mut self.roster, agent_id, name);
             }
             OpEntryKind::AgentDeleted { ref agent_id } => {
                 RosterAgent::fold_deleted(&mut self.roster, agent_id);
@@ -195,6 +190,9 @@ impl FleetView {
             }
             OpEntryKind::AgentStatusChanged { ref agent_id, status } => {
                 RosterAgent::fold_status(&mut self.roster, agent_id, status);
+            }
+            OpEntryKind::AgentLitChanged { ref agent_id, lit, ref warning } => {
+                RosterAgent::fold_lit(&mut self.roster, agent_id, lit, warning.clone());
             }
             OpEntryKind::TaskListChanged { ref agent_id, ref tasks } => {
                 RosterAgent::fold_tasks(&mut self.roster, agent_id, tasks.clone());

@@ -1,7 +1,8 @@
-import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { Loader2, ArchiveRestore } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Message } from "@/components/conversation/Message"
+import { ToolRun } from "@/components/conversation/ToolRun"
 import { AgentComposer, type CommandSuggestion } from "./AgentComposer"
 import { CreateCommandDialog } from "./CreateCommandDialog"
 import { SystemEditorDialog } from "@/components/shell/behaviour/SystemEditor"
@@ -11,51 +12,11 @@ import { collectAgentFiles, useConversationDrop, type UploadedFile } from "./fil
 import { FormMessageRow } from "./forms/FormMessageRow"
 import { isFormMessage } from "./forms/helpers"
 import { useScrollPin, useAgentForms } from "./forms/useAgentForms"
-import { parseAutoLine, segmentLog, toChatMessage } from "@/lib/support/agentMessages"
+import { segmentLog, toChatMessage } from "@/lib/support/agentMessages"
 import { AgentAsideRail } from "./fileUpload/AgentAsideRail"
 import { useAgentAside } from "./fileUpload/useAgentAside"
 import { useAsideDefault } from "@/lib/providers/toggles/asideDefault"
 import type { AgentDetail, AgentMsg } from "@/lib/types"
-
-/**
- * A collapsed run of auto tool-activity traces, rendered as an aligned
- * three-column grid (verb · tool · intent) so the agent's live work is easy to
- * scan at a glance. Verbs and tool names carry distinct accent colours from the
- * app palette; intents are dimmed context.
- *
- * `memo`-wrapped: an auto-run re-renders only when its `msgs` array reference
- * changes. `segmentLog` is memoized on `agent.log` in the parent, so the
- * segment objects (hence this `msgs` array) stay reference-stable across the
- * renders an unrelated SSE delta triggers — the shallow prop compare then skips
- * this whole subtree. Part of the T510 render-storm fix.
- */
-const AutoRun = memo(function AutoRun({ msgs }: { msgs: AgentMsg[] }) {
-  const n = msgs.length
-  return (
-    <details className="group/auto mb-2 ml-7">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-muted-foreground/75 transition-colors hover:bg-muted/40 hover:text-muted-foreground">
-        <span className="text-muted-foreground/60 transition-transform group-open/auto:rotate-90">
-          ▸
-        </span>
-        <span>
-          ⚙ {n} tool action{n === 1 ? "" : "s"}
-        </span>
-      </summary>
-      <div className="mt-1 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-0.5 border-l border-border/60 pl-3 font-mono text-[11px]">
-        {msgs.map((m) => {
-          const { verb, tool, intent } = parseAutoLine(m)
-          return (
-            <Fragment key={m.id}>
-              <span className="text-(--interactive)">{verb}</span>
-              <span className="text-foreground/70">{tool}</span>
-              <span className="truncate text-muted-foreground/55">{intent}</span>
-            </Fragment>
-          )
-        })}
-      </div>
-    </details>
-  )
-})
 
 /**
  * One rendered NON-auto message row — the memoized boundary that kills the
@@ -280,7 +241,7 @@ export function AgentConversation({
   agent: AgentDetail
   /** owning agent — needed to open the shared Quick Look drawer for an attachment */
   fleetId: string
-  onSend?: ((text: string) => void) | undefined
+  onSend?: ((text: string) => Promise<boolean>) | undefined
   /** upload picked files into this agent (composer paperclip). May be async so
    *  callers can `await` it to keep an in-flight loader up (T471). */
   onAttach?: ((files: File[]) => void | Promise<void>) | undefined
@@ -398,7 +359,7 @@ export function AgentConversation({
 
             {segments.map((seg) =>
               seg.type === "auto" ? (
-                <AutoRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
+                <ToolRun key={`auto-${seg.msgs[0]?.id ?? seg.type}`} msgs={seg.msgs} />
               ) : isFormMessage(seg.msg.text ?? "") ? (
                 <FormMessageRow
                   key={seg.msg.id}
@@ -434,8 +395,8 @@ export function AgentConversation({
           <AgentComposer
             key={agent.id}
             status={agent.status}
-            focused={agent.focused}
             paused={agent.paused}
+            warning={agent.warning}
             onSend={onSend}
             onAttach={onAttach}
             pendingFiles={pendingFiles}

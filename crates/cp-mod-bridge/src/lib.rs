@@ -146,6 +146,11 @@ pub struct BridgeState {
     /// milliseconds, not on the next disk flush.
     pub agent_statuses: std::collections::HashMap<String, cp_wire::types::AgentTurn>,
 
+    /// Last per-agent sidebar light + ⚠ reason emitted as an `AgentLitChanged`
+    /// delta. Never seeded: the first pass emits every agent's light, so a
+    /// restart self-heals the view.
+    pub agent_lits: std::collections::HashMap<String, (bool, Option<String>)>,
+
     /// Last focused-thread id emitted as a `AgentFocusChanged` delta. The
     /// focus chokepoint diffs the live `FocusState.focused_agent_id` against
     /// this memo every tick and emits only on an actual change (the same
@@ -180,6 +185,10 @@ pub struct BridgeState {
     /// memo every tick and emits `AgentPaused`/`AgentResumed` only on an
     /// actual change — mirrors the archived chokepoint (T371).
     pub agent_paused_memo: std::collections::HashMap<String, bool>,
+
+    /// Per-agent display name as last emitted/seeded. The rename chokepoint
+    /// emits `AgentRenamed` when an agent's live name differs from it.
+    pub agent_name_memo: std::collections::HashMap<String, String>,
 
     /// Per-thread projected task list as last emitted/seeded, keyed by agent
     /// id. The task chokepoint ([`emit_task_lists`]) projects each agent's

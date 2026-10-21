@@ -172,6 +172,23 @@ impl AgentsState {
         state.ext_mut::<Self>()
     }
 
+    /// Rename agent `id` to the trimmed `name` — the one path shared by the
+    /// TUI, the web command and the `Agent` tool. The bridge picks the change
+    /// up on its next tick and journals an `AgentRenamed` delta.
+    ///
+    /// # Errors
+    ///
+    /// The trimmed name is blank, or no agent has that id.
+    pub fn rename(&mut self, id: &str, name: &str) -> Result<(), String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("agent name cannot be blank".to_owned());
+        }
+        let agent = self.agents.iter_mut().find(|a| a.id == id).ok_or_else(|| format!("agent {id} not found"))?;
+        trimmed.clone_into(&mut agent.name);
+        Ok(())
+    }
+
     /// Returns true if any *non-archived*, non-paused agent is runnable in `groups`.
     ///
     /// Archived agents are invisible to the LLM (T9): they never trigger
@@ -318,6 +335,13 @@ pub struct FocusState {
     #[serde(default)]
     #[serde(alias = "new_thread_title")]
     pub new_agent_title: cp_base::state::runtime::textarea::TextArea,
+    /// Agent being renamed in the TUI (Ctrl+R); `None` = no rename pending.
+    /// Transient: a reload drops a half-typed rename.
+    #[serde(skip)]
+    pub renaming_agent_id: Option<String>,
+    /// Draft name for the pending rename, prefilled with the current name.
+    #[serde(skip)]
+    pub rename_title: cp_base::state::runtime::textarea::TextArea,
 }
 
 impl Default for FocusState {
@@ -341,6 +365,8 @@ impl FocusState {
             last_read_count: std::collections::BTreeMap::new(),
             read_dwell: None,
             new_agent_title: cp_base::state::runtime::textarea::TextArea::new(),
+            renaming_agent_id: None,
+            rename_title: cp_base::state::runtime::textarea::TextArea::new(),
         }
     }
 

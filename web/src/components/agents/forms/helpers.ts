@@ -62,8 +62,20 @@ export interface FormAnswer {
   submittedAt?: string | number
 }
 
-const FORM_RE = /```form\n([\s\S]*?)```/g
-const FORM_ANSWER_RE = /```form-answer\n([\s\S]*?)```/
+// ── Fence scanning (CommonMark-correct) ──────────────────────────────────
+//
+// The closing fence MUST sit on its own line: it is anchored to a preceding
+// newline and must be followed by nothing but optional trailing blanks then
+// end-of-line. A naive non-greedy `/```form\n([\s\S]*?)```/` instead closes on
+// the FIRST triple-backtick anywhere in the body — so a block whose prose or
+// option label merely *mentions* a fence inline (a label reading "emit an
+// ```openui``` block") is truncated mid-YAML, and the remainder spills out as
+// loose text full of stray fences that then corrupt the surrounding markdown.
+// Requiring an own-line close leaves such inline runs alone, as CommonMark
+// specifies. `[ \t]*` before the lookahead cannot overlap `\r?\n`, so the close
+// scan stays linear (no super-linear backtracking window).
+const FORM_RE = /```form\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/g
+const FORM_ANSWER_RE = /```form-answer\r?\n([\s\S]*?)\r?\n```[ \t]*(?=\r?\n|$)/
 
 /** Whether a message body carries a ` ```form ` or ` ```form-answer ` block —
  *  i.e. it must render through the form row (fresh every render) rather than the
@@ -237,23 +249,28 @@ function parseFormBody(body: string): FormSpec | null {
   return spec
 }
 
-/** Parse every ` ```form ` block in a message body into {@link FormSpec}s (a
- *  malformed block is skipped, matching the send-time guard). */
-export function parseFormBlocks(text: string): FormSpec[] {
-  const out: FormSpec[] = []
-  FORM_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = FORM_RE.exec(text)) !== null) {
-    const spec = parseFormBody(m[1] ?? "")
-    if (spec) out.push(spec)
-  }
-  return out
-}
+/** An ordered render segment of a form-bearing body: a run of prose, or one
+ *  parsed form at the exact position its ` ```form ` block appeared. */
+export type FormSegment = { type: "text"; text: string } | { type: "form"; spec: FormSpec }
 
-/** Remove every ` ```form ` block from a message body so the prose can render
- *  without the raw YAML (the widget is drawn separately). */
-export function stripFormBlocks(text: string): string {
-  return text.replaceAll(FORM_RE, "").trim()
+/** Split a body into ordered prose / form segments so the widget renders where
+ *  the LLM placed it, not after the prose. Malformed blocks and blank prose runs
+ *  are dropped. */
+export function splitFormSegments(text: string): FormSegment[] {
+  const out: FormSegment[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  FORM_RE.lastIndex = 0
+  while ((m = FORM_RE.exec(text)) !== null) {
+    const before = text.slice(last, m.index)
+    if (before.trim().length > 0) out.push({ type: "text", text: before })
+    const spec = parseFormBody(m[1] ?? "")
+    if (spec) out.push({ type: "form", spec })
+    last = m.index + m[0].length
+  }
+  const tail = text.slice(last)
+  if (tail.trim().length > 0) out.push({ type: "text", text: tail })
+  return out
 }
 
 /**

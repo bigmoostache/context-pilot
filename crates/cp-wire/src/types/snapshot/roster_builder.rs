@@ -134,6 +134,8 @@ impl RosterAgentBuilder {
             tasks: self.tasks,
             notes: self.notes,
             parent_agent_id: self.parent_agent_id,
+            lit: false,
+            warning: None,
         }
     }
 }

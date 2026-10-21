@@ -172,6 +172,10 @@ pub enum Action {
     AgentArchiveConfirm,
     /// Cancel agent archive — dismisses the confirmation.
     AgentArchiveCancel,
+    /// Start renaming the selected agent (Ctrl+R) — prefills its name.
+    AgentRenameStart,
+    /// Cancel the pending rename without applying it.
+    AgentRenameCancel,
     /// Toggle between the active and archived agent lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
     AgentToggleArchivedView,

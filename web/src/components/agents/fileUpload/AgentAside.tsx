@@ -1,8 +1,9 @@
-import { useMemo } from "react"
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { animate, createSpring } from "animejs"
 import {
   Paperclip,
   ListChecks,
-  StickyNote,
+  NotepadText,
   ChevronLeft,
   Download,
   PanelRightClose,
@@ -14,9 +15,10 @@ import { kindOf } from "@/components/finder/support/kind"
 import { FinderPreview } from "@/components/finder/preview/FinderPreview"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { downloadFile } from "@/lib/api"
+import { prefersReducedMotion } from "@/lib/utils"
 import { uploadToNode, type UploadedFile } from "./helpers"
 import type { AgentFile } from "./FileSidebar"
-import { TaskList, NoteList } from "./AgentAsideTasks"
+import { TaskList, NoteList, NotePreview } from "./AgentAsideTasks"
 import type { AgentTask, AgentNote } from "@/lib/types"
 
 /**
@@ -69,6 +71,51 @@ function clampTab(
   return "files"
 }
 
+/**
+ * Tab motion (anime.js), scoped to the aside's root: a 2px indicator under the
+ * tab strip springs to the active trigger (its first placement is instant), and
+ * the newly shown panel fades in. Opacity only — nothing slides into place.
+ */
+function useTabMotion(rootRef: RefObject<HTMLDivElement | null>, activeTab: AsideTab): void {
+  const placedRef = useRef(false)
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    const bar = el?.querySelector<HTMLElement>("[data-tab-indicator]")
+    const tab = el?.querySelector<HTMLElement>('[data-slot=tabs-trigger][aria-selected="true"]')
+    if (!el || !bar || !tab) return
+    const reduced = prefersReducedMotion()
+    const target = { translateX: tab.offsetLeft, width: tab.offsetWidth }
+    if (!placedRef.current || reduced) {
+      placedRef.current = true
+      animate(bar, { ...target, opacity: 1, duration: 0 })
+      return
+    }
+    animate(bar, { ...target, ease: createSpring({ stiffness: 380, damping: 30 }) })
+    const panel = el.querySelector<HTMLElement>("[data-slot=tabs-content]:not([hidden])")
+    if (panel) animate(panel, { opacity: [0, 1], duration: 200, ease: "outQuad" })
+  }, [rootRef, activeTab])
+}
+
+/** Rail width class: sidebar width for lists, 40vw (50vw with the left rail hidden) for a preview. */
+function railWidth(previewing: boolean, leftRailHidden: boolean): string {
+  if (!previewing) return "w-(--sidebar-w)"
+  return leftRailHidden ? "w-[50vw] max-w-[50vw]" : "w-[40vw] max-w-[40vw]"
+}
+
+/**
+ * The open note id for the Notes tab, reset to none when the agent changes
+ * ("adjust state while rendering": the aside is reused across agents).
+ */
+function useOpenNote(agentId: string): [string | null, (id: string | null) => void] {
+  const [noteId, setNoteId] = useState<string | null>(null)
+  const [noteAgent, setNoteAgent] = useState(agentId)
+  if (noteAgent !== agentId) {
+    setNoteAgent(agentId)
+    setNoteId(null)
+  }
+  return [noteId, setNoteId]
+}
+
 export function AgentAside({
   files,
   tasks,
@@ -106,25 +153,36 @@ export function AgentAside({
   // Per-section presence gates (T666): a tab is shown only when its section has
   // content, and the whole rail disappears when BOTH are empty (the conversation
   // then takes the full width).
+  // Open note (Notes tab list → preview).
+  const [noteId, setNoteId] = useOpenNote(agentId)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Clamp the active tab to a VISIBLE one (computed before the empty-rail early
+  // return so the tab-motion hook always runs).
+  const activeTab = clampTab(tab, {
+    hasFiles: files.length > 0,
+    hasTasks: tasks.length > 0,
+    hasNotes: notes.length > 0,
+  })
+  useTabMotion(rootRef, activeTab)
   const hasFiles = files.length > 0
   const hasTasks = tasks.length > 0
   const hasNotes = notes.length > 0
   if (!hasFiles && !hasTasks && !hasNotes) return null
 
-  // Clamp the active tab to a VISIBLE one (helper hoisted to module scope so
-  // this component stays under the cyclomatic-complexity budget).
-  const activeTab = clampTab(tab, { hasFiles, hasTasks, hasNotes })
-  const previewing = activeTab === "files" && selectedFile !== null
+  const openNote = activeTab === "notes" ? notes.find((n) => n.id === noteId) : undefined
+  // A note preview takes the same widened rail as a file preview.
+  const previewing = (activeTab === "files" && selectedFile !== null) || openNote !== undefined
+  const back = () => {
+    onSelectFile(null)
+    setNoteId(null)
+  }
 
   return (
     <div
+      ref={rootRef}
       className={
         "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
-        (previewing
-          ? leftRailHidden
-            ? "w-[50vw] max-w-[50vw]"
-            : "w-[40vw] max-w-[40vw]"
-          : "w-(--sidebar-w)")
+        railWidth(previewing, leftRailHidden)
       }
     >
       <TooltipProvider>
@@ -144,8 +202,8 @@ export function AgentAside({
             hasNotes={hasNotes}
             previewing={previewing}
             fleetId={fleetId}
-            file={selectedFile}
-            onBack={() => onSelectFile(null)}
+            file={activeTab === "files" ? selectedFile : null}
+            onBack={back}
             onHide={onHide}
             hintShown={hintShown}
           />
@@ -157,10 +215,14 @@ export function AgentAside({
             </TabsContent>
           )}
 
-          {/* Notes tab — the focused agent's scratchpad cells (list → expand) */}
+          {/* Notes tab — the agent's scratchpad cells: list, or the open note */}
           {hasNotes && (
-            <TabsContent value="notes" className="min-h-0 flex-1 overflow-y-auto">
-              <NoteList notes={notes} storageKey={`cp-notes-open-${fleetId}-${agentId}`} />
+            <TabsContent value="notes" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {openNote ? (
+                <NotePreview note={openNote} />
+              ) : (
+                <NoteList notes={notes} onSelect={setNoteId} />
+              )}
             </TabsContent>
           )}
 
@@ -222,21 +284,36 @@ function AsideTabBar({
           icon starts at exactly the trigger's px-2 (8px) inset — the SAME 8px a
           depth-0 task row's status icon sits at — so the tab strip and the task
           list share one icon column (T685 alignment). */}
-      <TabsList variant="line" className="h-8 gap-0.5 p-0">
+      {/* The built-in per-trigger underline is hidden (after:hidden); the shared
+          [data-tab-indicator] bar below glides between tabs instead (useTabMotion). */}
+      <TabsList variant="line" className="relative h-8 gap-0.5 p-0">
+        <span
+          data-tab-indicator
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-px left-0 h-0.5 w-0 rounded-full bg-foreground opacity-0"
+        />
         {hasTasks && (
-          <TabsTrigger value="tasks" className="border-0 px-2 text-[13.5px]">
+          <TabsTrigger value="tasks" className="border-0 px-2 text-[13.5px] after:hidden">
             <ListChecks className="size-3.5" />
             Tasks
           </TabsTrigger>
         )}
         {hasNotes && (
-          <TabsTrigger value="notes" className="border-0 px-2 text-[13.5px]">
-            <StickyNote className="size-3.5" />
+          <TabsTrigger
+            value="notes"
+            onClick={onBack}
+            className="border-0 px-2 text-[13.5px] after:hidden"
+          >
+            <NotepadText className="size-3.5" />
             Notes
           </TabsTrigger>
         )}
         {hasFiles && (
-          <TabsTrigger value="files" onClick={onBack} className="border-0 px-2 text-[13.5px]">
+          <TabsTrigger
+            value="files"
+            onClick={onBack}
+            className="border-0 px-2 text-[13.5px] after:hidden"
+          >
             <Paperclip className="size-3.5" />
             Files
           </TabsTrigger>

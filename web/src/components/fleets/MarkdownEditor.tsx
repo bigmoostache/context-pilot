@@ -314,7 +314,7 @@ function Tool({
         "flex size-7 items-center justify-center rounded-md transition-colors",
         disabled && "opacity-30",
         on
-          ? "bg-(--signal)/15 text-(--signal)"
+          ? "bg-signal/15 text-(--signal)"
           : "text-muted-foreground/80 hover:bg-muted/70 hover:text-foreground",
       )}
     >

@@ -10,6 +10,29 @@ use crate::state::persistence::save_state;
 use cp_base::config::REVERIE;
 use cp_mod_queue::types::QueueState;
 
+/// One main-loop reverie pass, each step timed (`loop.reverie.rv_*`) so a
+/// spike is attributed instead of showing as untimed self time.
+pub(super) fn run_reverie_phase(app: &mut App) {
+    {
+        // Start a stream for any reverie that has none yet.
+        let _g = crate::profile!("rv_start");
+        maybe_start_reverie_stream(app);
+    }
+    {
+        // Text chunks, tool calls, done/error.
+        let _g = crate::profile!("rv_events");
+        process_reverie_events(app);
+    }
+    {
+        // After main tools: the main AI has priority.
+        let _g = crate::profile!("rv_tools");
+        handle_reverie_tools(app);
+    }
+    // Auto-relaunch guard rail when a reverie ends without Report.
+    let _g = crate::profile!("rv_end_turn");
+    check_reverie_end_turn(app);
+}
+
 /// Check if any reverie needs a stream started (state has reverie but no stream).
 /// Called from the main event loop.
 pub(super) fn maybe_start_reverie_stream(app: &mut App) {
@@ -23,12 +46,35 @@ pub(super) fn maybe_start_reverie_stream(app: &mut App) {
         .collect();
 
     for system_id in needs_start {
-        let (tx, rx) = mpsc::channel();
-        streaming::start_reverie_stream(&mut app.state, &system_id, tx);
-        let _r = app
-            .reverie_streams
-            .insert(system_id, super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false });
+        as_owner(app, &system_id, |owned| {
+            let (tx, rx) = mpsc::channel();
+            streaming::start_reverie_stream(&mut owned.state, &system_id, tx);
+            let _r = owned.reverie_streams.insert(
+                system_id.clone(),
+                super::super::ReverieStream { rx, pending_tools: Vec::new(), report_called: false },
+            );
+        });
     }
+}
+
+/// Run `f` with the reverie's launching agent as the executing agent, then
+/// restore. The reverie pass runs once per tick under whichever agent happens
+/// to be executing (usually the focused one); without this, its context,
+/// tool effects and spine notifications land in that agent instead of the
+/// owner. Falls back to the current agent when the owner has no runtime.
+fn as_owner<R>(app: &mut App, slot: &str, f: impl FnOnce(&mut App) -> R) -> R {
+    let candidate = app
+        .state
+        .reveries
+        .get(slot)
+        .and_then(|r| r.agent_id.clone())
+        .filter(|id| app.state.agent_store.contains(id) && app.state.executing_agent_id() != Some(id.as_str()));
+    let Some(owner) = candidate else { return f(app) };
+    let prev = app.state.executing_agent_id().map(str::to_owned);
+    app.state.agent_store.set_executing(Some(owner));
+    let out = f(app);
+    app.state.agent_store.set_executing(prev);
+    out
 }
 
 /// Poll all reverie streams for events and process them.
@@ -44,12 +90,14 @@ pub(super) fn process_reverie_events(app: &mut App) {
             None => continue,
         };
 
-        for evt in events {
-            app.state.flags.ui.dirty = true;
-            if apply_reverie_event(app, &system_id, evt) {
-                break; // This agent's stream is gone, move to next
+        as_owner(app, &system_id, |owned| {
+            for evt in events {
+                owned.state.flags.ui.dirty = true;
+                if apply_reverie_event(owned, &system_id, evt) {
+                    break; // This agent's stream is gone, move to next
+                }
             }
-        }
+        });
     }
 }
 
@@ -130,10 +178,18 @@ pub(super) fn handle_reverie_tools(app: &mut App) {
         .collect();
 
     for system_id in system_ids {
+        as_owner(app, &system_id, |owned| run_reverie_tools(owned, &system_id));
+    }
+}
+
+/// Execute one reverie's pending tool calls, then re-stream it if still alive.
+fn run_reverie_tools(app: &mut App, slot: &str) {
+    {
+        let system_id = slot.to_owned();
         // Take pending tools from the stream state
         let pending = match app.reverie_streams.get_mut(&system_id) {
             Some(s) => std::mem::take(&mut s.pending_tools),
-            None => continue,
+            None => return,
         };
 
         let mut tool_results = Vec::new();
@@ -306,10 +362,17 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
         app.state.reveries.iter().filter(|entry| !entry.1.is_streaming).map(|(id, _)| id.clone()).collect();
 
     for system_id in stopped {
+        as_owner(app, &system_id, |owned| end_turn_one(owned, system_id.clone()));
+    }
+}
+
+/// [`check_reverie_end_turn`] for one stopped reverie slot.
+fn end_turn_one(app: &mut App, system_id: String) {
+    {
         let report_called = app.reverie_streams.get(&system_id).is_some_and(|s| s.report_called);
 
         if report_called {
-            continue; // All good
+            return; // All good
         }
 
         // End turn without Report — check retry limit
@@ -329,7 +392,7 @@ pub(super) fn check_reverie_end_turn(app: &mut App) {
             QueueState::get_mut(&mut app.state).clear(Some(&system_id));
             drop(app.state.reveries.remove(&system_id));
             drop(app.reverie_streams.remove(&system_id));
-            continue;
+            return;
         }
 
         // Inject a user message telling the LLM to call Report, then re-stream

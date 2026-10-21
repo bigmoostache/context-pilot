@@ -15,6 +15,10 @@ fn paste_display_text(idx: usize, paste_buffers: &[String], paste_buffer_labels:
     let label = paste_buffer_labels.get(idx).and_then(|l| l.as_ref());
     label.map_or_else(
         || {
+            // A large paste stashed to `.uploads/` shows as its attachment chip.
+            if let Some(chip) = paste_buffers.get(idx).and_then(|s| super::file_chip::parse_file_upload_buffer(s)) {
+                return format!("{PASTE_PLACEHOLDER_START}{}{PASTE_PLACEHOLDER_END}", chip.label());
+            }
             let (token_count, line_count) =
                 paste_buffers.get(idx).map_or((0, 0), |s| (crate::state::estimate_tokens(s), s.lines().count().max(1)));
             format!(

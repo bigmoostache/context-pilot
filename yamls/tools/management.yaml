@@ -10,7 +10,8 @@ tools:
                 Depth is capped (default 2 below a root). No id allowed.
         read    id? (default: you)  -> stats: parent, children, turn, execution
                 state, groups, messages, open panels, context tokens.
-        update  id, name?, description?  -> direct children only.
+        update  id?, name?, description?  -> rename/redescribe yourself
+                (id omitted or your own) or a direct child.
         delete  id, key?  -> any of your descendants, with its whole subtree
                 and their coordination groups. If it has sub-agents, or any of
                 them is busy (streaming or in a tool call), the call fails with
@@ -20,7 +21,7 @@ tools:
       delete them as soon as you are done with them. Never leave one behind.
     parameters:
       operation: "create | read | update | delete"
-      id: "Target agent id (A<n>). Forbidden for create; read defaults to you."
+      id: "Target agent id (A<n>). Forbidden for create; read and update default to you."
       name: "Agent name (create: required; update: optional)."
       description: "One-line purpose shown in the agents tree (create/update)."
       key: "Confirmation key returned by a refused delete."

@@ -49,53 +49,49 @@ fn is_notification_message(msg: &Message) -> bool {
     msg.role == "user" && msg.content.trim_start().starts_with("/* Notification [")
 }
 
-/// Format a range of messages into a text chunk (delegates to shared function).
-fn format_chunk_content(messages: &[Message], start: usize, end: usize) -> String {
-    let slice = messages.get(start..end).unwrap_or_default();
-    let filtered: Vec<Message> = slice.iter().filter(|m| !is_notification_message(m)).cloned().collect();
-    crate::state::format_messages_to_chunk(&filtered)
-}
-
 /// Count active (non-Deleted, non-Detached) messages in `msgs`.
 fn active_count(msgs: &[Message]) -> usize {
     msgs.iter().filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).count()
 }
 
-/// Sum estimated tokens over active messages in `msgs`.
-fn active_tokens(msgs: &[Message]) -> usize {
-    msgs.iter()
-        .filter(|m| m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached)
-        .map(estimate_message_tokens)
-        .sum()
-}
+/// Exclusive-end index of the next chunk to detach, or `None` when the four
+/// constraints of [`detach_conversation_chunks`] cannot all be met.
+///
+/// Token estimates are computed once per message (they serialize tool inputs,
+/// so the former three separate whole-conversation scans dominated the cost).
+/// The boundary is the first turn boundary where both chunk minimums hold; the
+/// tip keep-minimums are then derived from the totals by subtraction.
+fn plan_detach(messages: &[Message]) -> Option<usize> {
+    let tokens: Vec<Option<usize>> = messages
+        .iter()
+        .map(|m| {
+            (m.status != MsgStatus::Deleted && m.status != MsgStatus::Detached).then(|| estimate_message_tokens(m))
+        })
+        .collect();
+    let total_active = tokens.iter().flatten().count();
+    let total_tokens: usize = tokens.iter().flatten().sum();
+    if total_active < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES)
+        || total_tokens < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS)
+    {
+        return None;
+    }
 
-/// Walk from oldest, returning the exclusive-end index of the first detachable
-/// chunk: a turn boundary reached once BOTH chunk minimums (messages + tokens)
-/// are satisfied. `None` when no such boundary exists.
-fn find_detach_boundary(messages: &[Message]) -> Option<usize> {
     let mut active_seen = 0usize;
     let mut tokens_seen = 0usize;
-    for (idx, msg) in messages.iter().enumerate() {
-        if msg.status == MsgStatus::Deleted || msg.status == MsgStatus::Detached {
-            continue;
-        }
+    for (idx, slot) in tokens.iter().enumerate() {
+        let Some(tok) = *slot else { continue };
         active_seen = active_seen.saturating_add(1);
-        tokens_seen = tokens_seen.saturating_add(estimate_message_tokens(msg));
-
+        tokens_seen = tokens_seen.saturating_add(tok);
         if active_seen >= DETACH_CHUNK_MIN_MESSAGES
             && tokens_seen >= DETACH_CHUNK_MIN_TOKENS
             && is_turn_boundary(messages, idx)
         {
-            return (idx.saturating_add(1) > 0).then(|| idx.saturating_add(1));
+            let tip_ok = total_active.saturating_sub(active_seen) >= DETACH_KEEP_MIN_MESSAGES
+                && total_tokens.saturating_sub(tokens_seen) >= DETACH_KEEP_MIN_TOKENS;
+            return tip_ok.then(|| idx.saturating_add(1));
         }
     }
     None
-}
-
-/// Whether the tip remaining after `boundary` still satisfies both keep minimums.
-fn tip_keeps_enough(messages: &[Message], boundary: usize) -> bool {
-    let remaining = messages.get(boundary..).unwrap_or_default();
-    active_count(remaining) >= DETACH_KEEP_MIN_MESSAGES && active_tokens(remaining) >= DETACH_KEEP_MIN_TOKENS
 }
 
 /// Build the `Chat HH:MM–HH:MM` (or `Chat (N)`) name for a detached chunk.
@@ -134,7 +130,7 @@ fn push_history_chunk(state: &mut crate::state::State, boundary: usize) -> bool 
         .cloned()
         .collect();
 
-    let content = format_chunk_content(&state.agent().messages, 0, boundary);
+    let content = crate::state::format_messages_to_chunk(&history_msgs);
     if content.is_empty() {
         return false;
     }
@@ -189,19 +185,12 @@ pub(super) fn detach_conversation_chunks(state: &mut crate::state::State) {
     }
 
     loop {
-        // Quick check: bail if we can't satisfy both chunk minimums while
-        // leaving enough in the tip.
-        if active_count(&state.agent().messages) < DETACH_CHUNK_MIN_MESSAGES.saturating_add(DETACH_KEEP_MIN_MESSAGES) {
-            break;
-        }
-        if active_tokens(&state.agent().messages) < DETACH_CHUNK_MIN_TOKENS.saturating_add(DETACH_KEEP_MIN_TOKENS) {
-            break;
-        }
-
-        let Some(boundary) = find_detach_boundary(&state.agent().messages) else { break };
-        if !tip_keeps_enough(&state.agent().messages, boundary) {
-            break;
-        }
+        let planned = {
+            let _g = crate::profile!("detach_plan");
+            plan_detach(&state.agent().messages)
+        };
+        let Some(boundary) = planned else { break };
+        let _g = crate::profile!("detach_push");
         if !push_history_chunk(state, boundary) {
             break;
         }

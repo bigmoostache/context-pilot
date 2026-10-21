@@ -245,6 +245,7 @@ pub(super) static EXTERNAL: &[Spec] = &[
     external("CP_SHEET_SNAPSHOT", "Test harness (orchestrator sheet save, ignored): the browser snapshot to replay."),
     external("CP_SHEET_NAMES", "Test harness (orchestrator sheet save, ignored): comma-separated sheets to test."),
     external("CP_SHEET_MAY_REFUSE", "Test harness (orchestrator sheet save, ignored): set to accept a refused save."),
+    external("CP_PPTX", "Test harness (orchestrator slides smoke, ignored): the deck to convert."),
     external("CP_PORT", "Docker Compose only: the host port the cockpit is published on."),
     external("CP_API_URL", "Playwright only: the orchestrator the end-to-end tests target."),
     external("CP_WEB_URL", "Playwright only: the dev server the end-to-end tests target."),

@@ -85,6 +85,9 @@
           "lastActivityMs": {
             "type": "integer"
           },
+          "lit": {
+            "type": "boolean"
+          },
           "log": {
             "items": {
               "$ref": "#/components/schemas/AgentMsg"
@@ -123,6 +126,10 @@
           },
           "unread": {
             "type": "integer"
+          },
+          "warning": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -1878,6 +1885,9 @@
           "kind": {
             "type": "string"
           },
+          "lit": {
+            "type": "boolean"
+          },
           "message_id": {
             "type": "string"
           },
@@ -1925,6 +1935,9 @@
           },
           "used_tokens": {
             "type": "integer"
+          },
+          "warning": {
+            "type": "string"
           }
         },
         "required": [
@@ -2220,6 +2233,377 @@
         "required": [
           "name",
           "rows"
+        ],
+        "type": "object"
+      },
+      "Slide": {
+        "properties": {
+          "background": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "index": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "shapes": {
+            "items": {
+              "$ref": "#/components/schemas/SlideShape"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "hidden",
+          "shapes"
+        ],
+        "type": "object"
+      },
+      "SlideBullet": {
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "font": {
+            "type": "string"
+          },
+          "scale": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "scale"
+        ],
+        "type": "object"
+      },
+      "SlideDeck": {
+        "properties": {
+          "height": {
+            "type": "integer"
+          },
+          "slides": {
+            "items": {
+              "$ref": "#/components/schemas/Slide"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "width": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "slides",
+          "truncated"
+        ],
+        "type": "object"
+      },
+      "SlideParagraph": {
+        "properties": {
+          "align": {
+            "type": "string"
+          },
+          "bullet": {
+            "$ref": "#/components/schemas/SlideBullet"
+          },
+          "endSize": {
+            "type": "integer"
+          },
+          "indent": {
+            "type": "integer"
+          },
+          "lineSpacing": {
+            "description": "Positive: 1/1000 percent; negative: 1/100 pt.",
+            "type": "integer"
+          },
+          "marginLeft": {
+            "type": "integer"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/SlideRun"
+            },
+            "type": "array"
+          },
+          "spaceAfter": {
+            "type": "integer"
+          },
+          "spaceBefore": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "align",
+          "marginLeft",
+          "indent",
+          "lineSpacing",
+          "spaceBefore",
+          "spaceAfter",
+          "endSize",
+          "runs"
+        ],
+        "type": "object"
+      },
+      "SlideRun": {
+        "properties": {
+          "baseline": {
+            "type": "integer"
+          },
+          "bold": {
+            "type": "boolean"
+          },
+          "caps": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "font": {
+            "type": "string"
+          },
+          "highlight": {
+            "type": "string"
+          },
+          "italic": {
+            "type": "boolean"
+          },
+          "link": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "strike": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string"
+          },
+          "underline": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "text",
+          "size",
+          "bold",
+          "italic",
+          "underline",
+          "strike",
+          "color",
+          "font",
+          "baseline"
+        ],
+        "type": "object"
+      },
+      "SlideShape": {
+        "properties": {
+          "fill": {
+            "description": "CSS colour or gradient.",
+            "type": "string"
+          },
+          "flipH": {
+            "type": "boolean"
+          },
+          "flipV": {
+            "type": "boolean"
+          },
+          "h": {
+            "type": "integer"
+          },
+          "image": {
+            "description": "data: URL of the picture fill.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "description": "SVG path in the shape's own EMU box.",
+            "type": "string"
+          },
+          "rot": {
+            "type": "integer"
+          },
+          "stroke": {
+            "$ref": "#/components/schemas/SlideStroke"
+          },
+          "table": {
+            "$ref": "#/components/schemas/SlideTable"
+          },
+          "text": {
+            "$ref": "#/components/schemas/SlideTextBody"
+          },
+          "w": {
+            "type": "integer"
+          },
+          "x": {
+            "type": "integer"
+          },
+          "y": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "x",
+          "y",
+          "w",
+          "h",
+          "rot",
+          "flipH",
+          "flipV"
+        ],
+        "type": "object"
+      },
+      "SlideStroke": {
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "dash": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "tail": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "color",
+          "width"
+        ],
+        "type": "object"
+      },
+      "SlideTable": {
+        "properties": {
+          "cols": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SlideTableRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "cols",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "SlideTableCell": {
+        "properties": {
+          "borders": {
+            "description": "Left, top, right, bottom.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SlideStroke"
+                }
+              ],
+              "nullable": true
+            },
+            "type": "array"
+          },
+          "colSpan": {
+            "type": "integer"
+          },
+          "fill": {
+            "type": "string"
+          },
+          "merged": {
+            "type": "boolean"
+          },
+          "rowSpan": {
+            "type": "integer"
+          },
+          "text": {
+            "$ref": "#/components/schemas/SlideTextBody"
+          }
+        },
+        "required": [
+          "colSpan",
+          "rowSpan",
+          "merged",
+          "borders",
+          "text"
+        ],
+        "type": "object"
+      },
+      "SlideTableRow": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/SlideTableCell"
+            },
+            "type": "array"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "height",
+          "cells"
+        ],
+        "type": "object"
+      },
+      "SlideTextBody": {
+        "properties": {
+          "anchor": {
+            "type": "string"
+          },
+          "fontScale": {
+            "type": "integer"
+          },
+          "insets": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "paragraphs": {
+            "items": {
+              "$ref": "#/components/schemas/SlideParagraph"
+            },
+            "type": "array"
+          },
+          "vert": {
+            "type": "string"
+          },
+          "wrap": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "anchor",
+          "insets",
+          "wrap",
+          "fontScale",
+          "paragraphs"
         ],
         "type": "object"
       },
@@ -4670,6 +5054,54 @@
           }
         },
         "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
+        "tags": [
+          "fs"
+        ]
+      }
+    },
+    "/api/fleet/{id}/fs/slides": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlideDeck"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Presentation slides (pptx resolved through master/layout)",
         "tags": [
           "fs"
         ]

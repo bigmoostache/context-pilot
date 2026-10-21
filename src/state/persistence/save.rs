@@ -308,6 +308,7 @@ fn worker_state_op(
         .with_panel_uids(important_uids, panel_uid_to_local_id)
         .with_id_counters(state.agent().next_tool_id, state.agent().next_result_id)
         .with_draft(state.agent().composer.text.clone(), state.agent().composer.cursor)
+        .with_last_stop_reason(state.agent().last_stop_reason.clone())
         .with_modules(worker_modules);
     let json = serde_json::to_string(&worker_state).ok()?;
     Some(WriteOp {

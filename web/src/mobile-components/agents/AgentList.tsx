@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { animate, stagger } from "animejs"
 import {
   Search,
@@ -10,6 +10,7 @@ import {
   Trash2,
   Plus,
   ChevronRight,
+  Pencil,
   LayoutGrid,
 } from "lucide-react"
 import { ScrollArea } from "@/mobile-components/ui/scroll-area"
@@ -18,7 +19,9 @@ import { FrostedBottomBar } from "@/mobile-components/shell/chrome/FrostedBottom
 import { useElementHeight } from "@/lib/live/useElementHeight"
 import type { AgentDetail } from "@/lib/types"
 import { cn, prefersReducedMotion } from "@/lib/utils"
-import { previewOf } from "@/lib/support/agentMessages"
+import { litColor, previewOf, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
+import { PendingSpinner } from "@/mobile-components/ui/pending"
+import { RenameInput } from "./dialogs/RenameInput"
 import { useSwipeRow } from "@/lib/live/useSwipeRow"
 
 interface AgentListProps {
@@ -40,6 +43,8 @@ interface AgentListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single agent (T371) */
   onPause: (id: string) => void
+  /** rename a live agent */
+  onRename: (id: string, name: string) => void
   /** create a agent named `name` — the bottom search field doubles as the
    *  create input, so its current value IS the new agent's name (T633) */
   onNewAgent: (name: string) => void
@@ -68,11 +73,12 @@ export function AgentList({
   onArchive,
   onDelete,
   onPause,
+  onRename,
   onNewAgent,
 }: AgentListProps) {
-  // The bottom search/create bar floats as a glass overlay (T637), so reserve a
-  // 1.5× bottom spacer in the scroll content sized from its measured height —
-  // the last row must scroll clear of the frosted bar. Mirrors the composer.
+  const [renamingId, setRenamingId] = useState<string | null>(null) // swipe → Rename row
+  // The bottom bar floats as glass (T637): a 1.5× spacer sized from its measured
+  // height lets the last row scroll clear of it. Mirrors the composer.
   const barRef = useRef<HTMLDivElement>(null)
   const barH = useElementHeight(barRef)
 
@@ -88,6 +94,7 @@ export function AgentList({
   // Backend order = sidebar tree (creation order, sub-agents under their
   // parent, `depth` per row, T860); render as received.
   const visible = source.filter((t) => matches(t))
+  const guides = treeGuides(visible)
 
   // #3 List cascade (anime.js): stagger the rows in on first mount and whenever
   // the set flips live↔archived. Deliberately keyed ONLY on `showArchived` (not
@@ -139,9 +146,8 @@ export function AgentList({
           so the caption was redundant chrome — dropped, and the archived list
           now pads + scrolls edge-to-edge exactly like the live list. */}
       <ScrollArea className="min-h-0 flex-1">
-        {/* pad the top so the first row clears the floating corner buttons AND
-            sits below the iOS status bar at rest, while scrolling edge-to-edge
-            UNDER it — applied in BOTH live and archived modes now (T639). */}
+        {/* top pad clears the corner buttons + iOS status bar at rest; content
+            still scrolls edge-to-edge UNDER it, live and archived (T639). */}
         <div className="pt-[calc(env(safe-area-inset-top)+3rem)]">
           {visible.length === 0 ? (
             <EmptyState hasQuery={q !== ""} showArchived={showArchived} />
@@ -149,20 +155,28 @@ export function AgentList({
             <ul ref={listRef} className="flex flex-col">
               {visible.map((t) => (
                 <li key={t.id}>
-                  <SwipeRow
-                    archived={showArchived}
-                    isPaused={!showArchived && Boolean(t.paused)}
-                    onArchive={() => onArchive(t.id)}
-                    onDelete={() => onDelete(t.id)}
-                    onPause={() => onPause(t.id)}
-                  >
-                    <AgentRow
-                      t={t}
-                      selected={t.id === selectedId}
+                  {renamingId === t.id ? (
+                    <RenameRow t={t} onRename={onRename} onDone={() => setRenamingId(null)} />
+                  ) : (
+                    <SwipeRow
                       archived={showArchived}
-                      onSelect={onSelect}
-                    />
-                  </SwipeRow>
+                      isPaused={!showArchived && Boolean(t.paused)}
+                      onArchive={() => onArchive(t.id)}
+                      onDelete={() => onDelete(t.id)}
+                      onPause={() => onPause(t.id)}
+                      onRename={() => setRenamingId(t.id)}
+                    >
+                      <AgentRow
+                        t={t}
+                        selected={t.id === selectedId}
+                        archived={showArchived}
+                        onSelect={(id) => {
+                          if (!t.pending) onSelect(id)
+                        }}
+                        guide={guides.get(t.id)}
+                      />
+                    </SwipeRow>
+                  )}
                 </li>
               ))}
             </ul>
@@ -238,20 +252,6 @@ function EmptyState({ hasQuery, showArchived }: { hasQuery: boolean; showArchive
 
 // ── row ──────────────────────────────────────────────────────────────
 
-/**
- * The leading status dot colour, encoding whose turn it is (T627). First match
- * wins: yellow (--warn) paused; green (--ok) focused; orange (--signal) agent's
- * turn (MY_TURN / ACTIVE) not yet focused; grey (muted) the user's turn, or any
- * archived row (inactive).
- */
-function statusTint(t: AgentDetail, archived: boolean): string {
-  if (archived) return "var(--muted-foreground)"
-  if (t.paused) return "var(--warn)"
-  if (t.focused) return "var(--ok)"
-  if (t.status === "MY_TURN" || t.status === "ACTIVE") return "var(--signal)"
-  return "var(--muted-foreground)"
-}
-
 /** One-line conversation row: tree indent by `depth` (guide line per level),
  *  status dot, title, unread badge at the end. Sits above the swipe-revealed
  *  action strip ({@link SwipeRow}). */
@@ -260,11 +260,13 @@ function AgentRow({
   selected,
   archived,
   onSelect,
+  guide,
 }: {
   t: AgentDetail
   selected: boolean
   archived: boolean
   onSelect: (id: string) => void
+  guide?: TreeGuide | undefined
 }) {
   const unread = archived ? 0 : (t.unread ?? 0)
   const attention = !archived && (unread > 0 || t.status === "MY_TURN" || Boolean(t.focused))
@@ -272,16 +274,13 @@ function AgentRow({
     <button
       onClick={() => onSelect(t.id)}
       className={cn(
-        "flex w-full items-stretch px-4 text-left",
+        "relative flex w-full items-stretch px-4 text-left",
         selected ? "bg-muted/50" : "bg-background active:bg-muted/40",
       )}
     >
-      <TreeGuides depth={t.depth ?? 0} />
+      <TreeGuides depth={t.depth ?? 0} guide={guide} />
       <span className="flex min-w-0 flex-1 items-center gap-2 py-3">
-        <span
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ background: statusTint(t, archived) }}
-        />
+        <span className="size-2.5 shrink-0" style={{ background: litColor(t, archived) }} />
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-[16px] text-foreground",
@@ -290,6 +289,7 @@ function AgentRow({
         >
           {t.name}
         </span>
+        {t.pending && <PendingSpinner />}
         {unread > 0 && (
           <span
             className="shrink-0 px-1.5 text-[12px] font-semibold text-(--primary-foreground) tabular-nums"
@@ -304,28 +304,73 @@ function AgentRow({
   )
 }
 
-/** Tree indent: one 16px column per depth level with a vertical guide line;
- *  the last column adds the elbow toward the dot. */
-function TreeGuides({ depth }: { depth: number }) {
-  if (depth <= 0) return null
+/** Tree indent: one 16px column per depth level. Ancestor columns carry a line
+ *  only while their branch continues below; the own column draws the upper half
+ *  + elbow, plus the lower half when a sibling follows. A parent gets a stub from
+ *  its dot down to its children's column. */
+function TreeGuides({ depth, guide }: { depth: number; guide: TreeGuide | undefined }) {
+  const line = "absolute left-1.5 w-px bg-muted-foreground/25"
   return (
-    <span aria-hidden className="flex shrink-0">
-      {Array.from({ length: depth }, (_, i) => (
-        <span key={i} className="relative w-4">
-          <span className="absolute inset-y-0 left-1.5 w-px bg-muted-foreground/25" />
-          {i === depth - 1 && (
-            <span className="absolute top-1/2 left-1.5 h-px w-2.5 bg-muted-foreground/25" />
-          )}
+    <>
+      {depth > 0 && (
+        <span aria-hidden className="flex shrink-0">
+          {Array.from({ length: depth }, (_, i) => {
+            const own = i === depth - 1
+            return (
+              <span key={i} className="relative w-4">
+                {own ? (
+                  <>
+                    <span className={cn(line, "top-0", guide?.more ? "bottom-0" : "h-1/2")} />
+                    <span className="absolute top-1/2 left-1.5 h-px w-2.5 bg-muted-foreground/25" />
+                  </>
+                ) : (
+                  guide?.through[i] && <span className={cn(line, "inset-y-0")} />
+                )}
+              </span>
+            )
+          })}
         </span>
-      ))}
-    </span>
+      )}
+      {guide?.kids && (
+        <span
+          aria-hidden
+          className="absolute top-1/2 bottom-0 w-px bg-muted-foreground/25"
+          style={{ left: 22 + depth * 16 }}
+        />
+      )}
+    </>
   )
 }
 
 // ── swipe-to-reveal actions ──────────────────────────────────────────
 
-/** Pixel width of the revealed action strip (two 68px action buttons). */
-const ACTION_W = 136
+/** A row swapped for the inline name editor (swipe → Rename); `onDone` always fires. */
+function RenameRow({
+  t,
+  onRename,
+  onDone,
+}: {
+  t: AgentDetail
+  onRename: (id: string, name: string) => void
+  onDone: () => void
+}) {
+  return (
+    <div className="flex items-center px-4 py-2.5">
+      <RenameInput
+        name={t.name}
+        className="py-1 text-[16px]"
+        onCommit={(next) => {
+          onDone()
+          onRename(t.id, next)
+        }}
+        onCancel={onDone}
+      />
+    </div>
+  )
+}
+
+/** Width of one 68px swipe action button; live rows show 3, archived rows 2. */
+const ACTION_BTN_W = 68
 
 /**
  * Wrap a row so a **left-swipe** slides it aside to reveal its trailing actions
@@ -341,6 +386,7 @@ function SwipeRow({
   onArchive,
   onDelete,
   onPause,
+  onRename,
 }: {
   children: React.ReactNode
   archived: boolean
@@ -348,20 +394,34 @@ function SwipeRow({
   onArchive: () => void
   onDelete: () => void
   onPause: () => void
+  onRename: () => void
 }) {
-  const { rowRef, close, bind } = useSwipeRow(ACTION_W)
+  const actionW = ACTION_BTN_W * (archived ? 2 : 3)
+  const { rowRef, close, bind } = useSwipeRow(actionW)
 
-  // Second action is delete for an archived row (permanent), else pause/resume.
+  // Live row: rename / archive / pause. Archived row: restore / delete.
   return (
     <div className="relative overflow-hidden">
       {/* action strip — behind the row content, pinned to the right edge */}
-      <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTION_W }}>
+      <div className="absolute inset-y-0 right-0 flex" style={{ width: actionW }}>
+        {!archived && (
+          <button
+            onClick={() => {
+              close()
+              onRename()
+            }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-muted-foreground text-[11px] font-medium text-white"
+          >
+            <Pencil className="size-4" />
+            Rename
+          </button>
+        )}
         <button
           onClick={() => {
             onArchive()
             close()
           }}
-          className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
+          className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--warn) text-[11px] font-medium text-white"
         >
           {archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
           {archived ? "Restore" : "Archive"}
@@ -372,7 +432,7 @@ function SwipeRow({
               onDelete()
               close()
             }}
-            className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--danger) text-[11px] font-medium text-white"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--danger) text-[11px] font-medium text-white"
           >
             <Trash2 className="size-4" />
             Delete
@@ -383,7 +443,7 @@ function SwipeRow({
               onPause()
               close()
             }}
-            className="flex w-1/2 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-(--interactive) text-[11px] font-medium text-white"
           >
             {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
             {isPaused ? "Resume" : "Pause"}

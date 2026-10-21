@@ -76,9 +76,34 @@ fn seed_archived_memo_if_needed(app: &mut App) {
     }
     let oplog_archived = oplog_roster_archived(&app.state);
     log::info!("bridge: emit_thread_archived seeding from oplog roster ({} entries)", oplog_archived.len());
+    emit_missed_deletions(&app.state, oplog_archived.keys());
     let bs = app.state.ext_mut::<BridgeState>();
     bs.agent_archived_memo.extend(oplog_archived);
     bs.seeded.seed_archived();
+}
+
+/// Emit [`AgentDeleted`] for every agent the oplog roster still lists but the
+/// live state no longer has.
+///
+/// A hard delete saves `config.json` at once but journals its delta on the
+/// non-blocking durable path: a process exit in between drops the delta, and
+/// the backend view (hence the web sidebar) keeps the agent forever. Run once
+/// per boot, this heals that divergence.
+///
+/// Skipped on an empty live roster (a config that failed to parse must not
+/// delete everyone). Pre-T860 `T<n>` ids are left alone: the backend already
+/// folds them onto their `A<n>` twins.
+fn emit_missed_deletions<'roster>(state: &State, journaled: impl Iterator<Item = &'roster String>) {
+    let live = &AgentsState::get(state).agents;
+    if live.is_empty() {
+        return;
+    }
+    let gone: Vec<String> =
+        journaled.filter(|id| id.starts_with('A') && !live.iter().any(|a| a.id == **id)).cloned().collect();
+    for agent_id in gone {
+        log::info!("bridge: {agent_id} deleted but never journaled, emitting AgentDeleted");
+        emit_roster_delta(state, OpEntryKind::AgentDeleted { agent_id });
+    }
 }
 
 /// Diff live archived flags against the memo; collect (`agent_id`, archived) for

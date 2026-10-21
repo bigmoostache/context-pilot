@@ -50,6 +50,7 @@ export function toChatMessage(m: AgentMsg): ChatMessage {
     tool: m.tool,
     ts: formatTs(m.ts),
     streaming: m.streaming,
+    pending: m.pending,
   }
 }
 
@@ -178,16 +179,54 @@ export function parseDraft(key: string | undefined): Draft {
   return { text: raw, selStart: raw.length, selEnd: raw.length }
 }
 
+/** A sidebar row's status-square colour: red when the backend reports a ⚠
+ *  stall (`warning`), the old dot's orange-brown when it lights it, grey
+ *  otherwise (always grey once archived). */
+export function litColor(t: AgentDetail, archived: boolean): string {
+  if (archived) return "var(--unlit)"
+  if (t.warning) return "var(--alarm)"
+  return t.lit ? "var(--lit)" : "var(--unlit)"
+}
+
+/** Where a sidebar row's hierarchy lines run (see {@link treeGuides}). */
+export interface TreeGuide {
+  /** per ancestor column (0..depth-2): the line passes straight through */
+  through: boolean[]
+  /** a later sibling follows, so the row's own column continues below the elbow */
+  more: boolean
+  /** the next row is a child, so a stub runs from the dot down to it */
+  kids: boolean
+}
+
 /**
- * A agent's status-dot colour: green while focused or active, the signal
- * accent when it is your turn, muted otherwise. A flat if-chain rather than
- * nested ternaries — four outcomes read as four lines.
+ * Guide-line layout for a list already in tree order (each row's `depth`,
+ * sub-agents right under their parent). A column's line continues only while
+ * a later row still hangs off it; the last child therefore draws just the upper
+ * half of its line, and a parent gets a stub below its dot down to its children.
  */
-export function dotColor(isFocused: boolean, status: AgentDetail["status"]): string {
-  if (isFocused) return "var(--ok)"
-  if (status === "MY_TURN") return "var(--signal)"
-  if (status === "ACTIVE") return "var(--ok)"
-  return "var(--muted-foreground)"
+export function treeGuides(
+  rows: { id: string; depth?: number | undefined }[],
+): Map<string, TreeGuide> {
+  const depthAt = (i: number) => rows[i]?.depth ?? 0
+  // Does a row at exactly `d` follow `i` before the list climbs above `d`?
+  const continues = (i: number, d: number) => {
+    for (let j = i + 1; j < rows.length; j++) {
+      const dj = depthAt(j)
+      if (dj < d) return false
+      if (dj === d) return true
+    }
+    return false
+  }
+  const out = new Map<string, TreeGuide>()
+  for (const [i, r] of rows.entries()) {
+    const d = depthAt(i)
+    out.set(r.id, {
+      through: Array.from({ length: Math.max(0, d - 1) }, (_, c) => continues(i, c + 1)),
+      more: d > 0 && continues(i, d),
+      kids: depthAt(i + 1) > d,
+    })
+  }
+  return out
 }
 
 /**
@@ -210,12 +249,15 @@ export const ROW_ACTION_COPY = {
   },
   pause: { title: "Pause", body: "Stop this agent from running. Queued messages wait." },
   resume: { title: "Resume", body: "Let this agent run again." },
+  rename: { title: "Rename", body: "Change this agent's name. Enter saves, Esc cancels." },
 } as const
 
 /** The turn-status banner shown above the composer input, or null. */
 export interface Banner {
   working: boolean
   paused: boolean
+  /** the agent is stalled (TUI ⚠): `text` is the backend's reason */
+  warning: boolean
   color: string | undefined
   text: string
 }
@@ -224,10 +266,10 @@ export interface Banner {
  * Resolve the composer's turn-status banner from the agent state (T39/T371).
  *
  * A flat precedence chain (not a nested ternary): a paused agent shows the
- * amber pause notice; otherwise, only when the agent owes this agent a
- * response, an active spinner while streaming / working the FOCUSED agent, or
- * a static "will pick up soon" clock for a queued (non-focused) agent-turn
- * agent. Returns null on the user's turn (no banner).
+ * amber pause notice; a stalled agent (the TUI's ⚠, `warning` = the backend's
+ * reason) shows that reason in red; otherwise, on the agent's turn, a spinner
+ * reading "streaming" or "working" (focus plays no part). Returns null on the
+ * user's turn (no banner).
  *
  * Lives here, beside {@link ROW_ACTION_COPY}, for the same reason: it is a pure
  * agent-state → copy derivation with no JSX in it, and the sentences it picks
@@ -237,32 +279,35 @@ export function resolveComposerBanner(
   paused: boolean,
   fleetBusy: boolean,
   streaming: boolean,
-  focused: boolean,
+  warning?: string | null,
 ): Banner | null {
   if (paused) {
     return {
       working: false,
       paused: true,
+      warning: false,
       color: undefined,
       text: "Agent paused — it won't respond until resumed.",
     }
   }
+  if (warning) {
+    return { working: false, paused: false, warning: true, color: "var(--alarm)", text: warning }
+  }
   if (!fleetBusy) return null
   if (streaming) {
-    return { working: true, paused: false, color: "var(--ok)", text: "Agent is streaming…" }
-  }
-  if (focused) {
     return {
       working: true,
       paused: false,
-      color: "var(--signal)",
-      text: "Agent is working…",
+      warning: false,
+      color: "var(--ok)",
+      text: "Agent is streaming…",
     }
   }
   return {
-    working: false,
+    working: true,
     paused: false,
-    color: undefined,
-    text: "Agent will pick this up soon.",
+    warning: false,
+    color: "var(--signal)",
+    text: "Agent is working…",
   }
 }

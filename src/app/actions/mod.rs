@@ -154,8 +154,11 @@ fn handle_insert_text(state: &mut State, text: &str) {
 fn handle_paste_text(state: &mut State, text: String) {
     let _r = cursor::delete_selection(state);
     state.agent_mut().composer.push_undo(cp_base::state::runtime::textarea::EditKind::Other);
+    // Large pastes become a `.uploads/` text file; the buffer then holds its
+    // ` ```file-upload ` block (rendered as a chip, sent as the attachment).
+    let stored = helpers::stash_large_paste(&text).unwrap_or(text);
     let idx = state.agent().paste_buffers.len();
-    state.agent_mut().paste_buffers.push(text);
+    state.agent_mut().paste_buffers.push(stored);
     state.agent_mut().paste_buffer_labels.push(None);
     let sentinel = format!("\x00{idx}\x00");
     let pos = state.agent().composer.cursor;
@@ -244,7 +247,7 @@ fn cycle_view_mode(state: &mut State) {
 /// Apply an `Action`. Text-editing actions on the virtual "+ New Agent" row
 /// edit that row's own title textarea instead of the executing agent's composer.
 pub(crate) fn apply_action(state: &mut State, action: Action) -> ActionResult {
-    if agents::is_title_edit(&action) && agents::editing_new_agent_title(state) {
+    if agents::is_title_edit(&action) && (agents::renaming(state) || agents::editing_new_agent_title(state)) {
         return agents::with_new_agent_title(state, action, dispatch_action);
     }
     dispatch_action(state, action)
@@ -449,6 +452,8 @@ fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
         | Action::AgentArchiveStart
         | Action::AgentArchiveConfirm
         | Action::AgentArchiveCancel
+        | Action::AgentRenameStart
+        | Action::AgentRenameCancel
         | Action::AgentDrillIn
         | Action::AgentDrillOut
         | Action::AgentToggleArchivedView => return agents::dispatch(state, &action),

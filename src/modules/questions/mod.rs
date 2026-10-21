@@ -29,7 +29,7 @@ fn todo_item_object() -> ParamType {
         ToolParam::new("title", ParamType::String).desc("Task title. Required when creating; omit to leave untouched."),
         ToolParam::new("description", ParamType::String).desc("Longer detail. Omit to leave untouched."),
         ToolParam::new("status", ParamType::String)
-            .desc("One of: planned, in_progress, done, cancelled. Defaults to planned on create."),
+            .desc("One of: planned, in_progress, done, cancelled, deleted (hard-removes the task and its subtree). Defaults to planned on create."),
         ToolParam::new("children", ParamType::Array(Box::new(ParamType::Object(vec![])))).desc(
             "Nested tasks CREATED under this one. Same fields as a parent item, minus `id` (nesting sets the parent).",
         ),

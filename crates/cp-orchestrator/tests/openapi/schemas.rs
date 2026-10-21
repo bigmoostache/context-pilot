@@ -89,6 +89,10 @@ pub(super) fn core() -> Value {
                 "id": { "type": "string" },
                 "name": { "type": "string" },
                 "status": { "type": "string", "enum": ["MY_TURN", "THEIR_TURN", "ACTIVE"] },
+                // Sidebar light: TUI spinner OR green circle (agent_lit).
+                "lit": { "type": "boolean" },
+                // Why the TUI row shows ⚠ (red square + banner); null when fine.
+                "warning": { "type": "string", "nullable": true },
                 "fleetId": { "type": "string" },
                 "fleet": { "type": "string" },
                 // Creation time, epoch ms.

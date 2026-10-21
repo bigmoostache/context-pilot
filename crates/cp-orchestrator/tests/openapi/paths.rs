@@ -207,6 +207,11 @@ pub(super) fn paths() -> Value {
             "parameters": [qp("path")],
             "responses": merge(ok(r("SheetData")), err())
         }})),
+        "/api/fleet/{id}/fs/slides": with_agent(json!({ "get": {
+            "tags": ["fs"], "summary": "Presentation slides (pptx resolved through master/layout)",
+            "parameters": [qp("path")],
+            "responses": merge(ok(r("SlideDeck")), err())
+        }})),
         "/api/fleet/{id}/fs/download": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Download file or folder",
             "parameters": [qp("path")],

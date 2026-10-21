@@ -1,14 +1,18 @@
-import { Archive, ArchiveRestore, ChevronLeft, Pause, Play, Trash2 } from "lucide-react"
-import { useRef } from "react"
+import { Archive, ArchiveRestore, ChevronLeft, Pause, Pencil, Play, Trash2 } from "lucide-react"
+import { useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { PendingSpinner } from "@/components/ui/pending"
+import { SelectionGlide } from "@/components/ui/selectionGlide"
+import { useDepartures, useTitleMarquee } from "@/components/ui/rowMotion"
 import { Tip } from "@/components/ui/tip"
 import type { AgentDetail } from "@/lib/types"
-import { cn, prefersReducedMotion } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { clickable, useLoopNav } from "@/lib/support/a11y"
-import { dotColor, ROW_ACTION_COPY } from "@/lib/support/agentMessages"
+import { litColor, ROW_ACTION_COPY, treeGuides, type TreeGuide } from "@/lib/support/agentMessages"
 import { HintBadge } from "@/components/shell/chrome/HintBadge"
 import { useAgentReadState } from "@/lib/live/agentView"
 import { AgentSearchPalette } from "./dialogs/AgentSearchPalette"
+import { RenameInput } from "./dialogs/RenameInput"
 
 interface AgentListProps {
   /** all of the realm's agents (archived included) — filtering happens here */
@@ -24,6 +28,8 @@ interface AgentListProps {
   onDelete: (id: string) => void
   /** pause ↔ resume a single agent (T371) */
   onPause: (id: string) => void
+  /** rename a live agent */
+  onRename: (id: string, name: string) => void
   /** Search-palette open state — CONTROLLED (trigger lives in the header rail,
    *  a sibling of this view; the palette renders here for the list + agent). */
   searchOpen: boolean
@@ -46,6 +52,7 @@ export function AgentList({
   onArchive,
   onDelete,
   onPause,
+  onRename,
   searchOpen,
   onSearchOpenChange,
 }: AgentListProps) {
@@ -69,20 +76,31 @@ export function AgentList({
 
   const navHintOf = (id: string): "up" | "down" | undefined =>
     id === prevId ? "up" : id === nextId ? "down" : undefined
+  const guides = treeGuides(visible)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const row = (t: AgentDetail, archivedRow?: boolean) => (
     <AgentRow
       key={t.id}
       t={t}
       selected={t.id === selectedId}
-      onSelect={onSelect}
+      onSelect={(id) => {
+        if (!t.pending) onSelect(id)
+      }}
       onArchive={onArchive}
       onPause={archivedRow ? undefined : onPause}
+      onRename={archivedRow ? undefined : onRename}
       onDelete={archivedRow ? onDelete : undefined}
       archived={archivedRow}
       navHint={navHintOf(t.id)}
       navHeld={navHeld}
+      guide={guides.get(t.id)}
     />
+  )
+
+  // Archived/deleted rows collapse in place; the rows below slide up.
+  const rows = useDepartures(visible, showArchived ? "archived" : "live", (t) =>
+    row(t, showArchived),
   )
 
   // `bg-surface-2` (`--card` is the selected row on top). Flush, no h-margin.
@@ -102,10 +120,15 @@ export function AgentList({
         <ScrollArea className="min-h-0 flex-1">
           {/* The panel's single inner inset — one `p-2` on the content (not the
               ScrollArea) so the scrollbar still runs flush to the panel edge. */}
-          <div className="p-2">
+          <div ref={listRef} className="relative p-2">
+            <SelectionGlide
+              containerRef={listRef}
+              selectedId={selectedId}
+              layoutKey={showArchived ? "archived" : "live"}
+            />
             {visible.length === 0 && <EmptyState showArchived={showArchived} />}
 
-            {visible.map((t) => row(t, showArchived))}
+            {rows}
           </div>
         </ScrollArea>
 
@@ -169,42 +192,40 @@ function EmptyState({ showArchived }: { showArchived: boolean }) {
   return <p className="px-2.5 py-6 text-center text-[11.5px] text-muted-foreground/55">{message}</p>
 }
 
-/** Row-hover title marquee (WAA): dwell, scroll left ~10 chars/s, dwell, reset. No-op if it fits / reduced-motion. */
-function useTitleMarquee() {
-  const trackRef = useRef<HTMLSpanElement>(null)
-  const animRef = useRef<Animation | null>(null)
-  const onMouseEnter = () => {
-    const el = trackRef.current
-    if (!el || prefersReducedMotion()) return
-    const dist = Math.max(0, el.scrollWidth - el.clientWidth)
-    if (dist === 0) return
-    const scrollS = dist / (el.scrollWidth / Math.max(1, el.textContent.length)) / 10
-    const total = 0.6 + scrollS
-    animRef.current = el.animate(
-      [
-        { transform: "translateX(0)", offset: 0 },
-        { transform: "translateX(0)", offset: 0.3 / total },
-        { transform: `translateX(-${dist}px)`, offset: (0.3 + scrollS) / total },
-        { transform: `translateX(-${dist}px)`, offset: 1 },
-      ],
-      { duration: total * 1000, iterations: Infinity, easing: "linear" },
-    )
-  }
-  const onMouseLeave = () => animRef.current?.cancel()
-  return { trackRef, onMouseEnter, onMouseLeave }
-}
-
 /** Agent title markup — ellipsis at rest, brightens + un-clips on row hover; motion via {@link useTitleMarquee}. */
 function MarqueeTitle({ name, trackRef }: { name: string; trackRef: React.Ref<HTMLSpanElement> }) {
   return (
     <span className="min-w-0 flex-1 overflow-hidden">
       <span
         ref={trackRef}
-        className="block truncate text-[13px] font-medium text-foreground/90 group-hover:overflow-visible group-hover:text-clip group-hover:text-foreground"
+        className="agent-title inline-block max-w-full truncate align-top text-[13px] font-medium text-foreground/90 group-hover:overflow-visible group-hover:text-clip group-hover:text-foreground"
       >
         {name}
       </span>
     </span>
+  )
+}
+
+/** The row title's inline name editor; `onDone` fires on commit and cancel. */
+function RowRenameInput({
+  t,
+  onRename,
+  onDone,
+}: {
+  t: AgentDetail
+  onRename: (id: string, name: string) => void
+  onDone: () => void
+}) {
+  return (
+    <RenameInput
+      name={t.name}
+      className="text-[13px] font-medium"
+      onCommit={(name) => {
+        onDone()
+        onRename(t.id, name)
+      }}
+      onCancel={onDone}
+    />
   )
 }
 
@@ -214,99 +235,118 @@ function AgentRow({
   onSelect,
   onArchive,
   onPause,
+  onRename,
   onDelete,
   archived,
   navHint,
   navHeld,
+  guide,
 }: {
   t: AgentDetail
   selected: boolean
   onSelect: (id: string) => void
   onArchive: (id: string) => void
   onPause?: ((id: string) => void) | undefined
+  onRename?: ((id: string, name: string) => void) | undefined
   onDelete?: ((id: string) => void) | undefined
   archived?: boolean | undefined
   /** Which loop-nav arrow badge this row shows while ⌘/Ctrl is held (T634). */
   navHint?: "up" | "down" | undefined
   /** Whether ⌘/Ctrl is currently held — gates the badge's visibility. */
   navHeld?: boolean | undefined
+  /** hierarchy-line layout for this row ({@link treeGuides}) */
+  guide?: TreeGuide | undefined
 }) {
-  const isFocused = !archived && t.focused
   const isPaused = !archived && t.paused
   const marquee = useTitleMarquee()
+  const [renaming, setRenaming] = useState(false)
 
   return (
     <div
       onMouseEnter={marquee.onMouseEnter}
       onMouseLeave={marquee.onMouseLeave}
       className={cn(
-        "group relative mb-0.5 flex w-full items-stretch rounded-lg px-2.5 text-left transition-colors select-none",
-        selected ? "card-shadow bg-card" : "hover:card-shadow hover:bg-card",
+        "group relative flex w-full items-stretch rounded-lg px-2.5 text-left transition-[background-color,scale] duration-300 ease-out select-none hover:duration-150 active:scale-[0.99]",
+        !selected && "hover:bg-card/55",
       )}
+      data-row-id={t.id}
     >
       {navHint && (
         <HintBadge label={navHint === "up" ? "↑" : "↓"} shown={Boolean(navHeld)} side="left" />
       )}
-      <TreeGuides depth={t.depth ?? 0} />
+      <TreeGuides depth={t.depth ?? 0} guide={guide} />
       <div
         {...clickable(() => onSelect(t.id))}
         className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left"
       >
         <StatusDot t={t} archived={Boolean(archived)} />
-        {isFocused && <StatusBadge tone="ok" label="focused" />}
         {isPaused && <StatusBadge tone="warn" label="paused" />}
-        <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
+        {renaming && onRename ? (
+          <RowRenameInput t={t} onRename={onRename} onDone={() => setRenaming(false)} />
+        ) : (
+          <MarqueeTitle name={t.name} trackRef={marquee.trackRef} />
+        )}
+        {t.pending && <PendingSpinner />}
         <span className="relative ml-auto flex shrink-0 items-center">
           <UnreadBadge count={archived ? 0 : (t.unread ?? 0)} />
-          <RowActions
-            id={t.id}
-            archived={Boolean(archived)}
-            isPaused={Boolean(isPaused)}
-            onArchive={onArchive}
-            onDelete={onDelete}
-            onPause={onPause}
-          />
+          {!renaming && (
+            <RowActions
+              id={t.id}
+              archived={Boolean(archived)}
+              isPaused={Boolean(isPaused)}
+              onArchive={onArchive}
+              onDelete={onDelete}
+              onPause={onPause}
+              onRename={() => setRenaming(true)}
+            />
+          )}
         </span>
       </div>
     </div>
   )
 }
 
-/** Leading status dot: grey archived, warn paused, else {@link dotColor}; pulses
- *  while focused or on the agent's turn. */
+/** Leading status square: brown when the backend's `lit` is set (TUI spinner
+ *  or green circle), grey otherwise and on archived rows. */
 function StatusDot({ t, archived }: { t: AgentDetail; archived: boolean }) {
-  const isFocused = !archived && Boolean(t.focused)
-  const isPaused = !archived && Boolean(t.paused)
-  const live = !archived && !isPaused
-  const pulse = live && (isFocused || t.status === "MY_TURN" || t.status === "ACTIVE")
-  const background = archived
-    ? "var(--muted-foreground)"
-    : isPaused
-      ? "var(--warn)"
-      : dotColor(isFocused, t.status)
-  return (
-    <span
-      className={cn("size-2 shrink-0 rounded-full", pulse && "animate-pulse")}
-      style={{ background }}
-    />
-  )
+  return <span className="size-2 shrink-0" style={{ background: litColor(t, archived) }} />
 }
 
-/** Tree indent for a sub-agent row: one 12px column per depth level, each
- *  carrying a vertical guide line; the last column adds the elbow to the dot. */
-function TreeGuides({ depth }: { depth: number }) {
-  if (depth <= 0) return null
+/** Tree indent for a row: one 12px column per depth level. Ancestor columns
+ *  carry a line only while their branch continues below; the own column draws
+ *  the upper half + elbow, plus the lower half when a sibling follows. A parent
+ *  gets a stub from its dot down to its children's column. */
+function TreeGuides({ depth, guide }: { depth: number; guide: TreeGuide | undefined }) {
+  const line = "absolute left-1 w-px bg-muted-foreground/25"
   return (
-    <span aria-hidden className="flex shrink-0">
-      {Array.from({ length: depth }, (_, i) => (
-        <span key={i} className="relative w-3">
-          <span className="absolute inset-y-0 left-1 w-px bg-muted-foreground/25" />
-          {i === depth - 1 && (
-            <span className="absolute top-1/2 left-1 h-px w-2 bg-muted-foreground/25" />
-          )}
+    <>
+      {depth > 0 && (
+        <span aria-hidden className="flex shrink-0">
+          {Array.from({ length: depth }, (_, i) => {
+            const own = i === depth - 1
+            return (
+              <span key={i} className="relative w-3">
+                {own ? (
+                  <>
+                    <span className={cn(line, "top-0", guide?.more ? "bottom-0" : "h-1/2")} />
+                    <span className="absolute top-1/2 left-1 h-px w-2 bg-muted-foreground/25" />
+                  </>
+                ) : (
+                  guide?.through[i] && <span className={cn(line, "inset-y-0")} />
+                )}
+              </span>
+            )
+          })}
         </span>
-      ))}
-    </span>
+      )}
+      {guide?.kids && (
+        <span
+          aria-hidden
+          className="absolute top-1/2 bottom-0 w-px bg-muted-foreground/25"
+          style={{ left: 14 + depth * 12 }}
+        />
+      )}
+    </>
   )
 }
 
@@ -324,7 +364,7 @@ function UnreadBadge({ count }: { count: number }) {
   )
 }
 
-/** Hover-revealed row actions: archive/restore, delete (archived), pause/resume (live). Each stops propagation so it doesn't select the row. */
+/** Hover-revealed row actions: archive/restore, delete (archived), rename + pause/resume (live). Each stops propagation so it doesn't select the row. */
 function RowActions({
   id,
   archived,
@@ -332,6 +372,7 @@ function RowActions({
   onArchive,
   onDelete,
   onPause,
+  onRename,
 }: {
   id: string
   archived: boolean
@@ -339,9 +380,14 @@ function RowActions({
   onArchive: (id: string) => void
   onDelete?: ((id: string) => void) | undefined
   onPause?: ((id: string) => void) | undefined
+  /** opens the inline name editor */
+  onRename?: (() => void) | undefined
 }) {
   return (
     <span className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      {!archived && onRename && (
+        <RowAction copy={ROW_ACTION_COPY.rename} icon={Pencil} onClick={onRename} />
+      )}
       <RowAction
         copy={ROW_ACTION_COPY[archived ? "restore" : "archive"]}
         icon={archived ? ArchiveRestore : Archive}
@@ -393,7 +439,7 @@ function RowAction({
         }}
         aria-label={copy.title}
         className={cn(
-          "flex size-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors",
+          "flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 transition-colors",
           danger ? "hover:text-(--danger)" : "hover:text-foreground",
         )}
       >
@@ -403,7 +449,7 @@ function RowAction({
   )
 }
 
-/** A first-line status pill (focused / paused), tone-keyed to the palette (no `rounded-*` — the codebase is square). */
+/** A first-line status pill (paused), tone-keyed to the palette (no `rounded-*` — the codebase is square). */
 function StatusBadge({ tone, label }: { tone: "ok" | "warn"; label: string }) {
   return (
     <span

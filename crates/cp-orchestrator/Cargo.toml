@@ -54,6 +54,11 @@ csv = "1"
 # Full-fidelity xlsx/xlsm reader for the Univer viewer (T851): styles, merges,
 # freeze panes, sizes, notes, links, conditional formats — calamine is values-only.
 umya-spreadsheet = "3.1"
+# PowerPoint viewer (`/fs/slides`): read the pptx package (a zip of OOXML
+# parts) and parse its XML. Same versions umya already pulls in, so no new
+# crates enter the build graph.
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+quick-xml = "0.41"
 # Password hashing — Argon2id (OWASP current recommendation). Pure-Rust,
 # memory-hard. Default features bring password-hash PHC format + OsRng for salt
 # generation. Used by services/auth for credential storage (FR-01, NFR-01).

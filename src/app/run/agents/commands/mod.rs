@@ -22,10 +22,14 @@ use cp_wire::types::oplog::OpEntryKind;
 use crate::app::App;
 
 use self::create::{BranchPoint, Seed, apply_branch_agent, apply_create_agent};
+use self::focus::apply_focus_agent;
+use self::rename::apply_rename_agent;
 use super::bridge::emit_roster_delta;
 
 /// `CreateAgent` / `BranchAgent` application.
 mod create;
+mod focus;
+mod rename;
 
 /// Dispatch a single accepted command to the appropriate agent action.
 pub(super) fn apply_command(app: &mut App, cmd: Command) {
@@ -64,6 +68,8 @@ pub(super) fn apply_command(app: &mut App, cmd: Command) {
         CommandKind::ResumeAgent { agent_id } => {
             apply_resume_agent(&mut app.state, &agent_id);
         }
+        CommandKind::RenameAgent { agent_id, name } => apply_rename_agent(&mut app.state, &agent_id, &name),
+        CommandKind::FocusAgent { agent_id } => apply_focus_agent(&mut app.state, &agent_id),
         CommandKind::DeleteAgent { agent_id } => {
             apply_delete_agent(&mut app.state, &agent_id);
             app.teardown_agent(&agent_id);

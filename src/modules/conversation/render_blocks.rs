@@ -14,6 +14,7 @@ use crate::modules::{ToolVisualizer, build_visualizer_registry};
 use crate::state::{Message, MsgKind, MsgStatus};
 use crate::ui::helpers::wrap_text;
 
+use super::render_input_blocks::file_chip;
 use super::render_json::extract_json_fields;
 
 /// Lazily built registry of `tool_name` → visualizer function.
@@ -286,6 +287,16 @@ fn render_markdown_line(blocks: &mut Vec<Block>, ctx: &TextBodyCtx<'_>, line: &s
     }
 }
 
+/// If a ` ```file-upload ` block starts at `scan.idx`, render it as a chip
+/// (`📎 name · size` + muted path line), advance past it, and return true.
+fn consume_file_chip(blocks: &mut Vec<Block>, ctx: &TextBodyCtx<'_>, lines: &[&str], scan: &mut MdScan) -> bool {
+    let Some((chip, next)) = file_chip::parse_file_upload_at(lines, scan.idx) else { return false };
+    push_prefixed(blocks, ctx, &mut scan.is_first, vec![Span::styled(chip.label(), Semantic::Info)]);
+    push_prefixed(blocks, ctx, &mut scan.is_first, vec![Span::styled(chip.path, Semantic::Muted)]);
+    scan.idx = next;
+    true
+}
+
 /// Render one user line: wrap verbatim, no markdown parsing.
 fn render_user_line(blocks: &mut Vec<Block>, ctx: &TextBodyCtx<'_>, line: &str, is_first: &mut bool) {
     for line_text in &wrap_text(line, ctx.wrap_width) {
@@ -303,6 +314,9 @@ fn render_text_body(blocks: &mut Vec<Block>, content: &str, is_assistant: bool, 
     while scan.idx < content_lines.len() {
         let Some(&line) = content_lines.get(scan.idx) else { break };
 
+        if !in_code_block && consume_file_chip(blocks, ctx, &content_lines, &mut scan) {
+            continue;
+        }
         if is_assistant && line.trim().starts_with("```") {
             in_code_block = !in_code_block;
             push_prefixed(blocks, ctx, &mut scan.is_first, vec![Span::styled(line.to_owned(), Semantic::Muted)]);
@@ -321,16 +335,24 @@ fn render_text_body(blocks: &mut Vec<Block>, content: &str, is_assistant: bool, 
         }
 
         if is_assistant {
-            if line.trim().starts_with('|') && line.trim().ends_with('|') {
-                consume_markdown_table(blocks, ctx, &content_lines, &mut scan);
-                continue;
-            }
-            render_markdown_line(blocks, ctx, line, &mut scan.is_first);
+            render_assistant_prose(blocks, ctx, &content_lines, &mut scan);
         } else {
             render_user_line(blocks, ctx, line, &mut scan.is_first);
+            scan.idx = scan.idx.saturating_add(1);
         }
-        scan.idx = scan.idx.saturating_add(1);
     }
+}
+
+/// Render the assistant prose line at `scan.idx` and advance: a `|…|` row
+/// starts a markdown table (consumed whole), anything else is inline markdown.
+fn render_assistant_prose(blocks: &mut Vec<Block>, ctx: &TextBodyCtx<'_>, lines: &[&str], scan: &mut MdScan) {
+    let Some(&line) = lines.get(scan.idx) else { return };
+    if line.trim().starts_with('|') && line.trim().ends_with('|') {
+        consume_markdown_table(blocks, ctx, lines, scan);
+        return;
+    }
+    render_markdown_line(blocks, ctx, line, &mut scan.is_first);
+    scan.idx = scan.idx.saturating_add(1);
 }
 
 /// Push one body line: `ctx.lead()` prefix spans followed by `content_spans`.

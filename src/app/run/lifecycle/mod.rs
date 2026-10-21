@@ -338,14 +338,7 @@ impl App {
 
         // === REVERIE (CONTEXT OPTIMIZER SUB-AGENT) ===
         super::tools::watchdog::mark(super::tools::watchdog::Step::Reverie);
-        // Check if a reverie needs to start streaming (state.reverie exists but no stream yet)
-        super::reverie::maybe_start_reverie_stream(self);
-        // Poll reverie stream events (text chunks, tool calls, done/error)
-        super::reverie::process_reverie_events(self);
-        // Execute pending reverie tool calls (after main tools — main AI has priority)
-        super::reverie::handle_reverie_tools(self);
-        // Check if reverie ended without calling Report (auto-relaunch guard rail)
-        super::reverie::check_reverie_end_turn(self);
+        super::reverie::run_reverie_phase(self);
     }
 
     /// Bridge self-heal: if `CP_BRIDGE=1` but boot lost the flock race on a fast

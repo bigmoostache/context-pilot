@@ -123,24 +123,25 @@ fn brief(state: &mut State, (caller, child, gid): (&str, &str, &str), text: &str
     Ok(())
 }
 
-/// Rename / redescribe a direct child of `caller`.
+/// Rename / redescribe `caller` itself or one of its direct children.
 fn update(state: &mut State, caller: &str, args: &Args<'_>) -> Result<String, String> {
-    let id = args.id.ok_or_else(|| "update requires an id".to_owned())?;
+    let id = args.id.unwrap_or(caller);
     if args.name.is_none() && args.description.is_none() {
         return Err("update needs a name and/or a description".to_owned());
     }
-    let agents = &mut AgentsState::get_mut(state).agents;
-    let agent = agents.iter_mut().find(|a| a.id == id).ok_or_else(|| format!("agent {id} not found"))?;
-    if agent.parent_agent_id.as_deref() != Some(caller) {
-        return Err(format!("{id} is not a direct child of {caller}"));
-    }
-    if let Some(n) = args.name {
-        n.clone_into(&mut agent.name);
+    let agents = AgentsState::get_mut(state);
+    let agent = agents.agents.iter_mut().find(|a| a.id == id).ok_or_else(|| format!("agent {id} not found"))?;
+    if id != caller && agent.parent_agent_id.as_deref() != Some(caller) {
+        return Err(format!("{id} is neither you nor a direct child of {caller}"));
     }
     if let Some(d) = args.description {
         d.clone_into(&mut agent.description);
     }
-    Ok(format!("Updated {id} \"{}\": {}", agent.name, agent.description))
+    if let Some(n) = args.name {
+        agents.rename(id, n)?;
+    }
+    let updated = agents.agents.iter().find(|a| a.id == id).ok_or_else(|| format!("agent {id} not found"))?;
+    Ok(format!("Updated {id} \"{}\": {}", updated.name, updated.description))
 }
 
 /// Delete a strict descendant of `caller` with its whole subtree. A subtree

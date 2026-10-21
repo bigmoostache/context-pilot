@@ -98,6 +98,10 @@ pub(crate) fn execute_send(tool: &ToolUse, state: &mut State) -> ToolResult {
         Ok(v) => v,
         Err(e) => return ToolResult::new(tool.id.clone(), e, true),
     };
+    // Post only with the latest view of the group (see `freshness`).
+    if let Some(refusal) = crate::send::freshness::guard(state, tid, &gid) {
+        return ToolResult::new(tool.id.clone(), refusal, true);
+    }
     let next_raw = tool.input.get("next").and_then(serde_json::Value::as_str).unwrap_or_default().trim().to_owned();
 
     let markdown =

@@ -11,7 +11,13 @@ import {
   MarkdownPreview,
   TextPreview,
 } from "./previewParts"
-import { LiveImagePreview, LivePdfPreview, LivePreview, LiveSheetPreview } from "./livePreviews"
+import {
+  LiveImagePreview,
+  LivePdfPreview,
+  LivePreview,
+  LiveSheetPreview,
+  LiveSlidesPreview,
+} from "./livePreviews"
 import { TEXT_KINDS } from "./kinds"
 import {
   AudioPreview,
@@ -108,6 +114,7 @@ function livePreview(node: FinderNode, fleetId: string | undefined): ReactElemen
   if (node.kind === "image") return <LiveImagePreview fleetId={fleetId} node={node} />
   if (node.kind === "pdf") return <LivePdfPreview fleetId={fleetId} node={node} />
   if (node.kind === "sheet") return <LiveSheetPreview fleetId={fleetId} node={node} />
+  if (node.kind === "slides") return <LiveSlidesPreview fleetId={fleetId} node={node} />
   if (TEXT_KINDS.has(node.kind)) return <LivePreview fleetId={fleetId} node={node} />
   return null
 }

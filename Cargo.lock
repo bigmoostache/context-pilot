@@ -475,9 +475,6 @@ dependencies = [
 [[package]]
 name = "cp-fleet"
 version = "0.2.14"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "cp-groups"
@@ -821,6 +818,7 @@ dependencies = [
  "notify",
  "openssl",
  "portable-pty",
+ "quick-xml 0.41.0",
  "reqwest",
  "rusqlite",
  "serde",
@@ -831,6 +829,7 @@ dependencies = [
  "tiny_http",
  "umya-spreadsheet",
  "utoipa",
+ "zip 8.6.0",
 ]
 
 [[package]]

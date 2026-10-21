@@ -12,13 +12,13 @@
 //! disposable UI state, so a dropped delta self-heals from the agent's tier-②
 //! files on the next read.
 
-use cp_mod_agents::types::FocusState;
+use cp_mod_agents::types::{AgentsState, FocusState};
 use cp_mod_bridge::BridgeState;
 use cp_wire::types::oplog::OpEntryKind;
 
 use crate::app::App;
 
-use super::bridge::{bridge_active, emit_best_effort};
+use super::bridge::{bridge_active, emit_best_effort, emit_roster_delta};
 
 // ── Agent focus emission (focused-thread highlight — design doc I8) ──────
 
@@ -66,6 +66,42 @@ pub(in crate::app::run) fn emit_agent_focus(app: &mut App) {
     if changed {
         emit_best_effort(&app.state, OpEntryKind::AgentFocusChanged { agent_id: focused.clone() });
         app.state.ext_mut::<BridgeState>().last_focus = focused;
+    }
+}
+
+// ── Sidebar light emission ────────────────────────────────────────────────
+
+/// One agent's sidebar state as shipped to the web: the light, plus the ⚠
+/// reason ([`agent_warning`](crate::ui::agent_warning)) when it is stalled.
+type LitState = (bool, Option<String>);
+
+/// Emit an [`AgentLitChanged`](OpEntryKind::AgentLitChanged) whenever an
+/// agent's sidebar light ([`agent_lit`](crate::ui::agents_view::agent_lit))
+/// flips. Not a roster emitter: the light follows exec state, which the roster
+/// fingerprint does not cover. Durable, so the view's roster stays right.
+///
+/// No-op when the bridge is OFF.
+pub(in crate::app::run) fn emit_agent_lit(app: &mut App) {
+    if !bridge_active(&app.state) {
+        return;
+    }
+    let changed: Vec<(String, LitState)> = {
+        let memo = &app.state.ext::<BridgeState>().agent_lits;
+        AgentsState::get(&app.state)
+            .agents
+            .iter()
+            .filter_map(|a| {
+                let now = (crate::ui::agent_lit(&app.state, a), crate::ui::agent_warning(&app.state, a));
+                (memo.get(&a.id) != Some(&now)).then(|| (a.id.clone(), now))
+            })
+            .collect()
+    };
+    for (agent_id, now) in changed {
+        emit_roster_delta(
+            &app.state,
+            OpEntryKind::AgentLitChanged { agent_id: agent_id.clone(), lit: now.0, warning: now.1.clone() },
+        );
+        let _prev = app.state.ext_mut::<BridgeState>().agent_lits.insert(agent_id, now);
     }
 }
 

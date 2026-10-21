@@ -16,8 +16,8 @@ pub(super) use archived::emit_agent_archived;
 pub(super) use bridge::{bridge_active, emit_agent_status, emit_vitals, poll_bridge_commands};
 pub(super) use commands::drain_management;
 pub(super) use messages::{emit_messages, emit_notes, emit_task_lists};
-pub(super) use observers::{emit_agent_focus, emit_behaviour};
-pub(super) use paused::emit_agent_paused;
+pub(super) use observers::{emit_agent_focus, emit_agent_lit, emit_behaviour};
+pub(super) use paused::{emit_agent_adopted, emit_agent_paused, emit_agent_renamed};
 
 use crate::app::App;
 use cp_base::state::runtime::State;
@@ -126,16 +126,19 @@ pub(super) fn emit_bridge_deltas(app: &mut App) {
     };
     // Each emitter gets its own level-2 perf row (`loop.agents_emit.<name>`).
     // `true` = roster emitter, skipped while the roster fingerprint is unchanged.
-    let emitters: [Emitter; 9] = [
+    let emitters: [Emitter; 12] = [
+        ("emit_agent_adopted", emit_agent_adopted, true),
         ("emit_vitals", emit_vitals, false),
         ("emit_messages", emit_messages, true),
         ("emit_task_lists", emit_task_lists, false),
         ("emit_notes", emit_notes, false),
         ("emit_thread_status", emit_agent_status, true),
         ("emit_thread_focus", emit_agent_focus, false),
+        ("emit_agent_lit", emit_agent_lit, false),
         ("emit_behaviour", emit_behaviour, false),
         ("emit_thread_archived", emit_agent_archived, true),
         ("emit_thread_paused", emit_agent_paused, true),
+        ("emit_agent_renamed", emit_agent_renamed, true),
     ];
     for (name, emit, roster) in emitters {
         if roster && skip_roster {
@@ -203,10 +206,9 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
     if !bridge_active(&app.state) {
         return (false, None);
     }
-    let seeded = app
-        .state
-        .get_ext::<cp_mod_bridge::BridgeState>()
-        .is_some_and(|bs| bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused());
+    let seeded = app.state.get_ext::<cp_mod_bridge::BridgeState>().is_some_and(|bs| {
+        bs.seeded.messages() && bs.seeded.statuses() && bs.seeded.archived() && bs.seeded.paused() && bs.seeded.names()
+    });
     let groups = &cp_groups::types::GroupsState::get(&app.state).groups;
     // One pass over groups, then O(1) per agent: this runs every loop tick.
     let runnable = cp_groups::social::index::runnable_set(groups);
@@ -222,6 +224,7 @@ fn roster_gate(app: &App) -> (bool, Option<u64>) {
         runnable.contains(t.id.as_str()).hash(&mut h);
         t.archived.hash(&mut h);
         t.paused.hash(&mut h);
+        t.name.hash(&mut h);
     }
     let hash = h.finish();
     // Unseeded: run everything and store nothing, so the first pass after

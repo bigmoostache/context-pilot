@@ -831,6 +831,24 @@ M-tiny-56:
   contents: 'User mandate 10-15: always rebase our local stack on latest origin/master ("main.HEAD"); fix PRs target master. Merge PRs once CI is green.'
   importance: critical
   last_edited_ms: 1792062235956
+M-tiny-57:
+  tier: tiny
+  title: Optimistic update rule
+  contents: 'Critical webapp updates: optimistic + one shared discreet loader on the pending element; no retry; on failure restore pre-execute state (textarea text, re-prefilled create dialog).'
+  importance: critical
+  last_edited_ms: 1792490659896
+M-tiny-58:
+  tier: tiny
+  title: 'Orch: no nohup via bash'
+  contents: 'Never relaunch the orchestrator via console_easy_bash nohup & disown: it dies when that shell is reaped (web empty). Use a console_create panel ''(DO NOT CLOSE)''.'
+  importance: high
+  last_edited_ms: 1792498751105
+M-tiny-59:
+  tier: tiny
+  title: Refusals N=30 result
+  contents: 'astra dump 20261020T155505 Opus5.5: baseline 30/30 refuse; whole-sentence redaction of charged tokens (C_aggr, /tmp/refusal_n.py) → 3/30. Word-swaps do nothing. Measure N>=30.'
+  importance: high
+  last_edited_ms: 1792514365647
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'

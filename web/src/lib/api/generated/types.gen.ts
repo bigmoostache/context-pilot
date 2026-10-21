@@ -29,6 +29,7 @@ export type AgentDetail = {
     id: string;
     lastActivity?: string;
     lastActivityMs?: number;
+    lit?: boolean;
     log: Array<AgentMsg>;
     name: string;
     notes?: Array<AgentNote>;
@@ -37,6 +38,7 @@ export type AgentDetail = {
     status: 'MY_TURN' | 'THEIR_TURN' | 'ACTIVE';
     tasks?: Array<AgentTask>;
     unread?: number;
+    warning?: string | null;
 };
 
 export type AgentMsg = {
@@ -662,6 +664,7 @@ export type OpEntryKind = {
     inline_body?: string;
     input_tokens?: number;
     kind: string;
+    lit?: boolean;
     message_id?: string;
     message_ts?: number;
     miss_tokens?: number;
@@ -676,6 +679,7 @@ export type OpEntryKind = {
     threshold_tokens?: number;
     timestamp_ms?: number;
     used_tokens?: number;
+    warning?: string;
 };
 
 export type ProviderDef = {
@@ -774,6 +778,123 @@ export type SheetSaveResult = {
 export type SheetTab = {
     name: string;
     rows: Array<Array<string>>;
+};
+
+export type Slide = {
+    background?: string;
+    hidden: boolean;
+    index: number;
+    notes?: string;
+    shapes: Array<SlideShape>;
+};
+
+export type SlideBullet = {
+    color?: string;
+    font?: string;
+    scale: number;
+    text: string;
+};
+
+export type SlideDeck = {
+    height: number;
+    slides: Array<Slide>;
+    truncated: boolean;
+    width: number;
+};
+
+export type SlideParagraph = {
+    align: string;
+    bullet?: SlideBullet;
+    endSize: number;
+    indent: number;
+    /**
+     * Positive: 1/1000 percent; negative: 1/100 pt.
+     */
+    lineSpacing: number;
+    marginLeft: number;
+    runs: Array<SlideRun>;
+    spaceAfter: number;
+    spaceBefore: number;
+};
+
+export type SlideRun = {
+    baseline: number;
+    bold: boolean;
+    caps?: string;
+    color: string;
+    font: string;
+    highlight?: string;
+    italic: boolean;
+    link?: string;
+    size: number;
+    strike: boolean;
+    text: string;
+    underline: boolean;
+};
+
+export type SlideShape = {
+    /**
+     * CSS colour or gradient.
+     */
+    fill?: string;
+    flipH: boolean;
+    flipV: boolean;
+    h: number;
+    /**
+     * data: URL of the picture fill.
+     */
+    image?: string;
+    name: string;
+    /**
+     * SVG path in the shape's own EMU box.
+     */
+    path?: string;
+    rot: number;
+    stroke?: SlideStroke;
+    table?: SlideTable;
+    text?: SlideTextBody;
+    w: number;
+    x: number;
+    y: number;
+};
+
+export type SlideStroke = {
+    color: string;
+    dash?: string;
+    head?: string;
+    tail?: string;
+    width: number;
+};
+
+export type SlideTable = {
+    cols: Array<number>;
+    rows: Array<SlideTableRow>;
+};
+
+export type SlideTableCell = {
+    /**
+     * Left, top, right, bottom.
+     */
+    borders: Array<SlideStroke | null>;
+    colSpan: number;
+    fill?: string;
+    merged: boolean;
+    rowSpan: number;
+    text: SlideTextBody;
+};
+
+export type SlideTableRow = {
+    cells: Array<SlideTableCell>;
+    height: number;
+};
+
+export type SlideTextBody = {
+    anchor: string;
+    fontScale: number;
+    insets: Array<number>;
+    paragraphs: Array<SlideParagraph>;
+    vert?: string;
+    wrap: boolean;
 };
 
 export type TicketResponse = {
@@ -2197,6 +2318,35 @@ export type PostApiFleetByIdFsSheetSaveResponses = {
 };
 
 export type PostApiFleetByIdFsSheetSaveResponse = PostApiFleetByIdFsSheetSaveResponses[keyof PostApiFleetByIdFsSheetSaveResponses];
+
+export type GetApiFleetByIdFsSlidesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/slides';
+};
+
+export type GetApiFleetByIdFsSlidesErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsSlidesError = GetApiFleetByIdFsSlidesErrors[keyof GetApiFleetByIdFsSlidesErrors];
+
+export type GetApiFleetByIdFsSlidesResponses = {
+    /**
+     * Success
+     */
+    200: SlideDeck;
+};
+
+export type GetApiFleetByIdFsSlidesResponse = GetApiFleetByIdFsSlidesResponses[keyof GetApiFleetByIdFsSlidesResponses];
 
 export type PostApiFleetByIdFsTrashData = {
     body: {

@@ -134,6 +134,9 @@
   --interactive: #4e7a82; /* links / info */
   --ok: #6f9a77;
   --warn: #c2904f;
+  --lit: var(--signal); /* sidebar agent light — same hue as the old status dot */
+  --unlit: #b5aa9b; /* sidebar agent square off — lighter than muted-foreground */
+  --alarm: #e0201a; /* sidebar agent square when the TUI shows ⚠ — pure red */
   --danger: #c0685c;
   --shadow-color: 30deg 30% 60%;
   --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 12%), 0 4px 12px hsl(var(--shadow-color) / 8%);
@@ -214,6 +217,9 @@
   --interactive: #c98f6b; /* warm tan — links / info, lighter & calmer than the primary torch */
   --ok: #86bc6f; /* forest green (TUI success) */
   --warn: #e5c07b; /* gold / amber (TUI warning) */
+  --lit: var(--signal); /* sidebar agent light — same hue as the old status dot */
+  --unlit: var(--muted-foreground); /* sidebar agent square off */
+  --alarm: #ff3b30; /* sidebar agent square when the TUI shows ⚠ — pure red */
   --danger: #c85050; /* blood red (TUI error) */
   --shadow-color: 45deg 10% 3%;
   --shadow-card:
@@ -279,6 +285,12 @@ html.mobile.standalone .mobile-shell {
 @layer base {
   * {
     @apply border-border;
+  }
+
+  /* Tailwind v4 dropped the pointer cursor on buttons; restore it. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
   }
 
   body {
@@ -391,21 +403,6 @@ html.mobile.standalone .mobile-shell {
 
   to {
     width: 100%;
-  }
-}
-
-/* In-progress task glyph: a lit segment (the "snake") travels clockwise around
-   a FIXED square outline via marching stroke-dashoffset — the square itself and
-   its centre dot never move. pathLength normalises the perimeter to 100, so the
-   offset runs 0→-100 for exactly one full lap. See StatusIcon in
-   ThreadAsideTasks. */
-@keyframes snake-border {
-  from {
-    stroke-dashoffset: 0;
-  }
-
-  to {
-    stroke-dashoffset: -100;
   }
 }
 
@@ -758,4 +755,31 @@ html.mobile.standalone .mobile-shell {
 .univer-container [class*="toolbar"] {
   font-size: 12px;
   gap: 2px;
+}
+
+/* Sidebar agent title (AgentList): hovering the title text draws an underline in from
+   the left; on leave it slides out to the right. The anchor flips with the
+   hover state, so the bar always exits in the direction it was drawn. */
+.agent-title {
+  padding-bottom: 2px;
+  background: linear-gradient(
+      color-mix(in oklab, currentcolor 25%, transparent),
+      color-mix(in oklab, currentcolor 25%, transparent)
+    )
+    no-repeat right bottom / 0 1.5px;
+  cursor: pointer;
+  transition: background-size 380ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.agent-title:hover {
+  background-position: left bottom;
+  background-size: 100% 1.5px;
+  transition-duration: 320ms;
+  transition-timing-function: cubic-bezier(0.7, 0, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-title {
+    transition: none;
+  }
 }

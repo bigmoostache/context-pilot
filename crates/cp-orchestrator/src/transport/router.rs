@@ -137,6 +137,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "fs"]) => inspect::finder::fs_list(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "slides"]) => inspect::finder::fs_slides(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (&Method::Get, &["api", "fleet", id, "conversation"]) => inspect::finder::conversation(state, id),
         (&Method::Post, &["api", "fleet", id, "command"]) => rest::command(state, id, body_bytes),

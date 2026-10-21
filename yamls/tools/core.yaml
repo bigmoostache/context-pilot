@@ -53,7 +53,7 @@ tools:
       - `id` — existing task to update. OMIT IT TO CREATE. Ids are backend-assigned; never invent one.
       - `title` — required when creating. On an update, omit it to leave the title untouched.
       - `description` — longer detail. Omit to leave untouched.
-      - `status` — one of: planned, in_progress, done, cancelled. Defaults to planned on create.
+      - `status` — one of: planned, in_progress, done, cancelled, deleted. Defaults to planned on create.
       - `children` — a nested list of tasks CREATED under this item.
 
       THE CALL MERGES — it never replaces. Tasks you don't mention are left exactly as they are, so you only ever send what actually changed. A status flip is one tiny item:
@@ -64,9 +64,11 @@ tools:
 
         {"items": [{"id": "X41", "children": [{"title": "Late-discovered subtask"}]}]}
 
-      DELETING is an explicit `{"id": "X41", "status": "cancelled"}` — a cancelled task is soft-deleted (hidden, recoverable, sorted last), never hard-removed. Omitting a task NEVER deletes it.
+      DELETING: `{"id": "X41", "status": "deleted"}` hard-removes the task and its whole subtree. `{"id": "X41", "status": "cancelled"}` soft-deletes it (hidden, sorted last). Omitting a task NEVER deletes it.
 
-      The whole call is ATOMIC and validated first: a nested `id`, an `id` that doesn't exist on this agent, a repeated `id`, a create with no `title`, or a bad `status` rejects the ENTIRE call and changes nothing — the error names every problem at once. After applying, the tool echoes the fresh task tree; check it to confirm the interpreted result.
+      AUTO-CLEAN: once every child of a task is done or cancelled (recursively), those children are removed automatically. The parent stays with its own status — mark it done yourself.
+
+      The whole call is ATOMIC and validated first: a nested `id`, an `id` that doesn't exist on this agent, a repeated `id`, a create with no `title`, a `deleted` without `id`, or a bad `status` rejects the ENTIRE call and changes nothing — the error names every problem at once. After applying, the tool echoes the fresh task tree; check it to confirm the interpreted result.
 
       Reparenting and reordering existing tasks are not supported — create the task where you want it.
     parameters:
@@ -74,5 +76,5 @@ tools:
       id: "Existing task id to UPDATE (e.g. 'X41'). Omit to CREATE. Never allowed on a nested child."
       title: "Task title. Required when creating; omit to leave untouched."
       description: "Longer detail. Omit to leave untouched."
-      status: "One of: planned, in_progress, done, cancelled. Defaults to planned on create."
+      status: "One of: planned, in_progress, done, cancelled, deleted (hard-removes the task and its subtree). Defaults to planned on create."
       children: "Nested tasks CREATED under this one. Same fields as a parent item, minus `id` (nesting sets the parent)."

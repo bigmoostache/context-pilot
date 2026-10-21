@@ -221,3 +221,32 @@ pub(super) fn page_dynamic(state: &mut State, forward: bool) {
         switch_to_panel(state, selected);
     }
 }
+
+/// Pastes at or above this many characters are stashed as a `.uploads/` text
+/// file instead of inlined. Same value as the webapp's `LARGE_PASTE_CHARS`.
+const LARGE_PASTE_CHARS: usize = 2000;
+
+/// Write a large paste to `.uploads/paste-<local time>[-n].txt` (relative to
+/// the agent's cwd) and return its ` ```file-upload ` block, byte-identical in
+/// shape to what the webapp composer sends. `None` for small pastes or when the
+/// write fails — the caller then keeps the paste inline, so nothing is lost.
+pub(super) fn stash_large_paste(text: &str) -> Option<String> {
+    use std::io::Write as _;
+    if text.chars().count() < LARGE_PASTE_CHARS {
+        return None;
+    }
+    let dir = std::path::Path::new(".uploads");
+    std::fs::create_dir_all(dir).ok()?;
+    let stamp = cp_mod_utilities::time::now_local_ymd_hms_file();
+    // `create_new` claims the name atomically; bump a suffix on collision.
+    let (name, mut file) = (0u32..100).find_map(|n| {
+        let name = if n == 0 { format!("paste-{stamp}.txt") } else { format!("paste-{stamp}-{n}.txt") };
+        std::fs::OpenOptions::new().write(true).create_new(true).open(dir.join(&name)).ok().map(|f| (name, f))
+    })?;
+    file.write_all(text.as_bytes()).ok()?;
+    let note = format!("pasted by user at {}", cp_mod_utilities::time::now_utc_rfc3339_secs());
+    Some(format!(
+        "\n```file-upload\nfile:\n  path: .uploads/{name}\n  name: {name}\n  size: {}\n  note: {note}\n```\n",
+        text.len()
+    ))
+}
