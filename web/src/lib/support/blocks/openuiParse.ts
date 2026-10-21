@@ -135,16 +135,28 @@ function parseArg(tok: string): OpenUiArg | undefined {
   return isIdent(tok) ? { kind: "ref", id: tok } : undefined
 }
 
+/**
+ * Parse a property value. Unlike a positional argument, a bare word here is a
+ * STRING — props are keyed by name, so there is no ref ambiguity, and the
+ * advertised grammar writes `tone: ok` / `tone: warn` unquoted. A quoted
+ * string, number or boolean parses as usual.
+ */
+function propValue(tok: string): OpenUiValue | undefined {
+  const sc = scalar(tok)
+  if (sc !== undefined) return sc
+  return isIdent(tok) ? tok : undefined
+}
+
 /** Split a call's argument list into positional args and `key: value` props. */
 function parseCallArgs(raw: string): { args: OpenUiArg[]; props: Record<string, OpenUiValue> } {
   const args: OpenUiArg[] = []
   const props: Record<string, OpenUiValue> = {}
   for (const piece of splitArgs(raw)) {
     const colon = piece.indexOf(":")
-    // A top-level `key: value` (key is a bare identifier, value a scalar).
+    // A top-level `key: value` (key is a bare identifier, value a scalar or word).
     if (colon > 0 && !piece.startsWith('"') && !piece.startsWith("[")) {
       const key = piece.slice(0, colon).trim()
-      const val = scalar(piece.slice(colon + 1).trim())
+      const val = propValue(piece.slice(colon + 1).trim())
       if (isIdent(key) && val !== undefined) {
         props[key] = val
         continue

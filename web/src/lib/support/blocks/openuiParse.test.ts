@@ -17,7 +17,7 @@ describe("parseOpenUi", () => {
         'ok    = Badge("3 healthy", tone: ok)',
         "row   = Row([ok], gap: 8)",
         'cpu   = Metric(label: "CPU", value: "64%", delta: -4)',
-        "root  = Card([title, row, cpu], title: \"prod-eu\")",
+        'root  = Card([title, row, cpu], title: "prod-eu")',
       ].join("\n"),
     )
 
@@ -32,7 +32,9 @@ describe("parseOpenUi", () => {
 
   it("keeps commas and brackets inside quoted strings and lists split correctly", () => {
     const program = parseOpenUi(
-      ['a = Text("one, two [three]")', "b = BarChart([1, 4, 2])", "root = Stack([a, b])"].join("\n"),
+      ['a = Text("one, two [three]")', "b = BarChart([1, 4, 2])", "root = Stack([a, b])"].join(
+        "\n",
+      ),
     )
 
     expect(program.ok).toBe(true)
@@ -42,8 +44,18 @@ describe("parseOpenUi", () => {
   })
 
   it("ignores blank lines and comments", () => {
-    const program = parseOpenUi('\n# a comment\n\nroot = Divider()\n')
+    const program = parseOpenUi("\n# a comment\n\nroot = Divider()\n")
     expect(program.ok).toBe(true)
+  })
+
+  it("parses a bare word as a string property value (tone: ok)", () => {
+    const program = parseOpenUi(
+      ['b = Badge("3 healthy", tone: ok)', "root = Stack([b])"].join("\n"),
+    )
+    expect(program.ok).toBe(true)
+    if (!program.ok) return
+    expect(program.nodes.get("b")?.props).toEqual({ tone: "ok" })
+    expect(program.nodes.get("root")?.args[0]).toEqual({ kind: "refs", ids: ["b"] })
   })
 
   it("rejects a missing root", () => {
