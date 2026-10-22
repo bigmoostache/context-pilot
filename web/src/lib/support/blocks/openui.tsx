@@ -27,7 +27,7 @@ import {
   Sparkline,
   Table,
 } from "./openuiWidgets"
-import { SqlTable } from "./openuiSql"
+import { SqlTable } from "./sqlTable/SqlTable"
 
 // ── OpenUI Lang — layout + entry (see the ```openui``` block in the Send tool) ──
 //

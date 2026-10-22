@@ -351,7 +351,12 @@ export function searchConversations(
 /** One page of a read-only entity SQL query, answered by the agent (openui `SqlTable`). */
 export function fetchSqlPage(
   fleetId: string,
-  body: { sql: string; offset: number; limit: number },
+  body: {
+    sql: string
+    offset: number
+    limit: number
+    view?: import("./generated/types.gen").SqlView
+  },
 ): Promise<import("./generated/types.gen").SqlPage> {
   return sdk<import("./generated/types.gen").SqlPage>(
     postApiFleetByIdSql({ path: { id: fleetId }, body }),
