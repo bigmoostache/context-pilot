@@ -133,6 +133,13 @@ pub struct SpineConfig {
     /// Timestamp (ms) of when the last continuation error occurred. Used for backoff delay.
     #[serde(default)]
     pub last_continuation_error_ms: Option<u64>,
+
+    /// Nudge retries spent on the current empty turn (a turn that answered a
+    /// synthetic message with no text and no tool call). One retry is allowed,
+    /// then the agent is blocked. Reset once the assistant answers or a human
+    /// message arrives.
+    #[serde(default)]
+    pub empty_turn_retries: usize,
 }
 
 /// Module-owned state for the Spine module

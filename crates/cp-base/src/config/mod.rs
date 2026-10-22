@@ -93,6 +93,9 @@ pub struct SpineInjections {
     pub auto_continuation: String,
     /// Injected when the user types during an active stream.
     pub user_message_during_stream: String,
+    /// Prefixed to the single retry fired after a turn answered a
+    /// notification with no text and no tool call.
+    pub empty_turn_nudge: String,
     /// Injected after a TUI reload completes.
     pub reload_complete: String,
     /// The "continue" synthetic message content.

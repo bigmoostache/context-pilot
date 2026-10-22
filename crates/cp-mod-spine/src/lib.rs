@@ -282,6 +282,7 @@ impl Module for SpineModule {
         // Reset error backoff — human can immediately trigger a new stream
         ss.config.consecutive_continuation_errors = 0;
         ss.config.last_continuation_error_ms = None;
+        ss.config.empty_turn_retries = 0;
     }
 
     fn on_stream_stop(&self, state: &mut State) {

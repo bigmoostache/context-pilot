@@ -46,7 +46,9 @@ fn in_backoff(state: &State) -> bool {
 fn is_synthetic(content: &str) -> bool {
     let spine = &INJECTIONS.spine;
     let prefix = spine.auto_continuation.split("{count}").next().unwrap_or_default().trim();
+    let nudge = spine.empty_turn_nudge.trim();
     (!prefix.is_empty() && content.starts_with(prefix))
+        || (!nudge.is_empty() && content.starts_with(nudge))
         || content == spine.continue_msg.trim()
         || content == spine.reload_complete.trim()
         || content == spine.user_message_during_stream.trim()
@@ -130,12 +132,24 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     }
 
     // Guardrail 2: no two synthetic messages in a row before the assistant answers.
+    // The stream is not running here, so an unanswered synthetic means the turn
+    // ended empty (END_TURN with no text, no tool call). Retry once with a nudge,
+    // then block so the agent surfaces as stuck instead of idling silently.
     if last_synthetic_unanswered(state) {
-        return SpineDecision::Idle;
+        if SpineState::get(state).config.empty_turn_retries >= 1 {
+            return block_empty_turn(state);
+        }
+    } else {
+        SpineState::get_mut(state).config.empty_turn_retries = 0;
     }
+    let nudge = SpineState::get(state).config.empty_turn_retries == 0 && last_synthetic_unanswered(state);
 
     // Build the continuation action from unprocessed notifications
-    let action = build_continuation_from_notifications(state);
+    let mut action = build_continuation_from_notifications(state);
+    if nudge {
+        action = with_empty_turn_nudge(action);
+        SpineState::get_mut(state).config.empty_turn_retries = 1;
+    }
 
     // Check guard rails before firing
     if let Some(reason) = check_guard_rails(state) {
@@ -150,6 +164,30 @@ pub fn check_spine(state: &mut State) -> SpineDecision {
     state.touch_panel(Kind::SPINE);
 
     SpineDecision::Continue(action)
+}
+
+/// Prefix the continuation with the empty-turn nudge. A transparent relaunch
+/// becomes a synthetic message so the nudge actually reaches the model.
+fn with_empty_turn_nudge(action: ContinuationAction) -> ContinuationAction {
+    let nudge = INJECTIONS.spine.empty_turn_nudge.trim_end();
+    match action {
+        ContinuationAction::SyntheticMessage(msg) => ContinuationAction::SyntheticMessage(format!("{nudge}\n{msg}")),
+        ContinuationAction::Relaunch => ContinuationAction::SyntheticMessage(nudge.to_owned()),
+    }
+}
+
+/// Second empty turn in a row: stop retrying, park pending notifications as
+/// blocked and report it, so the agent shows as stuck (⚠) until a human acts.
+fn block_empty_turn(state: &mut State) -> SpineDecision {
+    let reason = "the model ended its turn twice without text or tool call".to_owned();
+    drop(SpineState::create_notification(
+        state,
+        NotificationType::Custom,
+        "guard_rail:EmptyTurn".to_owned(),
+        format!("Auto-continuation blocked: {reason}"),
+    ));
+    SpineState::mark_all_unprocessed_as_blocked(state);
+    SpineDecision::Blocked(reason)
 }
 
 /// Build a `ContinuationAction` directly from unprocessed notifications.
@@ -300,15 +338,41 @@ mod tests {
         assert!(after.last_continuation_error_ms.is_none());
     }
 
+    /// Fire the pending continuation, then end the turn with no reply at all.
+    fn fire_and_end_empty(state: &mut State) -> String {
+        let SpineDecision::Continue(action) = check_spine(state) else { panic!("expected Continue") };
+        let ContinuationAction::SyntheticMessage(msg) = action.clone() else { panic!("expected SyntheticMessage") };
+        assert!(apply_continuation(state, action));
+        state.agent_mut().stream.phase.transition(cp_base::state::flags::StreamPhase::Idle);
+        msg
+    }
+
     #[test]
-    fn unanswered_synthetic_blocks_a_second_one() {
+    fn empty_turn_is_nudged_once_then_blocked() {
         let mut state = spine_state();
         notify(&mut state, "a");
-        let SpineDecision::Continue(action) = check_spine(&mut state) else { panic!("expected Continue") };
-        assert!(apply_continuation(&mut state, action));
-        state.agent_mut().stream.phase.transition(cp_base::state::flags::StreamPhase::Idle);
+        let first = fire_and_end_empty(&mut state);
+        assert!(!first.starts_with(INJECTIONS.spine.empty_turn_nudge.trim()));
         notify(&mut state, "b");
-        assert!(matches!(check_spine(&mut state), SpineDecision::Idle));
+        let second = fire_and_end_empty(&mut state);
+        assert!(second.starts_with(INJECTIONS.spine.empty_turn_nudge.trim()));
+        notify(&mut state, "c");
+        assert!(matches!(check_spine(&mut state), SpineDecision::Blocked(_)));
+        assert!(!SpineState::has_unprocessed_notifications(&state));
+    }
+
+    #[test]
+    fn answered_turn_resets_the_nudge() {
+        let mut state = spine_state();
+        notify(&mut state, "a");
+        let _first = fire_and_end_empty(&mut state);
+        notify(&mut state, "b");
+        let _nudged = fire_and_end_empty(&mut state);
+        answer_and_succeed(&mut state);
+        notify(&mut state, "c");
+        let third = fire_and_end_empty(&mut state);
+        assert!(!third.starts_with(INJECTIONS.spine.empty_turn_nudge.trim()));
+        assert_eq!(SpineState::get(&state).config.empty_turn_retries, 0);
     }
 
     #[test]

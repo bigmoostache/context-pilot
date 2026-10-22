@@ -9,6 +9,8 @@ spine:
     Please address these. */
   user_message_during_stream: |
     /* A user message was submitted while you were streaming. It has been inserted into the conversation above. Please review and respond to it. */
+  empty_turn_nudge: |
+    /* Your previous turn ended without any text or tool call, so the notifications below are still unanswered. Act on them now: reply with Send in the group where you hold the turn, or release the turn. */
   reload_complete: "/* Reload complete */"
   continue: "/* Continue */"
 
