@@ -49,6 +49,7 @@ Where the orchestrator listens and where it finds its agents and front.
 | `CP_AGENTS_ROOT` | path (existing directory) | `$HOME/code` | orchestrator |  | Where the project directories of newly created agents are made. |
 | `CP_AGENT_BINARY` | path (executable) | `<cwd>/target/release/tui` | orchestrator |  | The agent binary the supervisor spawns. A persisted active release overrides it after an OTA update. |
 | `CP_WEB_ROOT` | path (existing directory) | - | orchestrator |  | Directory of the built cockpit (SPA) served by the orchestrator. Unset, only the API is served. The updater repoints this path after a release swap. |
+| `CP_FINDER_EXTRA_ROOTS` | text | - | orchestrator |  | Colon-separated absolute directories the Finder may list and preview outside an agent's folder (e.g. `~/dev` siblings cited by agents). Read-only: writes, uploads and sheet saves stay confined to the agent folder. `/tmp` is always previewable. |
 | `CP_PROVISION_FLAG` | path (parent directory must exist) | `<CP_AGENTS_DIR>/.provisioned` | orchestrator |  | Durable flag file written once the box identity is set (day-0 setup). |
 | `CP_RELEASES_BREAK_GLASS` | bool (0/1/true/false) | `0` | orchestrator |  | Re-enable manual version selection in the releases API. The auto-updater owns version choice otherwise. |
 

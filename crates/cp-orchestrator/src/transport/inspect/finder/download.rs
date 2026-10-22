@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{confined_path, extract_param, fleet_folder, previewable_path};
+use super::support::{extract_param, fleet_folder, listable_path, previewable_path};
 
 /// Maximum file size for downloads (100 MiB).
 const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
@@ -39,7 +39,7 @@ pub(crate) fn fs_download(state: &Mutex<Backend>, fleet_id: &str, query: &str) -
     };
     // Folders zip only inside the realm; files may also come from the
     // read-only preview roots (`/tmp`), where agents leave cited reports.
-    if let Some(dir) = confined_path(&folder, &relative).filter(|p| p.is_dir()) {
+    if let Some(dir) = listable_path(&folder, &relative).filter(|p| p.is_dir()) {
         return zip_and_download(&dir);
     }
     let Some(target) = previewable_path(&folder, &relative) else {

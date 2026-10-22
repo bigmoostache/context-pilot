@@ -7,7 +7,7 @@ use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
 use super::support::{
-    confined_path, count_visible_children, extract_param, fleet_folder, infer_kind, previewable_path,
+    count_visible_children, extract_param, fleet_folder, infer_kind, listable_path, previewable_path,
 };
 
 /// `GET /api/fleet/{id}/fs/descriptions` — the agent's tree descriptions.
@@ -72,7 +72,7 @@ pub(crate) fn fs_list(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Ht
         Err(reply) => return reply,
     };
     let relative = extract_param(query, "path").unwrap_or_default();
-    let Some(target) = confined_path(&folder, &relative) else {
+    let Some(target) = listable_path(&folder, &relative) else {
         return HttpReply::error(403, "path outside agent realm");
     };
 

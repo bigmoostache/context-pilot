@@ -32,25 +32,35 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
     canonical.starts_with(&root_canonical).then_some(canonical)
 }
 
-/// Read-only roots a preview may reach outside the fleet folder: agents
-/// write scratch files (prompts, reports) to `/tmp` and cite them in cards.
-const PREVIEW_EXTRA_ROOTS: &[&str] = &["/tmp"];
+/// Always-previewable root outside the fleet folder: agents write scratch
+/// files (prompts, reports) to `/tmp` and cite them in cards.
+const PREVIEW_TMP_ROOT: &str = "/tmp";
 
-/// [`confined_path`] widened with [`PREVIEW_EXTRA_ROOTS`] — for read-only
-/// preview endpoints only, never for listing or writes. Roots are
-/// canonicalized too (`/tmp` → `/private/tmp` on macOS).
+/// [`confined_path`] widened with `/tmp` — for read-only file previews.
 pub(super) fn previewable_path(root: &str, relative: &str) -> Option<PathBuf> {
+    widened_path(root, relative, &[Path::new(PREVIEW_TMP_ROOT)], &cp_env::env().orch.finder_extra_roots)
+}
+
+/// [`confined_path`] widened with `CP_FINDER_EXTRA_ROOTS` — for read-only
+/// directory listings (`/tmp` is preview-only, never browsable).
+pub(super) fn listable_path(root: &str, relative: &str) -> Option<PathBuf> {
+    widened_path(root, relative, &[], &cp_env::env().orch.finder_extra_roots)
+}
+
+/// Resolve `relative` (relative to `root`, `..` allowed, or absolute) and
+/// accept it inside `root` or under any of `fixed` / `extra`. Every root is
+/// canonicalized (`/tmp` → `/private/tmp` on macOS), so symlinks cannot
+/// smuggle a path past the prefix check. Never use for writes.
+fn widened_path(root: &str, relative: &str, fixed: &[&Path], extra: &[PathBuf]) -> Option<PathBuf> {
     if let Some(inside) = confined_path(root, relative) {
         return Some(inside);
     }
-    let abs = Path::new(relative);
-    if !abs.is_absolute() {
-        return None;
-    }
-    let canonical = abs.canonicalize().ok()?;
-    PREVIEW_EXTRA_ROOTS
+    let canonical = Path::new(root).join(relative).canonicalize().ok()?;
+    fixed
         .iter()
-        .filter_map(|r| Path::new(r).canonicalize().ok())
+        .copied()
+        .chain(extra.iter().map(PathBuf::as_path))
+        .filter_map(|r| r.canonicalize().ok())
         .any(|r| canonical.starts_with(r))
         .then_some(canonical)
 }
@@ -159,6 +169,23 @@ mod tests {
         let got = confined_path(&root.to_string_lossy(), &inner.to_string_lossy());
         let _r = std::fs::remove_dir(&inner);
         assert_eq!(got, Some(inner));
+    }
+
+    #[test]
+    fn widened_path_reaches_extra_root_via_dotdot() {
+        let base = std::env::temp_dir().canonicalize().expect("temp dir").join("cp-widened-probe");
+        let agent = base.join("agent");
+        let extra = base.join("dev/ingestion");
+        std::fs::create_dir_all(&agent).expect("mkdir agent");
+        std::fs::create_dir_all(&extra).expect("mkdir extra");
+        let root = agent.to_string_lossy();
+        let allowed = [base.join("dev")];
+        let got = widened_path(&root, "../dev/ingestion", &[], &allowed);
+        let denied = widened_path(&root, "../dev/ingestion", &[], &[]);
+        let _r = std::fs::remove_dir_all(&base);
+        assert_eq!(got, Some(extra));
+        assert!(denied.is_none());
+        assert!(widened_path(&root, "/etc", &[], &allowed).is_none());
     }
 
     #[test]

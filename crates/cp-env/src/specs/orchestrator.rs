@@ -60,6 +60,15 @@ pub(super) static SPECS: &[Spec] = &[
         ..Spec::BASE
     },
     Spec {
+        name: "CP_FINDER_EXTRA_ROOTS",
+        kind: Kind::Str,
+        fallback: Fallback::None,
+        scope: Scope::Orchestrator,
+        group: Group::Orchestrator,
+        doc: "Colon-separated absolute directories the Finder may list and preview outside an agent's folder (e.g. `~/dev` siblings cited by agents). Read-only: writes, uploads and sheet saves stay confined to the agent folder. `/tmp` is always previewable.",
+        ..Spec::BASE
+    },
+    Spec {
         name: "CP_PROVISION_FLAG",
         kind: Kind::Path(Exist::Parent),
         fallback: Fallback::Derived("<CP_AGENTS_DIR>/.provisioned"),
