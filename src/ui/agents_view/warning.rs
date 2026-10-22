@@ -26,14 +26,19 @@ pub(crate) fn agent_warning(state: &State, agent: &cp_mod_agents::types::Agent) 
     if agent.paused || agent.archived {
         return None;
     }
+    // Turn first: the TUI's ⚠ needs `MyTurn`. `Errored` is sticky in the fleet
+    // registry (only a user message clears it), so checking it first kept
+    // agents whose turn is with the human red on the web.
+    if cp_mod_agents::types::turn::status(state, &agent.id) != AgentStatus::MyTurn {
+        return None;
+    }
     let exec = FleetExecMirror::get(state).exec_state_of(&agent.id);
     if exec == AgentExecState::Errored {
         return Some(
             "Stuck: the last LLM calls kept failing. Send a message to retry, or switch the model.".to_owned(),
         );
     }
-    if exec == AgentExecState::Streaming || cp_mod_agents::types::turn::status(state, &agent.id) != AgentStatus::MyTurn
-    {
+    if exec == AgentExecState::Streaming {
         return None;
     }
     // From here the TUI shows ⚠ (MyTurn, nothing in flight). Pick the most
