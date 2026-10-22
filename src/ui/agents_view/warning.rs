@@ -55,6 +55,10 @@ pub(crate) fn agent_warning(state: &State, agent: &cp_mod_agents::types::Agent) 
             "Stopped: the model refused to continue (safety guardrail). Rephrase, or switch the model.".to_owned()
         }
         "max_tokens" => "Stopped: the reply hit the max output tokens. Send a message to continue.".to_owned(),
+        "rate_limited" => {
+            "Rate limited (429): the provider is rejecting calls. Wait for the limit to clear, or switch the model or account.".to_owned()
+        }
+        "api_error" => "Stopped: the last LLM call failed. Send a message to retry, or switch the model.".to_owned(),
         other => format!("Stopped abnormally (reason: {other}). Send a message to retry, or switch the model."),
     };
     Some(text)

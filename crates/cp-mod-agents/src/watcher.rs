@@ -201,9 +201,10 @@ impl Watcher for IdleMyTurnDetector {
 /// Returns `true` for `"end_turn"` and `"tool_use"` — the agent finished on
 /// its own terms and should be nudged if it left a `MY_TURN` agent unanswered.
 ///
-/// Returns `false` for everything else: `None` (stream error — `last_stop_reason`
-/// is not set on the error path), `"max_tokens"`, `"content_filter"`, or any
-/// other abnormal/unknown reason. These indicate a guardrail or infrastructure
+/// Returns `false` for everything else: `None` (no completed turn yet),
+/// `"rate_limited"` / `"api_error"` (synthetic, set on the stream-error path),
+/// `"max_tokens"`, `"content_filter"`, or any other abnormal/unknown reason.
+/// These indicate a guardrail or infrastructure
 /// issue, not agent laziness.
 fn is_normal_stop(reason: Option<&str>) -> bool {
     matches!(reason, Some("end_turn" | "tool_use"))

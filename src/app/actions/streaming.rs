@@ -159,10 +159,14 @@ fn apply_token_usage(app_state: &mut State, usage: &TokenUsage, cost: &StreamCos
 }
 
 /// Handle `StreamError` action — clean up streaming state, log error.
+///
+/// Also records a synthetic stop reason so the ⚠ warning and the idle watcher
+/// name the failure instead of falling back to "unknown/error".
 pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResult {
     const INLINE_LIMIT: usize = 1000;
 
     state.agent_mut().stream.phase.transition(StreamPhase::Idle);
+    state.agent_mut().last_stop_reason = Some(stream_error_reason(error).to_owned());
 
     // Remove estimated tokens on error from Conversation context
     let est = state.agent().streaming_estimated_tokens;
@@ -191,4 +195,14 @@ pub(crate) fn handle_stream_error(state: &mut State, error: &str) -> ActionResul
         return ActionResult::SaveMessage(id);
     }
     ActionResult::Save
+}
+
+/// Synthetic stop reason for a failed stream: `"rate_limited"` for a provider
+/// 429 / `rate_limit_error`, else `"api_error"`.
+fn stream_error_reason(error: &str) -> &'static str {
+    if error.contains("rate_limit_error") || error.contains("API error 429") || error.contains("Rate limited") {
+        "rate_limited"
+    } else {
+        "api_error"
+    }
 }
