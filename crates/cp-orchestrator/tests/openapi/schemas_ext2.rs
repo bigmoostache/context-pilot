@@ -300,7 +300,24 @@ pub(super) fn deploy() -> Value {
             "borders": { "type": "array", "items": { "allOf": [r("SlideStroke")], "nullable": true },
                          "description": "Left, top, right, bottom." },
             "text": r("SlideTextBody")
-        }), &["colSpan", "rowSpan", "merged", "borders", "text"])
+        }), &["colSpan", "rowSpan", "merged", "borders", "text"]),
+        // ── SqlTable view (cp-wire SqlView; hand-written, see its docs) ──
+        "SqlView": {
+            "type": "object",
+            "properties": {
+                "sort": arr(r("SqlSort")),
+                "search": { "type": "string", "nullable": true },
+                "filters": arr(r("SqlFilter"))
+            }
+        },
+        "SqlSort": obj(json!({ "column": string(), "desc": boolean() }), &["column"]),
+        "SqlFilter": obj(json!({
+            "column": string(), "op": r("FilterOp"), "value": { "type": "string", "nullable": true }
+        }), &["column", "op"]),
+        "FilterOp": { "type": "string", "enum": [
+            "contains", "not_contains", "starts_with", "ends_with", "eq", "neq",
+            "gt", "gte", "lt", "lte", "is_null", "not_null", "unknown"
+        ] },
         // The `ItNetwork*` schemas live in [`schemas_net`](super::schemas_net),
         // together with the request bodies they share their field lists with.
     })

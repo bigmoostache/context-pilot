@@ -9,3 +9,5 @@ pub(crate) mod errors;
 pub mod page;
 /// SQL statement parsing: classification + UTF-8-safe statement splitting.
 pub(crate) mod parse;
+/// Sort/search/filter clauses layered over a `SqlTable` base query.
+pub mod view;

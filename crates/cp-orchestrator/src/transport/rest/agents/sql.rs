@@ -11,7 +11,7 @@
 
 use std::sync::Mutex;
 
-use cp_wire::types::payload::query::{Kind, Outcome, Query};
+use cp_wire::types::payload::query::{Kind, Outcome, Query, SqlView};
 use serde::Deserialize;
 
 use crate::channel::FleetHandle;
@@ -34,6 +34,9 @@ struct SqlRequest {
     /// Rows per page; clamped to [`MAX_LIMIT`], defaults to [`DEFAULT_LIMIT`].
     #[serde(default)]
     limit: Option<u32>,
+    /// Sort, search and filters, validated and bound by the agent.
+    #[serde(default)]
+    view: SqlView,
 }
 
 /// Handle `POST /api/fleet/{id}/sql`.
@@ -49,7 +52,10 @@ pub(crate) fn sql_page(state: &Mutex<Backend>, id: &str, body_bytes: &[u8]) -> H
         Err(reply) => return reply,
     };
     let limit = request.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
-    let query = Query::new(format!("sql-page-{id}"), Kind::SqlPage { sql: request.sql, offset: request.offset, limit });
+    let query = Query::new(
+        format!("sql-page-{id}"),
+        Kind::SqlPage { sql: request.sql, offset: request.offset, limit, view: request.view },
+    );
 
     // Blocking agent I/O with no backend lock held.
     match FleetHandle::from_entry(&entry).query(query) {

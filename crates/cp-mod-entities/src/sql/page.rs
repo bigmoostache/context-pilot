@@ -11,10 +11,11 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use rusqlite::Connection;
-use rusqlite::types::ValueRef;
+use rusqlite::types::{Value, ValueRef};
+use rusqlite::{Connection, params_from_iter};
 
 use super::parse::{SqlKind, classify, split_statements};
+use super::view::{self, Request};
 
 /// How long a page query may run before `SQLite` is told to abort it.
 const DEADLINE: Duration = Duration::from_secs(3);
@@ -40,13 +41,13 @@ pub struct Page {
     pub total: u64,
 }
 
-/// Run one page of `sql` against the database at `db_path`.
+/// Run one page of `req.sql`, narrowed and ordered by `req.view`, against the database at `db_path`.
 ///
 /// # Errors
 /// A human-readable reason when the SQL is not a single read-only statement,
-/// fails to prepare or run, or exceeds the deadline.
-pub fn fetch(db_path: &Path, sql: &str, offset: u64, limit: u32) -> Result<Page, String> {
-    let body = single_select(sql)?;
+/// the view names an unknown column, or the query fails or exceeds the deadline.
+pub fn fetch(db_path: &Path, req: &Request<'_>) -> Result<Page, String> {
+    let body = single_select(req.sql)?;
     let conn = open(db_path)?;
     // Watchdog: interrupt the query if it outlives DEADLINE. Dropping `done`
     // (on return) wakes the watchdog early so it exits without interrupting.
@@ -57,20 +58,31 @@ pub fn fetch(db_path: &Path, sql: &str, offset: u64, limit: u32) -> Result<Page,
             interrupt.interrupt();
         }
     });
-    let page = run_page(&conn, body, offset, limit);
+    let page = run_page(&conn, body, req);
     drop(done);
     page
 }
 
-/// Count and slice `body` on an already-open connection.
-fn run_page(conn: &Connection, body: &str, offset: u64, limit: u32) -> Result<Page, String> {
-    let total: i64 =
-        conn.query_row(&format!("SELECT COUNT(*) FROM ({body})"), [], |row| row.get(0)).map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(&format!("SELECT * FROM ({body}) LIMIT ?1 OFFSET ?2")).map_err(|e| e.to_string())?;
-    let columns: Vec<String> = stmt.column_names().into_iter().map(str::to_owned).collect();
+/// Count and slice `body` (the validated `req.sql`), under `req.view`, on an already-open connection.
+fn run_page(conn: &Connection, body: &str, req: &Request<'_>) -> Result<Page, String> {
+    // The base query's own columns: the only names a view may reference.
+    let columns: Vec<String> = conn
+        .prepare(&format!("SELECT * FROM ({body}) LIMIT 0"))
+        .map_err(|e| e.to_string())?
+        .column_names()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    let (filter, order, mut params) = view::build(req.view, &columns)?;
+    let narrowed = format!("SELECT * FROM ({body}){filter}");
+    let total: i64 = conn
+        .query_row(&format!("SELECT COUNT(*) FROM ({narrowed})"), params_from_iter(params.iter()), |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&format!("{narrowed}{order} LIMIT ? OFFSET ?")).map_err(|e| e.to_string())?;
     let width = columns.len();
-    let offset_param = i64::try_from(offset).unwrap_or(i64::MAX);
-    let mut rows_iter = stmt.query((i64::from(limit), offset_param)).map_err(|e| e.to_string())?;
+    params.push(Value::Integer(i64::from(req.limit)));
+    params.push(Value::Integer(i64::try_from(req.offset).unwrap_or(i64::MAX)));
+    let mut rows_iter = stmt.query(params_from_iter(params.iter())).map_err(|e| e.to_string())?;
     let mut rows = Vec::new();
     while let Some(row) = rows_iter.next().map_err(|e| e.to_string())? {
         let cells = (0..width).map(|i| row.get_ref(i).ok().and_then(cell_text)).collect();
@@ -122,6 +134,11 @@ fn cell_text(value: ValueRef<'_>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sql::view::View;
+
+    fn run(path: &Path, sql: &str, view: &View, (offset, limit): (u64, u32)) -> Result<Page, String> {
+        fetch(path, &Request { sql, view, offset, limit })
+    }
 
     fn db() -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("dir");
@@ -138,7 +155,7 @@ mod tests {
     #[test]
     fn pages_with_total() {
         let (_dir, path) = db();
-        let page = fetch(&path, "SELECT * FROM t ORDER BY id;", 2, 2).expect("page");
+        let page = run(&path, "SELECT * FROM t ORDER BY id;", &View::default(), (2, 2)).expect("page");
         assert_eq!(page.columns, vec!["id", "name"]);
         assert_eq!(page.total, 5);
         assert_eq!(page.rows, vec![vec![Some("3".to_owned()), None], vec![Some("4".to_owned()), Some("d".to_owned())]]);
@@ -147,27 +164,59 @@ mod tests {
     #[test]
     fn rejects_writes() {
         let (_dir, path) = db();
-        let reason = fetch(&path, "DELETE FROM t", 0, 10).unwrap_err();
+        let reason = run(&path, "DELETE FROM t", &View::default(), (0, 10)).unwrap_err();
         assert!(reason.contains("read-only"), "{reason}");
     }
 
     #[test]
     fn rejects_multiple_statements() {
         let (_dir, path) = db();
-        let reason = fetch(&path, "SELECT 1; SELECT 2", 0, 10).unwrap_err();
+        let reason = run(&path, "SELECT 1; SELECT 2", &View::default(), (0, 10)).unwrap_err();
         assert!(reason.contains("exactly one"), "{reason}");
     }
 
     #[test]
     fn rejects_pragma() {
         let (_dir, path) = db();
-        let reason = fetch(&path, "PRAGMA table_info(t)", 0, 10).unwrap_err();
+        let reason = run(&path, "PRAGMA table_info(t)", &View::default(), (0, 10)).unwrap_err();
         assert!(reason.contains("read-only"), "{reason}");
     }
 
     #[test]
     fn aggregate_query_counts_one_row() {
         let (_dir, path) = db();
-        assert_eq!(fetch(&path, "SELECT COUNT(*) AS n FROM t", 0, 10).expect("ok").total, 1);
+        assert_eq!(run(&path, "SELECT COUNT(*) AS n FROM t", &View::default(), (0, 10)).expect("ok").total, 1);
+    }
+
+    fn filtered(view: &View) -> Page {
+        let (_dir, path) = db();
+        run(&path, "SELECT * FROM t", view, (0, 10)).expect("page")
+    }
+
+    #[test]
+    fn sorts_descending() {
+        let page = filtered(&View { sort: vec![("id".to_owned(), true)], ..View::default() });
+        assert_eq!(page.rows.first().and_then(|r| r.first().cloned()).flatten().as_deref(), Some("5"));
+    }
+
+    #[test]
+    fn search_and_filter_narrow_total() {
+        use super::view::{Filter, Op};
+        let page = filtered(&View { search: Some("D".to_owned()), ..View::default() });
+        assert_eq!(page.total, 1);
+        let gt = Filter { column: "id".to_owned(), op: Op::Gt, value: Some("3".to_owned()) };
+        assert_eq!(filtered(&View { filters: vec![gt], ..View::default() }).total, 2);
+        let null = Filter { column: "name".to_owned(), op: Op::IsNull, value: None };
+        assert_eq!(filtered(&View { filters: vec![null], ..View::default() }).total, 1);
+    }
+
+    #[test]
+    fn rejects_unknown_column_and_injection() {
+        let (_dir, path) = db();
+        let bad = View { sort: vec![("id; DROP TABLE t".to_owned(), false)], ..View::default() };
+        let reason = run(&path, "SELECT * FROM t", &bad, (0, 10)).unwrap_err();
+        assert!(reason.contains("unknown column"), "{reason}");
+        let lit = View { search: Some("%' OR 1=1 --".to_owned()), ..View::default() };
+        assert_eq!(run(&path, "SELECT * FROM t", &lit, (0, 10)).expect("ok").total, 0);
     }
 }

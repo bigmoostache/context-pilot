@@ -303,7 +303,8 @@ pub(super) fn paths() -> Value {
             "properties": {
                 "sql": { "type": "string" },
                 "offset": { "type": "integer", "format": "int64" },
-                "limit": { "type": "integer", "format": "int32" }
+                "limit": { "type": "integer", "format": "int32" },
+                "view": { "$ref": "#/components/schemas/SqlView" }
             },
             "required": ["sql"]
         })), r("SqlPage"))),

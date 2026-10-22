@@ -16,8 +16,9 @@
 
 use std::path::PathBuf;
 
+use cp_mod_entities::sql::view::{Filter, Op, Request, View};
 use cp_mod_search::meili::conversation_search::{SearchConvParams, search_conversations};
-use cp_wire::types::payload::query::{Kind, Outcome, Query, SqlPage};
+use cp_wire::types::payload::query::{FilterOp, Kind, Outcome, Query, SqlPage, SqlView};
 
 /// The resolved Meilisearch coordinates a query needs: `(port, master_key,
 /// project_hash)`.
@@ -70,17 +71,51 @@ pub(super) fn answer(ctx: &QueryCtx, query: &Query) -> Outcome {
                 Err(reason) => Outcome::Error { reason },
             }
         }
-        Kind::SqlPage { sql, offset, limit } => {
+        Kind::SqlPage { sql, offset, limit, view: wire_view } => {
             let Some(db) = ctx.entities_db.as_ref() else {
                 return Outcome::Error { reason: "entity database unavailable on this agent".to_owned() };
             };
-            match cp_mod_entities::sql::page::fetch(db, &sql, offset, limit) {
+            let view = match to_view(wire_view) {
+                Ok(mapped) => mapped,
+                Err(reason) => return Outcome::Error { reason },
+            };
+            match cp_mod_entities::sql::page::fetch(db, &Request { sql: &sql, view: &view, offset, limit }) {
                 Ok(page) => Outcome::Rows { page: SqlPage::new(page.columns, page.rows, page.total, offset) },
                 Err(reason) => Outcome::Error { reason },
             }
         }
         Kind::Unknown => Outcome::Error { reason: "unsupported query kind".to_owned() },
     }
+}
+
+/// Map the wire view onto the entities crate's own types.
+///
+/// # Errors
+/// A filter operator from a newer protocol version.
+fn to_view(wire: SqlView) -> Result<View, String> {
+    let filters = wire
+        .filters
+        .into_iter()
+        .map(|f| {
+            let op = match f.op {
+                FilterOp::Contains => Op::Contains,
+                FilterOp::NotContains => Op::NotContains,
+                FilterOp::StartsWith => Op::StartsWith,
+                FilterOp::EndsWith => Op::EndsWith,
+                FilterOp::Eq => Op::Eq,
+                FilterOp::Neq => Op::Neq,
+                FilterOp::Gt => Op::Gt,
+                FilterOp::Gte => Op::Gte,
+                FilterOp::Lt => Op::Lt,
+                FilterOp::Lte => Op::Lte,
+                FilterOp::IsNull => Op::IsNull,
+                FilterOp::NotNull => Op::NotNull,
+                FilterOp::Unknown => return Err("unsupported filter operator".to_owned()),
+            };
+            Ok(Filter { column: f.column, op, value: f.value })
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(View { sort: wire.sort.into_iter().map(|k| (k.column, k.desc)).collect(), search: wire.search, filters })
 }
 
 #[cfg(test)]
@@ -110,7 +145,10 @@ mod tests {
 
     #[test]
     fn missing_entities_db_yields_a_graceful_error() {
-        let q = Query::new("q-3".to_owned(), Kind::SqlPage { sql: "SELECT 1".to_owned(), offset: 0, limit: 10 });
+        let q = Query::new(
+            "q-3".to_owned(),
+            Kind::SqlPage { sql: "SELECT 1".to_owned(), offset: 0, limit: 10, view: SqlView::default() },
+        );
         assert_eq!(
             error_reason(answer(&QueryCtx::default(), &q)).as_deref(),
             Some("entity database unavailable on this agent")

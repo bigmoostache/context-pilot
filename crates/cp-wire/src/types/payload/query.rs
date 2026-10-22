@@ -93,6 +93,9 @@ pub enum Kind {
         offset: u64,
         /// Maximum rows in the page.
         limit: u32,
+        /// Sort, search and filters applied on top of `sql` (default: none).
+        #[serde(default)]
+        view: SqlView,
     },
 
     /// Catch-all for variants added in a newer protocol version.
@@ -204,6 +207,88 @@ impl ConvHit {
             score: p.score,
         }
     }
+}
+
+/// Server-side view over a `SqlTable` query: sort, search and filters.
+///
+/// Its `OpenAPI` schema is hand-written (orchestrator `tests/openapi`): the
+/// utoipa derive trips `large_stack_arrays` on these types.
+///
+/// Column names are validated by the agent against the query's result
+/// columns; values are bound as SQL parameters, never spliced.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SqlView {
+    /// Sort keys, most significant first.
+    #[serde(default)]
+    pub sort: Vec<SqlSort>,
+    /// Case-insensitive substring matched against every column.
+    #[serde(default)]
+    pub search: Option<String>,
+    /// Filters, all of which must hold.
+    #[serde(default)]
+    pub filters: Vec<SqlFilter>,
+}
+
+/// One sort key of a [`SqlView`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SqlSort {
+    /// Result column to order by.
+    pub column: String,
+    /// Descending when true.
+    #[serde(default)]
+    pub desc: bool,
+}
+
+/// One column filter of a [`SqlView`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SqlFilter {
+    /// Result column the filter applies to.
+    pub column: String,
+    /// Comparison operator.
+    pub op: FilterOp,
+    /// Operand; ignored by `is_null` / `not_null`.
+    #[serde(default)]
+    pub value: Option<String>,
+}
+
+/// Comparison operator of a [`SqlFilter`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "wire-protocol contract: closed operator set with an Unknown catch-all for N-1 tolerance; matched exhaustively by the agent"
+)]
+pub enum FilterOp {
+    /// Case-insensitive substring.
+    Contains,
+    /// Negated [`Contains`](FilterOp::Contains).
+    NotContains,
+    /// Case-insensitive prefix.
+    StartsWith,
+    /// Case-insensitive suffix.
+    EndsWith,
+    /// Equal.
+    Eq,
+    /// Not equal.
+    Neq,
+    /// Greater than.
+    Gt,
+    /// Greater than or equal.
+    Gte,
+    /// Less than.
+    Lt,
+    /// Less than or equal.
+    Lte,
+    /// Cell is `NULL`.
+    IsNull,
+    /// Cell is not `NULL`.
+    NotNull,
+    /// Operator added in a newer protocol version; the agent rejects it.
+    #[serde(other)]
+    Unknown,
 }
 
 /// One page of a read-only SQL query, cells already stringified for display.

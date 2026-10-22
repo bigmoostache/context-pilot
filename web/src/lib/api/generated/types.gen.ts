@@ -297,6 +297,8 @@ export type Features = {
     updater: boolean;
 };
 
+export type FilterOp = 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'is_null' | 'not_null' | 'unknown';
+
 export type FinderKind = 'folder' | 'code' | 'doc' | 'pdf' | 'sheet' | 'slides' | 'image' | 'markdown' | 'json' | 'archive' | 'audio' | 'video' | 'binary';
 
 export type FinderNode = {
@@ -897,6 +899,12 @@ export type SlideTextBody = {
     wrap: boolean;
 };
 
+export type SqlFilter = {
+    column: string;
+    op: FilterOp;
+    value?: string | null;
+};
+
 /**
  * One page of a read-only SQL query, cells already stringified for display.
  */
@@ -917,6 +925,17 @@ export type SqlPage = {
      * Total rows the whole query yields (for the pager).
      */
     total: number;
+};
+
+export type SqlSort = {
+    column: string;
+    desc?: boolean;
+};
+
+export type SqlView = {
+    filters?: Array<SqlFilter>;
+    search?: string | null;
+    sort?: Array<SqlSort>;
 };
 
 export type TicketResponse = {
@@ -2808,6 +2827,7 @@ export type PostApiFleetByIdSqlData = {
         limit?: number;
         offset?: number;
         sql: string;
+        view?: SqlView;
     };
     path: {
         id: string;

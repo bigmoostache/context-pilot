@@ -926,6 +926,24 @@
         ],
         "type": "object"
       },
+      "FilterOp": {
+        "enum": [
+          "contains",
+          "not_contains",
+          "starts_with",
+          "ends_with",
+          "eq",
+          "neq",
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "is_null",
+          "not_null",
+          "unknown"
+        ],
+        "type": "string"
+      },
       "FinderKind": {
         "enum": [
           "folder",
@@ -2607,6 +2625,25 @@
         ],
         "type": "object"
       },
+      "SqlFilter": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "op": {
+            "$ref": "#/components/schemas/FilterOp"
+          },
+          "value": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "op"
+        ],
+        "type": "object"
+      },
       "SqlPage": {
         "description": "One page of a read-only SQL query, cells already stringified for display.",
         "properties": {
@@ -2649,6 +2686,41 @@
           "total",
           "offset"
         ],
+        "type": "object"
+      },
+      "SqlSort": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "type": "object"
+      },
+      "SqlView": {
+        "properties": {
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/SqlFilter"
+            },
+            "type": "array"
+          },
+          "search": {
+            "nullable": true,
+            "type": "string"
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SqlSort"
+            },
+            "type": "array"
+          }
+        },
         "type": "object"
       },
       "TicketResponse": {
@@ -5995,6 +6067,9 @@
                   },
                   "sql": {
                     "type": "string"
+                  },
+                  "view": {
+                    "$ref": "#/components/schemas/SqlView"
                   }
                 },
                 "required": [
