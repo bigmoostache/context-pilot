@@ -65,7 +65,7 @@ pub(super) static SPECS: &[Spec] = &[
         fallback: Fallback::None,
         scope: Scope::Orchestrator,
         group: Group::Orchestrator,
-        doc: "Colon-separated absolute directories the Finder may list and preview outside an agent's folder (e.g. `~/dev` siblings cited by agents). Read-only: writes, uploads and sheet saves stay confined to the agent folder. `/tmp` is always previewable.",
+        doc: "Colon-separated absolute directories the Finder may list and preview outside an agent's folder (e.g. `~/dev` siblings cited by agents). Unset, defaults to `$HOME`. Read-only: writes, uploads and sheet saves stay confined to the agent folder; hidden entries (`.ssh`, `.context-pilot`, ...) under these roots are refused. `/tmp` is always previewable.",
         ..Spec::BASE
     },
     Spec {

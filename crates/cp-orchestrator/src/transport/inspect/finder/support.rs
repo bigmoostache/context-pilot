@@ -50,19 +50,23 @@ pub(super) fn listable_path(root: &str, relative: &str) -> Option<PathBuf> {
 /// Resolve `relative` (relative to `root`, `..` allowed, or absolute) and
 /// accept it inside `root` or under any of `fixed` / `extra`. Every root is
 /// canonicalized (`/tmp` → `/private/tmp` on macOS), so symlinks cannot
-/// smuggle a path past the prefix check. Never use for writes.
+/// smuggle a path past the prefix check. Under an `extra` root, any hidden
+/// component (`.ssh`, `.context-pilot`) is refused: `$HOME` is the default
+/// extra root and its dotfiles hold credentials. Never use for writes.
 fn widened_path(root: &str, relative: &str, fixed: &[&Path], extra: &[PathBuf]) -> Option<PathBuf> {
     if let Some(inside) = confined_path(root, relative) {
         return Some(inside);
     }
     let canonical = Path::new(root).join(relative).canonicalize().ok()?;
-    fixed
-        .iter()
-        .copied()
-        .chain(extra.iter().map(PathBuf::as_path))
-        .filter_map(|r| r.canonicalize().ok())
-        .any(|r| canonical.starts_with(r))
-        .then_some(canonical)
+    let under_fixed = fixed.iter().filter_map(|r| r.canonicalize().ok()).any(|r| canonical.starts_with(r));
+    let under_extra = || {
+        extra.iter().filter_map(|r| r.canonicalize().ok()).any(|r| {
+            canonical
+                .strip_prefix(&r)
+                .is_ok_and(|rest| !rest.components().any(|c| c.as_os_str().to_str().is_none_or(|s| s.starts_with('.'))))
+        })
+    };
+    (under_fixed || under_extra()).then_some(canonical)
 }
 
 /// Count the non-hidden direct children of a directory.
@@ -186,6 +190,22 @@ mod tests {
         assert_eq!(got, Some(extra));
         assert!(denied.is_none());
         assert!(widened_path(&root, "/etc", &[], &allowed).is_none());
+    }
+
+    #[test]
+    fn widened_path_refuses_hidden_under_extra_root() {
+        let base = std::env::temp_dir().canonicalize().expect("temp dir").join("cp-widened-hidden");
+        let agent = base.join("agent");
+        let secret = base.join("home/.ssh");
+        std::fs::create_dir_all(&agent).expect("mkdir agent");
+        std::fs::create_dir_all(&secret).expect("mkdir secret");
+        let root = agent.to_string_lossy();
+        let allowed = [base.join("home")];
+        let home = widened_path(&root, "../home", &[], &allowed);
+        let hidden = widened_path(&root, "../home/.ssh", &[], &allowed);
+        let _r = std::fs::remove_dir_all(&base);
+        assert_eq!(home, Some(base.join("home")));
+        assert!(hidden.is_none());
     }
 
     #[test]

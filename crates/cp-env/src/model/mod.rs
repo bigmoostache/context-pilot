@@ -172,10 +172,10 @@ fn orch_from_raw(raw: &Raw, home: &Path, agents_dir: &Path, cwd: &Path) -> Orch 
         agents_root: raw.path("CP_AGENTS_ROOT").unwrap_or_else(|| home.join("code")),
         agent_binary: raw.path("CP_AGENT_BINARY").unwrap_or_else(|| cwd.join("target/release/tui")),
         web_root: raw.path("CP_WEB_ROOT"),
-        finder_extra_roots: raw
-            .text("CP_FINDER_EXTRA_ROOTS")
-            .map(|list| list.split(':').map(str::trim).filter(|s| !s.is_empty()).map(PathBuf::from).collect())
-            .unwrap_or_default(),
+        finder_extra_roots: raw.text("CP_FINDER_EXTRA_ROOTS").map_or_else(
+            || vec![home.to_path_buf()],
+            |list| list.split(':').map(str::trim).filter(|s| !s.is_empty()).map(PathBuf::from).collect(),
+        ),
         provision_flag: raw.path("CP_PROVISION_FLAG").unwrap_or_else(|| agents_dir.join(".provisioned")),
         releases_break_glass: raw.flag("CP_RELEASES_BREAK_GLASS").unwrap_or_default(),
     }
