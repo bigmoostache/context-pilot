@@ -115,7 +115,23 @@ pub(super) fn dispatch(state: &mut State, action: &Action) -> ActionResult {
     if matches!(action, Action::AgentRenameCancel) {
         return rename_cancel(state);
     }
+    if matches!(action, Action::AgentCopyRef) {
+        return copy_ref(state);
+    }
     dispatch_archive(state, action)
+}
+
+/// Copy the debug reference of the agent under the list cursor (Ctrl+B).
+/// No-op off a real agent row.
+fn copy_ref(state: &State) -> ActionResult {
+    let focus = FocusState::get(state);
+    let visible = AgentsState::get(state).visible_indices(focus.viewing_archived);
+    let Some(agent) = visible.get(focus.selected_agent_idx).and_then(|&i| AgentsState::get(state).agents.get(i)) else {
+        return ActionResult::Nothing;
+    };
+    let text = crate::ui::agent_debug_ref(state, agent);
+    let _started = cp_base::state::runtime::textarea::copy_to_clipboard(&text);
+    ActionResult::Nothing
 }
 
 /// Arm a rename of the agent under the list cursor (Ctrl+R): the prompt opens

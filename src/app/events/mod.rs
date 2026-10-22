@@ -194,6 +194,8 @@ fn handle_agents_ctrl(key: &KeyEvent, state: &State) -> Option<Action> {
         KeyCode::Char('u') => Some(Action::AgentToggleArchivedView),
         // Ctrl+R renames the agent under the cursor (no-op off a real row).
         KeyCode::Char('r') => Some(Action::AgentRenameStart),
+        // Ctrl+B copies a debug reference of the agent under the cursor.
+        KeyCode::Char('b') => Some(Action::AgentCopyRef),
         KeyCode::Backspace
         | KeyCode::Enter
         | KeyCode::Left

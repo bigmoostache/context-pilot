@@ -176,6 +176,8 @@ pub enum Action {
     AgentRenameStart,
     /// Cancel the pending rename without applying it.
     AgentRenameCancel,
+    /// Copy a debug reference of the agent under the cursor to the clipboard (Ctrl+B).
+    AgentCopyRef,
     /// Toggle between the active and archived agent lists in the
     /// thread-centered view (Ctrl+U). Resets selection to the top.
     AgentToggleArchivedView,

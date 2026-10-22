@@ -454,6 +454,7 @@ fn dispatch_action(state: &mut State, action: Action) -> ActionResult {
         | Action::AgentArchiveCancel
         | Action::AgentRenameStart
         | Action::AgentRenameCancel
+        | Action::AgentCopyRef
         | Action::AgentDrillIn
         | Action::AgentDrillOut
         | Action::AgentToggleArchivedView => return agents::dispatch(state, &action),

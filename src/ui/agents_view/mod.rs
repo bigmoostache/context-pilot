@@ -8,10 +8,13 @@
 //! Sub-module [`messages`] handles the right-pane message area, input, and
 //! question form rendering.
 
+/// Ctrl+B debug reference text of one agent.
+mod debug_ref;
 /// Message area rendering: messages, input, question form.
 pub(super) mod messages;
 /// Name-entry prompts (new agent, rename).
 mod prompt;
+pub(crate) use debug_ref::agent_debug_ref;
 /// Virtualized agent-list entries.
 mod visible;
 /// Human-readable reason behind an agent row's ⚠ (web red square + banner).
@@ -361,6 +364,8 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" restore  ".to_owned()),
             S::styled("Ctrl+R".to_owned(), Semantic::KeyHint),
             S::muted(" ren  ".to_owned()),
+            S::styled("Ctrl+B".to_owned(), Semantic::KeyHint),
+            S::muted(" ref  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" active  ".to_owned()),
             S::styled("Esc".to_owned(), Semantic::KeyHint),
@@ -376,6 +381,8 @@ fn push_help_hint(blocks: &mut Vec<IrBlock>, viewing_archived: bool) {
             S::muted(" arch  ".to_owned()),
             S::styled("Ctrl+R".to_owned(), Semantic::KeyHint),
             S::muted(" ren  ".to_owned()),
+            S::styled("Ctrl+B".to_owned(), Semantic::KeyHint),
+            S::muted(" ref  ".to_owned()),
             S::styled("Ctrl+U".to_owned(), Semantic::KeyHint),
             S::muted(" arch'd  ".to_owned()),
             S::styled("Esc".to_owned(), Semantic::KeyHint),
