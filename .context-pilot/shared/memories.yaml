@@ -452,6 +452,12 @@ M-short-34:
     T518. Switched check-rust-tests.sh to `cargo test --workspace`. Fixed 3 pre-existing breakages: cp-wire snapshot missing `paused` field, 8 test binaries with drifted use-extern silencer blocks, command() REST handler lost cost-breaker gate. Chain #30.
   importance: high
   last_edited_ms: 0
+M-short-35:
+  tier: short
+  title: OpenUI POC shipped
+  contents: 'OpenUI POC: branch openui-send-poc (6b2a2de3, 93555c67 pushed). ```openui``` fence = 4th Send block type -> web/src/lib/support/blocks/{openui.tsx,openuiParse.ts} (hand-rolled total scanner, no dep). markdown.tsx dispatches language-openui + drops <pre> frame (isLangPre). mermaid.tsx moved to blocks/ so support/ stays under the 8-entry cap.'
+  importance: high
+  last_edited_ms: 1792598059380
 M-short-36:
   tier: short
   title: T645 agent image
@@ -845,16 +851,34 @@ M-tiny-58:
   last_edited_ms: 1792498751105
 M-tiny-59:
   tier: tiny
-  title: Refusals N=30 result
-  contents: 'astra dump 20261020T155505 Opus5.5: baseline 30/30 refuse; whole-sentence redaction of charged tokens (C_aggr, /tmp/refusal_n.py) → 3/30. Word-swaps do nothing. Measure N>=30.'
-  importance: high
-  last_edited_ms: 1792514365647
+  title: OpenUI grammar
+  contents: 'OpenUI grammar: `id = Comp(args)`, `root` required, `[refs]` children, `key: value` props (bare word = string), ''#'' comments. See M-short-35.'
+  importance: medium
+  last_edited_ms: 1792598073974
 M-tiny-6:
   tier: tiny
   title: 'User preference: factor'
   contents: 'User preference: factor code out into new files rather than trimming comments to stay under line limits.'
   importance: medium
   last_edited_ms: 0
+M-tiny-60:
+  tier: tiny
+  title: Worktree web build trap
+  contents: 'Worktrees lack web/.env.local (VITE_API_URL=): build falls back to localhost:7878, web shows no agents. Copy it first. :5174 now serves openui-send-poc build.'
+  importance: high
+  last_edited_ms: 1792598342056
+M-tiny-61:
+  tier: tiny
+  title: This agent runs root tui
+  contents: 'A1054 runs via root run.sh `cargo run --release` (rebuilds root checkout). 10-21: root switched to openui-send-poc (user asked) to run SqlTable.'
+  importance: high
+  last_edited_ms: 1792608241185
+M-tiny-62:
+  tier: tiny
+  title: system_reload removed
+  contents: system_reload tool REMOVED 10-22 (7ae8c500). TUI reload = command palette 'Reload' only; replaces system_reload step in M-mid-10/M-long-5.
+  importance: high
+  last_edited_ms: 1792661680111
 M-tiny-7:
   tier: tiny
   title: 'SSE freeze: resolved'
