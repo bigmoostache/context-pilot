@@ -14,28 +14,6 @@ pub(crate) fn execute_tool(tool: &ToolUse, state: &mut State) -> ToolResult {
     crate::modules::dispatch_tool(tool, state, &active_modules)
 }
 
-/// Execute `reload_tui` tool (public for module access)
-pub(crate) fn execute_reload_tui(tool: &ToolUse, state: &mut State) -> ToolResult {
-    // Pin focus to the agent that invoked the reload. On boot the persisted
-    // focused agent is what `boot_load_config` uses to pick the first
-    // `states/<id>.json`, so the post-reload `ReloadResume` continuation (the
-    // "reload complete" message + stream relaunch) applies to that agent's
-    // state. Without this, a background agent that calls `system_reload` would
-    // have the resume land on whatever agent was focused at boot — the wrong
-    // one. When the caller is already focused this is a no-op.
-    if let Some(caller) = state.executing_agent_id().map(str::to_owned) {
-        let fs = cp_mod_agents::types::FocusState::get_mut(state);
-        if fs.focused_agent_id.as_deref() != Some(caller.as_str()) {
-            fs.focused_agent_id = Some(caller);
-        }
-    }
-
-    // Set flag - actual reload happens in app.rs after tool result is saved
-    state.flags.lifecycle.reload_pending = true;
-
-    ToolResult::new(tool.id.clone(), "Reload initiated. Restarting TUI...".to_owned(), false)
-}
-
 /// Write `reload_requested: true` into config.json so `run.sh` restarts the TUI.
 ///
 /// Called by the main event loop AFTER `save_state()` — otherwise `save_state`

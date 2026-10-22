@@ -249,8 +249,6 @@ impl Module for OverviewModule {
                 .reverie_allowed(true)
                 .param_array("ids", ParamType::String, true)
                 .build(),
-            // System tools
-            ToolDefinition::from_yaml("system_reload", t).short_desc("Restart the TUI").category("System").build(),
         ];
 
         defs
@@ -265,15 +263,12 @@ impl Module for OverviewModule {
             // Context tools
             "Close_panel" => Some(tools::close_context::execute(tool, state)),
 
-            // System tools (reload stays in core)
-            "system_reload" => Some(crate::infra::tools::execute_reload_tui(tool, state)),
-
             _ => None,
         }
     }
 
     fn tool_visualizers(&self) -> Vec<(&'static str, ToolVisualizer)> {
-        vec![("Close_panel", visualizers::visualize_core_output), ("system_reload", visualizers::visualize_core_output)]
+        vec![("Close_panel", visualizers::visualize_core_output)]
     }
 
     fn dependencies(&self) -> &[&'static str] {

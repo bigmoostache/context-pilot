@@ -357,7 +357,7 @@ pub(in crate::app::run) fn emit_agent_status(app: &mut App) {
     //
     // The memo must be seeded from the oplog, NOT from the live (disk) status:
     // a turn flip that lands on disk while the bridge is down (e.g. a `Send`
-    // immediately before a `system_reload`, or any restart straddling a
+    // immediately before a TUI reload, or any restart straddling a
     // transition) is saved to tier-② config.json by the normal save path but
     // never journaled as a `AgentStatusChanged` delta. If we seeded from the
     // live status, that post-flip value would become the baseline and the lost

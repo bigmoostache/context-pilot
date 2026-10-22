@@ -91,7 +91,7 @@ pub struct ConfigOverlay {
 pub struct Lifecycle {
     /// Whether an API check is in progress.
     pub api_check_in_progress: bool,
-    /// Reload pending (set by `system_reload`, triggers reload after tool result saved).
+    /// Reload pending (set by the palette's Reload command; the main loop saves and restarts).
     pub reload_pending: bool,
 }
 

@@ -108,7 +108,7 @@ impl App {
 
             self.run_background_phase(ch, current_ms);
 
-            // Check if TUI reload was requested (by system_reload tool)
+            // Check if TUI reload was requested (palette Reload command)
             if self.state.flags.lifecycle.reload_pending {
                 self.writer.flush();
                 self.save_all_agents();
@@ -150,7 +150,7 @@ impl App {
         Ok(())
     }
 
-    /// Auto-resume streaming if the reload flag was set (e.g., after `reload_tui`).
+    /// Auto-resume streaming when booted with `--resume-stream` (after a reload).
     fn auto_resume_stream_if_flagged(&mut self) {
         if !self.resume_stream {
             return;

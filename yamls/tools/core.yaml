@@ -6,10 +6,6 @@ tools:
     parameters:
       ids: "List of context IDs to close"
 
-  system_reload:
-    description: |
-      Reloads the TUI application to apply changes. Use after modifying TUI source code and rebuilding. State is preserved. IMPORTANT: You must ALWAYS call this tool after building - never just say 'reloading' without actually invoking this tool.
-
   Think:
     description: |
       Records a planning step as a structured tool call so the plan is visible in the UI and tracked across the session. Use it before a non-trivial, multi-step action to lay out the approach, compare options, or sequence the work.
