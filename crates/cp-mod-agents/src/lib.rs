@@ -165,8 +165,7 @@ impl Module for AgentsModule {
         // because WatcherRegistry is created by SpineModule's init_state, which
         // may run after AgentsModule's init_state. load_module_data runs in a
         // second pass after ALL init_state calls, so the registry exists.
-        cp_base::state::watchers::WatcherRegistry::get_mut(state)
-            .register(Box::new(watcher::IdleMyTurnDetector::new()));
+        watcher::ensure_idle_detector(state);
     }
 
     fn save_worker_data(&self, state: &State) -> serde_json::Value {

@@ -53,6 +53,21 @@ impl IdleMyTurnDetector {
     }
 }
 
+/// Register the detector in the executing agent's registry unless it already
+/// holds one. Idempotent.
+///
+/// The agents module is global, so its `load_module_data` runs once, against
+/// the boot agent only; any other agent's runtime starts without the detector.
+/// Focused, such an agent has no idle nudge at all (the background dispatcher
+/// skips the focused agent), so it sat on ⚠ until unfocused. Called on every
+/// focus change so the newly focused agent always carries one.
+pub fn ensure_idle_detector(state: &mut State) {
+    let registry = cp_base::state::watchers::WatcherRegistry::get_mut(state);
+    if !registry.active_watchers().iter().any(|w| w.id() == WATCHER_ID) {
+        registry.register(Box::new(IdleMyTurnDetector::new()));
+    }
+}
+
 impl Watcher for IdleMyTurnDetector {
     fn id(&self) -> &str {
         WATCHER_ID

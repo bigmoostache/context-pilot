@@ -49,7 +49,13 @@ impl App {
             self.park_outgoing(have_id.to_owned());
         }
         self.place_incoming(want.as_deref(), have.is_none());
+        let focused = want.is_some();
         self.state.agent_store.set_executing(want);
+        // Only the boot agent got the idle MY_TURN detector at load; without
+        // it a focused agent is never nudged (⚠ until unfocused).
+        if focused {
+            cp_mod_agents::watcher::ensure_idle_detector(&mut self.state);
+        }
     }
 
     /// Register the outgoing agent for background stepping. Its runtime,
