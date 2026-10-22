@@ -19,6 +19,8 @@ const LAST_TRACES: usize = 10;
 const EXCERPT_CHARS: usize = 300;
 /// Ellipsis appended to cut text.
 const ELLIPSIS: char = '\u{2026}';
+/// Marker prepended to every tool-trace message; noise in the reference.
+const AUTO_PREFIX: &str = "/* auto */";
 
 /// Char-boundary-safe excerpt, newlines flattened so each entry stays one line.
 fn excerpt(text: &str, max: usize) -> String {
@@ -55,9 +57,15 @@ fn push_messages(out: &mut Vec<String>, title: &str, msgs: &[AgentMessage], take
     out.push(format!("{title} (last {} of {}):", take.min(msgs.len()), msgs.len()));
     for m in msgs.iter().skip(msgs.len().saturating_sub(take)) {
         let who = m.author_agent_id.as_deref().map_or_else(|| m.author.to_string(), str::to_owned);
-        let body = m.content.as_deref().or(m.file_path.as_deref()).unwrap_or("");
-        out.push(format!("- [{}] {who}: {}", m.timestamp, excerpt(body, EXCERPT_CHARS)));
+        let raw = m.content.as_deref().or(m.file_path.as_deref()).unwrap_or("");
+        let body = raw.trim_start().strip_prefix(AUTO_PREFIX).map_or(raw, str::trim_start);
+        out.push(format!("- [{}] {who}: {}", local_time(m.timestamp), excerpt(body, EXCERPT_CHARS)));
     }
+}
+
+/// Epoch ms as local `YYYY-MM-DD HH:MM:SS`; the raw number when out of range.
+fn local_time(ms: u64) -> String {
+    i64::try_from(ms).ok().and_then(cp_mod_utilities::time::epoch_ms_to_local_ymd_hms).unwrap_or_else(|| ms.to_string())
 }
 
 /// Build the debug reference text for `agent`, capped at [`MAX_CHARS`].
@@ -73,7 +81,7 @@ pub(crate) fn agent_debug_ref(state: &State, agent: &Agent) -> String {
     out.push(format!(
         "parent={} origin={origin} created_at={} paused={} archived={}",
         agent.parent_agent_id.as_deref().unwrap_or("-"),
-        agent.created_at,
+        local_time(agent.created_at),
         agent.paused,
         agent.archived,
     ));
