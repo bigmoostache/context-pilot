@@ -229,6 +229,16 @@ tools:
       shows a LIVE, server-paginated table over your entity database (the one
       entity_sql writes). Single read-only SELECT only; prefer it over pasting
       rows into a Table when the data lives in entities or is more than a screen.
+      The user can sort (Shift = multi), search, filter, hide/pin/resize columns
+      and export CSV; sort/search/filters run server-side over the whole result.
+      Optional props: sort: "col desc, col2", hide: "a,b", pin: "a",
+      format: "col=percent, c2=currency:EUR, c3=badge, c4=bar" (also number[:d],
+      integer, bytes, duration, date, datetime, bool, code, link),
+      labels: "col=Label", align: "col=right", widths: "col=200",
+      density: compact|normal|comfortable, striped, row_numbers, wrap,
+      page_sizes: "10,25,50", max_height, toolbar/search/filters/export: false,
+      selectable + send: "text {count} {ids} {json} {csv}" (selected rows go to
+      you as a user message), send_label.
       `tone` ∈ signal | ok | warn | danger | interactive (default signal). Example:
 
         ```openui
