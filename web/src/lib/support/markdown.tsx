@@ -205,7 +205,9 @@ function components(variant: MarkdownVariant): Components {
     ? "border-white/40 text-current/85"
     : "border-[var(--signal)]/40 text-muted-foreground"
 
-  const tableBorder = onAccent ? "border-white/25" : "border-border"
+  // `border-border` is transparent app-wide (no-borders theme); tables opt in
+  // to the real hairline so the grid stays visible.
+  const tableBorder = onAccent ? "border-white/25" : "border-border-strong"
   const tableHeadBg = onAccent ? "bg-white/10" : "bg-muted/60"
 
   // List bullet/number ink. On the accent bubble the marker MUST inherit the
