@@ -54,7 +54,10 @@ export function postOfficeUpdate(
   const q = `path=${encodeURIComponent(path)}&seq=${String(seq)}&stateLen=${String(state.length)}`
   const name = path.split("/").pop() ?? path
   const blob = new Blob([state as BlobPart, file as BlobPart], { type: "application/octet-stream" })
-  return sendUpload<OfficeUpdateResult>(`/api/fleet/${fleetId}/fs/office/update?${q}`, blob, name)
+  // Autosave runs every few seconds: no upload toast.
+  return sendUpload<OfficeUpdateResult>(`/api/fleet/${fleetId}/fs/office/update?${q}`, blob, name, {
+    quiet: true,
+  })
 }
 
 /** An office document's bytes plus the version they were read at. */

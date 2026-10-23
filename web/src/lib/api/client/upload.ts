@@ -67,11 +67,19 @@ function failureOf(xhr: XMLHttpRequest): string {
  * progress reported to the toast stack. Resolves the parsed JSON reply; rejects
  * with an `Error` carrying the backend's `{ error }` text (or a network /
  * abort reason). No size cap: the backend streams uploads straight to disk.
+ * `quiet` skips the toast (background saves such as office autosave).
  */
-export function sendUpload<T>(path: string, file: Blob, name: string): Promise<T> {
+export function sendUpload<T>(
+  path: string,
+  file: Blob,
+  name: string,
+  { quiet = false }: { quiet?: boolean } = {},
+): Promise<T> {
   const id = store.nextId
   store.nextId += 1
-  setJobs([...store.jobs, { id, name, loaded: 0, total: file.size, status: "uploading" }])
+  if (!quiet) {
+    setJobs([...store.jobs, { id, name, loaded: 0, total: file.size, status: "uploading" }])
+  }
 
   return new Promise<T>((resolve, reject) => {
     const fail = (reason: string) => {
