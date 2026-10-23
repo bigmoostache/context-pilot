@@ -180,7 +180,7 @@ export function parseConfig(node: OpenUiNode, sql: string): TableConfig {
       (a, b) => a - b,
     ),
     density: DENSITIES.has(density) ? (density as Density) : "normal",
-    striped: flag(p["striped"], true),
+    striped: flag(p["striped"], false),
     selectable: flag(p["selectable"], send !== undefined),
     send,
     sendLabel: str(p["send_label"], "Send to agent"),

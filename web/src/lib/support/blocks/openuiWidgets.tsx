@@ -58,7 +58,7 @@ export function Sparkline({
     >
       <defs>
         <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+          <stop offset="0%" stopColor={color} stopOpacity={0.18} />
           <stop offset="100%" stopColor={color} stopOpacity={0} />
         </linearGradient>
       </defs>
@@ -87,30 +87,27 @@ export function Metric({ node }: { node: OpenUiNode }): ReactNode {
   const up = delta === undefined || delta >= 0
   const color = toneColor(node.props["tone"])
   return (
-    <div
-      className="flex min-w-36 flex-1 flex-col gap-1 rounded-xl p-3"
-      style={{ background: tint(color, 7) }}
-    >
-      <span className="text-[11px] font-medium tracking-wider uppercase opacity-55">
-        {str(node.props["label"])}
-      </span>
+    <div className="flex min-w-40 flex-1 flex-col gap-1.5 rounded-lg p-4 ring-1 ring-foreground/8">
+      <span className="text-[13px] text-muted-foreground">{str(node.props["label"])}</span>
       <div className="flex items-baseline gap-2">
-        <span className="text-[26px] leading-none font-semibold tracking-tight tabular-nums">
+        <span className="text-[26px] leading-none font-semibold tracking-tight text-foreground tabular-nums">
           {str(node.props["value"]) || firstText(node)}
         </span>
         {delta !== undefined && (
           <span
-            className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+            className="rounded-md px-1.5 py-0.5 text-[12px] font-medium tabular-nums ring-1 ring-inset"
             style={{
               color: up ? "var(--ok)" : "var(--danger)",
-              background: tint(up ? "var(--ok)" : "var(--danger)", 14),
+              background: tint(up ? "var(--ok)" : "var(--danger)", 10),
+              ["--tw-ring-color" as string]: tint(up ? "var(--ok)" : "var(--danger)", 25),
             }}
           >
-            {up ? "↑" : "↓"} {Math.abs(delta)}%
+            {up ? "+" : "−"}
+            {Math.abs(delta)}%
           </span>
         )}
       </div>
-      {trend.length > 1 && <Sparkline values={trend} color={color} height={32} />}
+      {trend.length > 1 && <Sparkline values={trend} color={color} height={36} />}
     </div>
   )
 }
@@ -129,14 +126,21 @@ export function Ring({ node }: { node: OpenUiNode }): ReactNode {
         aria-label={`${String(pct)}%`}
         role="img"
       >
-        <circle cx={42} cy={42} r={r} fill="none" stroke={tint(color, 16)} strokeWidth={8} />
+        <circle
+          cx={42}
+          cy={42}
+          r={r}
+          fill="none"
+          stroke={tint("var(--foreground)", 8)}
+          strokeWidth={6}
+        />
         <circle
           cx={42}
           cy={42}
           r={r}
           fill="none"
           stroke={color}
-          strokeWidth={8}
+          strokeWidth={6}
           strokeLinecap="round"
           strokeDasharray={`${String((pct / 100) * c)} ${String(c)}`}
           className="transition-[stroke-dasharray] duration-700"
@@ -152,7 +156,7 @@ export function Ring({ node }: { node: OpenUiNode }): ReactNode {
           {Math.round(pct)}%
         </text>
       </svg>
-      <span className="text-[11px] opacity-60">{str(node.props["label"])}</span>
+      <span className="text-[12px] text-muted-foreground">{str(node.props["label"])}</span>
     </div>
   )
 }
@@ -164,14 +168,11 @@ export function Progress({ node }: { node: OpenUiNode }): ReactNode {
   const label = str(node.props["label"])
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-[12px]">
-        <span className="opacity-70">{label}</span>
-        <span className="font-medium tabular-nums">{Math.round(pct)}%</span>
+      <div className="flex justify-between text-[13px]">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium text-foreground tabular-nums">{Math.round(pct)}%</span>
       </div>
-      <div
-        className="h-1.5 w-full overflow-hidden rounded-full"
-        style={{ background: tint(color, 15) }}
-      >
+      <div className="h-2 w-full overflow-hidden rounded-full bg-foreground/8">
         <div
           className="h-full rounded-full transition-[width] duration-700"
           style={{ width: `${String(pct)}%`, background: color }}
@@ -190,26 +191,36 @@ export function BarChart({ node }: { node: OpenUiNode }): ReactNode {
   const max = Math.max(...values, 1)
   const color = toneColor(node.props["tone"])
   return (
-    <div className="flex h-36 items-end gap-1.5 pt-5">
+    <div className="relative flex h-44 items-end gap-2 pt-6">
+      {[0, 1, 2, 3].map((g) => (
+        <div
+          key={g}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 h-px bg-foreground/6"
+          style={{ bottom: `calc(${String(g * 33.3)}% * 0.82 + 18px)` }}
+        />
+      ))}
       {values.map((v, i) => (
         <div
           key={i}
-          className="relative flex h-full flex-1 flex-col items-center justify-end gap-1"
+          className="relative flex h-full flex-1 flex-col items-center justify-end gap-1.5"
           onPointerEnter={() => setHover(i)}
           onPointerLeave={() => setHover(null)}
         >
           {hover === i && (
-            <span className="absolute -top-5 text-[11px] font-semibold tabular-nums">{v}</span>
+            <span className="absolute -top-6 rounded-md bg-popover px-1.5 py-0.5 text-[11px] font-medium tabular-nums shadow-sm ring-1 ring-foreground/10">
+              {v}
+            </span>
           )}
           <div
-            className="w-full rounded-md transition-opacity duration-150"
+            className="w-full max-w-10 rounded-t-sm transition-opacity duration-150"
             style={{
-              height: `${String(Math.max(3, (v / max) * 100))}%`,
+              height: `${String(Math.max(2, (v / max) * 82))}%`,
               background: color,
-              opacity: hover === null || hover === i ? 0.9 : 0.35,
+              opacity: hover === null || hover === i ? 1 : 0.4,
             }}
           />
-          <span className="text-[10px] opacity-50">{labels[i] ?? ""}</span>
+          <span className="text-[11px] text-muted-foreground">{labels[i] ?? ""}</span>
         </div>
       ))}
     </div>
@@ -221,13 +232,13 @@ export function Table({ node }: { node: OpenUiNode }): ReactNode {
   const [head = [], ...rows] = stringLists(node)
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[12.5px]">
+      <table className="w-full border-separate border-spacing-0 text-[13px]">
         <thead>
           <tr>
             {head.map((h) => (
               <th
                 key={h}
-                className="px-2 pb-2 text-left text-[11px] font-medium tracking-wider uppercase opacity-50"
+                className="border-b border-b-foreground/10 px-3 py-2 text-left text-[12px] font-medium text-muted-foreground"
               >
                 {h}
               </th>
@@ -236,12 +247,9 @@ export function Table({ node }: { node: OpenUiNode }): ReactNode {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} className="transition-colors odd:bg-foreground/3 hover:bg-foreground/6">
+            <tr key={i} className="transition-colors hover:bg-foreground/4">
               {r.map((c, j) => (
-                <td
-                  key={j}
-                  className="px-2 py-1.5 tabular-nums first:rounded-l-md last:rounded-r-md"
-                >
+                <td key={j} className="border-b border-b-foreground/6 px-3 py-2 tabular-nums">
                   {c}
                 </td>
               ))}
@@ -258,23 +266,26 @@ export function Badge({ node }: { node: OpenUiNode }): ReactNode {
   const color = toneColor(node.props["tone"])
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium"
-      style={{ color, background: tint(color, 14) }}
+      className="inline-flex items-center rounded-md px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset"
+      style={{
+        color,
+        background: tint(color, 10),
+        ["--tw-ring-color" as string]: tint(color, 25),
+      }}
     >
-      <span className="size-1.5 rounded-full" style={{ background: color }} />
       {firstText(node)}
     </span>
   )
 }
 
 const FIELD =
-  "w-full rounded-lg bg-foreground/5 px-3 py-1.5 text-[13px] outline-none transition-shadow focus:ring-2 focus:ring-(--signal)/40"
+  "h-9 w-full rounded-md bg-transparent px-3 text-[13px] ring-1 ring-foreground/12 outline-none transition-shadow focus:ring-2 focus:ring-(--signal)/50"
 
 /** Labelled wrapper shared by every input. */
 function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
-    <label className="flex min-w-40 flex-1 flex-col gap-1">
-      {label && <span className="text-[11px] font-medium opacity-60">{label}</span>}
+    <label className="flex min-w-40 flex-1 flex-col gap-1.5">
+      {label && <span className="text-[13px] font-medium text-foreground">{label}</span>}
       {children}
     </label>
   )
@@ -299,10 +310,9 @@ export function Input({ id, node }: { id: string; node: OpenUiNode }): ReactNode
 export function Select({ id, node }: { id: string; node: OpenUiNode }): ReactNode {
   const s = use(StoreContext)
   const options = stringLists(node)[0] ?? []
-  const color = toneColor(node.props["tone"])
   return (
     <Field label={str(node.props["label"])}>
-      <div className="flex gap-1 rounded-lg bg-foreground/5 p-1">
+      <div className="flex gap-1 rounded-md bg-foreground/6 p-1">
         {options.map((o) => {
           const on = s.vals[id] === o
           return (
@@ -311,10 +321,11 @@ export function Select({ id, node }: { id: string; node: OpenUiNode }): ReactNod
               type="button"
               onClick={() => s.set(id, o)}
               className={cn(
-                "flex-1 rounded-md px-2.5 py-1 text-[12.5px] font-medium transition-colors",
-                !on && "opacity-60 hover:opacity-100",
+                "flex-1 rounded-sm px-2.5 py-1 text-[13px] font-medium transition-colors",
+                on
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-foreground/8"
+                  : "text-muted-foreground hover:text-foreground",
               )}
-              style={on ? { background: color, color: "white" } : undefined}
             >
               {o}
             </button>
@@ -372,12 +383,13 @@ export function ActionButton({ node }: { node: OpenUiNode }): ReactNode {
     <button
       type="button"
       onClick={click}
-      className="rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-[transform,filter] hover:brightness-110 active:scale-95"
-      style={
+      className={cn(
+        "h-9 rounded-md px-4 text-[13px] font-medium transition-[filter,background-color] active:brightness-95",
         ghost
-          ? { color, background: tint(color, 12) }
-          : { color: "white", background: color, boxShadow: `0 4px 14px ${tint(color, 35)}` }
-      }
+          ? "bg-card text-foreground shadow-sm ring-1 ring-foreground/12 hover:bg-foreground/4"
+          : "text-white shadow-sm hover:brightness-110",
+      )}
+      style={ghost ? undefined : { background: color }}
     >
       {flash ?? (firstText(node) || "Go")}
     </button>

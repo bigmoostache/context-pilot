@@ -10,7 +10,6 @@ import {
   numbersArg,
   str,
   stringLists,
-  tint,
   toneColor,
   type Store,
 } from "./openuiKit"
@@ -60,18 +59,18 @@ function childIds(node: OpenUiNode): string[] {
 function Tabs({ labels, panes }: { labels: string[]; panes: ReactNode[] }): ReactNode {
   const [active, setActive] = useState(0)
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex gap-4 text-[13px]">
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-5 text-[13px] shadow-[inset_0_-1px_0_color-mix(in_oklab,var(--foreground)_10%,transparent)]">
         {labels.map((l, i) => (
           <button
             key={l}
             type="button"
             onClick={() => setActive(i)}
             className={cn(
-              "pb-1 font-medium transition-[opacity,box-shadow]",
+              "pb-2 font-medium transition-[color,box-shadow]",
               i === active
-                ? "opacity-100 shadow-[inset_0_-2px_0_var(--signal)]"
-                : "opacity-50 hover:opacity-80",
+                ? "text-foreground shadow-[inset_0_-2px_0_var(--signal)]"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {l}
@@ -96,26 +95,23 @@ const RENDERERS: Record<string, Renderer> = {
   ),
   Grid: (_id, node, kids) => (
     <div
-      className="grid gap-3"
+      className="grid gap-4"
       style={{
-        gridTemplateColumns: `repeat(auto-fit, minmax(${String(numProp(node, "min") ?? 150)}px, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fit, minmax(${String(numProp(node, "min") ?? 180)}px, 1fr))`,
       }}
     >
       {kids()}
     </div>
   ),
   Card: (_id, node, kids) => {
-    const color = toneColor(node.props["tone"])
+    const tone = node.props["tone"]
     return (
-      <section
-        className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-(--shadow-card)"
-        style={{
-          backgroundImage: `radial-gradient(120% 60% at 0% 0%, ${tint(color, 9)}, transparent 70%)`,
-        }}
-      >
+      <section className="flex min-w-0 flex-col gap-4 rounded-lg bg-card p-5 shadow-(--shadow-card) ring-1 ring-foreground/6">
         {node.props["title"] !== undefined && (
-          <header className="flex items-center gap-2 text-[11px] font-semibold tracking-wider uppercase opacity-55">
-            <span className="size-1.5 rounded-full" style={{ background: color }} />
+          <header className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
+            {tone !== undefined && (
+              <span className="size-2 rounded-xs" style={{ background: toneColor(tone) }} />
+            )}
             {str(node.props["title"])}
           </header>
         )}
@@ -127,19 +123,24 @@ const RENDERERS: Record<string, Renderer> = {
   Heading: (_id, node) => (
     <div
       className={cn(
-        "leading-tight font-semibold tracking-tight",
-        (numProp(node, "level") ?? 2) <= 2 ? "text-[19px]" : "text-[15px]",
+        "leading-tight font-semibold tracking-tight text-foreground",
+        (numProp(node, "level") ?? 2) <= 2 ? "text-[18px]" : "text-[15px]",
       )}
     >
       {firstText(node)}
     </div>
   ),
   Text: (_id, node) => (
-    <p className={cn("text-[13px] leading-relaxed", node.props["muted"] === true && "opacity-60")}>
+    <p
+      className={cn(
+        "text-[13px] leading-relaxed",
+        node.props["muted"] === true && "text-muted-foreground",
+      )}
+    >
       {firstText(node)}
     </p>
   ),
-  Divider: () => <div className="h-px w-full bg-foreground/8" />,
+  Divider: () => <div className="h-px w-full bg-foreground/10" />,
   Badge: (_id, node) => <Badge node={node} />,
   Metric: (_id, node) => <Metric node={node} />,
   Progress: (_id, node) => <Progress node={node} />,

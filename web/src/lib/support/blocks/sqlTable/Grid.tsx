@@ -22,6 +22,17 @@ const PAD: Record<SqlTableState["density"], string> = {
   comfortable: "px-3 py-2.5",
 }
 
+// Row tint (stripe / hover / selection) lives in a `--rt` custom property on
+// the <tr> and every cell paints it as a background-image layer. Sticky
+// (pinned) cells keep an opaque `bg-card` underneath, so they hide the columns
+// scrolling beneath them yet still follow the row's stripe, hover and selection.
+const ROW = "[--rt:transparent] hover:[--rt:color-mix(in_oklab,var(--foreground)_5%,transparent)]"
+const CELL =
+  "border-b border-b-foreground/6 bg-[image:linear-gradient(var(--rt),var(--rt))] transition-colors"
+const STICKY = "sticky z-10 bg-card"
+/** Soft shadow on the right edge of the last pinned column. */
+const PIN_EDGE = "shadow-[6px_0_8px_-6px_color-mix(in_oklab,var(--foreground)_22%,transparent)]"
+
 /** Fallback width for a pinned column without an explicit one (sticky offsets need a number). */
 const PIN_WIDTH = 160
 
@@ -164,10 +175,12 @@ function Head({
   p,
   offsets,
   gutter,
+  lastPinned,
 }: {
   p: GridProps
   offsets: Map<string, number>
   gutter: number
+  lastPinned: string | undefined
 }): ReactNode {
   const { st, cfg } = p
   const keys = p.rows.map((r, i) => p.rowKey(r, i))
@@ -184,13 +197,16 @@ function Head({
   return (
     <tr>
       {cfg.selectable && (
-        <th className="sticky left-0 z-20 bg-card" style={{ width: GUTTER }}>
+        <th
+          className="sticky left-0 z-20 border-b border-b-foreground/10 bg-card"
+          style={{ width: GUTTER }}
+        >
           <input type="checkbox" aria-label="Select page" checked={all} onChange={toggleAll} />
         </th>
       )}
       {cfg.rowNumbers && (
         <th
-          className="sticky z-20 bg-card text-[11px] opacity-40"
+          className="sticky z-20 border-b border-b-foreground/10 bg-card text-[11px] text-muted-foreground"
           style={{ width: GUTTER, left: cfg.selectable ? GUTTER : 0 }}
         >
           #
@@ -213,16 +229,19 @@ function Head({
             key={c.name}
             aria-sort={key ? (key.desc ? "descending" : "ascending") : "none"}
             className={cn(
-              "group relative bg-card text-[11px] font-medium tracking-wider whitespace-nowrap uppercase select-none",
+              "group relative border-b border-b-foreground/10 bg-card text-[12px] font-medium whitespace-nowrap text-muted-foreground select-none",
               PAD[st.density],
               left !== undefined && "sticky z-20",
+              c.name === lastPinned && PIN_EDGE,
             )}
             style={style}
           >
             <button
               type="button"
-              className="inline-flex cursor-pointer items-center gap-1 uppercase"
-              style={{ opacity: key ? 1 : 0.55 }}
+              className={cn(
+                "inline-flex cursor-pointer items-center gap-1 hover:text-foreground",
+                key && "text-foreground",
+              )}
               title="Click to sort, Shift+click to add a sort key"
               onClick={(e) => st.setSort(cycleSort(st.sort, c.name, e.shiftKey))}
             >
@@ -256,6 +275,7 @@ export function Grid(p: GridProps): ReactNode {
   const { st, cfg } = p
   const gutter = (cfg.selectable ? GUTTER : 0) + (cfg.rowNumbers ? GUTTER : 0)
   const offsets = pinOffsets(p.cols, st, gutter)
+  const lastPinned = p.cols.findLast((c) => offsets.has(c.name))?.name
   const maxOf = (i: number): number =>
     Math.max(0, ...p.rows.map((r) => Math.abs(numeric(r[i] ?? "") ?? 0)))
   const maxes = new Map(
@@ -268,10 +288,10 @@ export function Grid(p: GridProps): ReactNode {
     st.setSelected(next)
   }
   return (
-    <div className="overflow-auto rounded-lg" style={{ maxHeight: cfg.maxHeight }}>
-      <table className="w-full border-separate border-spacing-0 text-[12.5px]">
+    <div className="overflow-auto" style={{ maxHeight: cfg.maxHeight }}>
+      <table className="w-full border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-30">
-          <Head p={p} offsets={offsets} gutter={gutter} />
+          <Head p={p} offsets={offsets} gutter={gutter} lastPinned={lastPinned} />
         </thead>
         <tbody>
           {p.rows.map((r, i) => {
@@ -281,13 +301,13 @@ export function Grid(p: GridProps): ReactNode {
               <tr
                 key={key}
                 className={cn(
-                  "transition-colors hover:bg-foreground/6",
-                  cfg.striped && "odd:bg-foreground/3",
+                  ROW,
+                  cfg.striped && "odd:[--rt:color-mix(in_oklab,var(--foreground)_3%,transparent)]",
                 )}
-                style={sel ? { background: tint(p.color, 12) } : undefined}
+                style={sel ? ({ "--rt": tint(p.color, 12) } as CSSProperties) : undefined}
               >
                 {cfg.selectable && (
-                  <td className="sticky left-0 z-10 bg-card text-center" style={{ width: GUTTER }}>
+                  <td className={cn(CELL, STICKY, "left-0 text-center")} style={{ width: GUTTER }}>
                     <input
                       type="checkbox"
                       aria-label="Select row"
@@ -298,7 +318,11 @@ export function Grid(p: GridProps): ReactNode {
                 )}
                 {cfg.rowNumbers && (
                   <td
-                    className="sticky z-10 bg-card text-center text-[11px] tabular-nums opacity-40"
+                    className={cn(
+                      CELL,
+                      STICKY,
+                      "text-center text-[11px] text-muted-foreground tabular-nums",
+                    )}
                     style={{ left: cfg.selectable ? GUTTER : 0 }}
                   >
                     {String(st.offset + i + 1)}
@@ -321,10 +345,12 @@ export function Grid(p: GridProps): ReactNode {
                     <td
                       key={c.name}
                       className={cn(
+                        CELL,
                         PAD[st.density],
                         "tabular-nums",
                         cfg.wrap ? "wrap-break-word" : "max-w-80 truncate",
-                        left !== undefined && "sticky z-10 bg-card",
+                        left !== undefined && STICKY,
+                        c.name === lastPinned && PIN_EDGE,
                       )}
                       style={{ width, minWidth: width, maxWidth: width, left, textAlign: align }}
                       title={v ?? "NULL"}
