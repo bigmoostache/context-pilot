@@ -1,0 +1,284 @@
+--- a/crates/betteroffice-xlsx/src/authority.rs
++++ b/crates/betteroffice-xlsx/src/authority.rs
+@@ -34,12 +34,14 @@
+ mod cascade_composition_tests;
+ #[cfg(test)]
+ mod fingerprint_composition_tests;
++mod lazy_fingerprints;
+ mod hyperlinks;
+ mod merges;
+ #[cfg_attr(not(test), allow(dead_code))]
+ pub(crate) mod snapshot;
+ pub(crate) mod snapshot_validation;
+ pub(crate) use hyperlinks::validate_hyperlink_edit_baseline;
++use lazy_fingerprints::LazyFingerprints;
+ use hyperlinks::{
+     HYPERLINK_PREFIX, HyperlinkBaseline, HyperlinkEdits, HyperlinkProjection,
+     clear_hyperlink_edits, insert_hyperlink_edit, project_hyperlinks, sync_hyperlinks,
+@@ -162,7 +164,7 @@
+     date_system: DateSystem,
+     defined_names: Vec<DefinedName>,
+     fingerprint: String,
+-    fingerprints: BTreeMap<i64, Vec<String>>,
++    fingerprints: LazyFingerprints,
+     freeze_panes: Vec<Option<FreezePane>>,
+     formats: Vec<SheetFormat>,
+     col_styles: Vec<Vec<ColStyle>>,
+@@ -212,23 +214,20 @@
+         legacy_style_readings: &[Stylesheet],
+     ) -> Result<Self, String> {
+         let mut builder = FingerprintBuilder::new(model, legacy_dimensions);
+-        let ((fingerprint, bootstrap_client_id), fingerprints) = builder.batched(|builder| {
++        let (fingerprint, bootstrap_client_id) = builder.batched(|builder| {
+             let styles = FingerprintStyles::new(&model.styles);
+-            let current = builder.current(if released_styles(&model.styles) {
++            builder.current(if released_styles(&model.styles) {
+                 styles
+             } else {
+                 styles.with_written_fills()
+-            })?;
+-            let mut fingerprints = builder.style_fingerprints(&model.styles, legacy_styles)?;
+-            for reading in legacy_style_readings {
+-                for (version, accepted) in builder.style_fingerprints(reading, None)? {
+-                    for fingerprint in accepted {
+-                        append_fingerprint(&mut fingerprints, version, fingerprint);
+-                    }
+-                }
+-            }
+-            Ok((current, fingerprints))
++            })
+         })?;
++        let fingerprints = LazyFingerprints::pending(
++            model,
++            legacy_dimensions,
++            legacy_styles,
++            legacy_style_readings,
++        );
+         Ok(Self {
+             bootstrap_client_id,
+             date_system: model.date_system,
+@@ -461,7 +460,7 @@
+             date_system: model.date_system,
+             defined_names: model.defined_names.clone(),
+             fingerprint,
+-            fingerprints,
++            fingerprints: fingerprints.into(),
+             freeze_panes: model.sheets.iter().map(|sheet| sheet.freeze_pane).collect(),
+             formats: model.sheets.iter().map(|sheet| sheet.format).collect(),
+             col_styles: model
+@@ -498,6 +497,11 @@
+     }
+ 
+     fn accepts_fingerprint(&self, version: i64, fingerprint: &str) -> bool {
++        // The current reading needs no legacy hashing: a state this replica
++        // seeded itself (every open) is accepted without forcing them.
++        if version == SCHEMA_VERSION && fingerprint == self.fingerprint {
++            return true;
++        }
+         self.fingerprints
+             .get(&version)
+             .is_some_and(|accepted| accepted.iter().any(|value| value == fingerprint))
+@@ -872,7 +876,7 @@
+             date_system: Codec::read(&mut reader)?,
+             defined_names: Codec::read(&mut reader)?,
+             fingerprint: Codec::read(&mut reader)?,
+-            fingerprints: Codec::read(&mut reader)?,
++            fingerprints: BTreeMap::<i64, Vec<String>>::read(&mut reader)?.into(),
+             freeze_panes: Codec::read(&mut reader)?,
+             formats: Codec::read(&mut reader)?,
+             col_styles: Codec::read(&mut reader)?,
+@@ -7562,7 +7566,7 @@
+         assert!(current.contains(&actual.fingerprint));
+         assert_eq!(
+             released_readings(&actual.fingerprints),
+-            expected.fingerprints
++            *expected.fingerprints
+         );
+         let oracle =
+             WorkbookBase::from_model_with_legacy_dimensions_oracle(&patterned, &[], None).unwrap();
+--- a/crates/betteroffice-xlsx/src/authority/snapshot.rs
++++ b/crates/betteroffice-xlsx/src/authority/snapshot.rs
+@@ -2059,7 +2059,7 @@
+                     date_system: date,
+                     defined_names: Vec::new(),
+                     fingerprint,
+-                    fingerprints: BTreeMap::new(),
++                    fingerprints: Default::default(),
+                     freeze_panes: Vec::new(),
+                     formats: Vec::new(),
+                     col_styles: Vec::new(),
+@@ -2149,7 +2149,7 @@
+                 date_system,
+                 defined_names: Vec::new(),
+                 fingerprint,
+-                fingerprints: BTreeMap::new(),
++                fingerprints: Default::default(),
+                 freeze_panes: Vec::new(),
+                 formats: Vec::new(),
+                 col_styles: Vec::new(),
+@@ -3424,7 +3424,7 @@
+         base.bootstrap_client_id = 17;
+         base.date_system = DateSystem::V1904;
+         base.fingerprint = "kept-verbatim".into();
+-        base.fingerprints = BTreeMap::from([
++        *base.fingerprints = BTreeMap::from([
+             (
+                 i64::MIN,
+                 vec!["later".into(), "first".into(), "later".into()],
+--- /dev/null
++++ b/crates/betteroffice-xlsx/src/authority/lazy_fingerprints.rs
+@@ -0,0 +1,154 @@
++//! Accepted base fingerprints, hashed on first use.
++//!
++//! Opening a workbook needs only the current fingerprint (it seeds the
++//! bootstrap client). The accepted readings — every legacy schema and style
++//! reading a peer may have persisted — cost one SHA-256 stream each over every
++//! cell (about a hundred of them), yet are read only when a peer snapshot is
++//! adopted, seeds are matched or a recovery state is written. They are hashed
++//! the first time any of those asks.
++
++use std::collections::BTreeMap;
++use std::fmt;
++use std::ops::{Deref, DerefMut};
++use std::sync::{Arc, Mutex, OnceLock};
++
++use xlsx_model::{Stylesheet, Workbook as WorkbookModel};
++
++use super::{FingerprintBuilder, append_fingerprint};
++
++type Map = BTreeMap<i64, Vec<String>>;
++
++/// What the accepted readings hash: the workbook as it was opened.
++struct Pending {
++    model: WorkbookModel,
++    legacy_dimensions: Vec<xlsx_parse::LegacySheetDimensions>,
++    legacy_styles: Option<Stylesheet>,
++    legacy_style_readings: Vec<Stylesheet>,
++}
++
++impl Pending {
++    fn compute(&self) -> Result<Map, String> {
++        let mut builder = FingerprintBuilder::new(&self.model, &self.legacy_dimensions);
++        builder.batched(|builder| {
++            let mut fingerprints =
++                builder.style_fingerprints(&self.model.styles, self.legacy_styles.as_ref())?;
++            for reading in &self.legacy_style_readings {
++                for (version, accepted) in builder.style_fingerprints(reading, None)? {
++                    for fingerprint in accepted {
++                        append_fingerprint(&mut fingerprints, version, fingerprint);
++                    }
++                }
++            }
++            Ok(fingerprints)
++        })
++    }
++}
++
++struct Inner {
++    ready: OnceLock<Map>,
++    pending: Mutex<Option<Pending>>,
++}
++
++/// Accepted fingerprints per schema version, computed on first access.
++#[derive(Clone)]
++pub(super) struct LazyFingerprints(Arc<Inner>);
++
++impl LazyFingerprints {
++    pub(super) fn pending(
++        model: &WorkbookModel,
++        legacy_dimensions: &[xlsx_parse::LegacySheetDimensions],
++        legacy_styles: Option<&Stylesheet>,
++        legacy_style_readings: &[Stylesheet],
++    ) -> Self {
++        Self(Arc::new(Inner {
++            ready: OnceLock::new(),
++            pending: Mutex::new(Some(Pending {
++                model: model.clone(),
++                legacy_dimensions: legacy_dimensions.to_vec(),
++                legacy_styles: legacy_styles.cloned(),
++                legacy_style_readings: legacy_style_readings.to_vec(),
++            })),
++        }))
++    }
++
++    /// Hashes the pending readings now. A workbook that fails to hash accepts
++    /// no reading, so every peer snapshot is refused rather than misread.
++    fn force(&self) -> &Map {
++        self.0.ready.get_or_init(|| {
++            let pending = self
++                .0
++                .pending
++                .lock()
++                .unwrap_or_else(std::sync::PoisonError::into_inner)
++                .take();
++            pending
++                .map(|pending| pending.compute().unwrap_or_default())
++                .unwrap_or_default()
++        })
++    }
++}
++
++impl From<Map> for LazyFingerprints {
++    fn from(map: Map) -> Self {
++        Self(Arc::new(Inner {
++            ready: OnceLock::from(map),
++            pending: Mutex::new(None),
++        }))
++    }
++}
++
++impl Default for LazyFingerprints {
++    fn default() -> Self {
++        Map::new().into()
++    }
++}
++
++impl Deref for LazyFingerprints {
++    type Target = Map;
++
++    fn deref(&self) -> &Map {
++        self.force()
++    }
++}
++
++impl DerefMut for LazyFingerprints {
++    fn deref_mut(&mut self) -> &mut Map {
++        if Arc::get_mut(&mut self.0).is_none() {
++            *self = self.force().clone().into();
++        }
++        let inner = Arc::get_mut(&mut self.0).expect("unshared after copy");
++        if inner.ready.get().is_none() {
++            let pending = inner
++                .pending
++                .get_mut()
++                .unwrap_or_else(std::sync::PoisonError::into_inner)
++                .take();
++            let map = pending
++                .map(|pending| pending.compute().unwrap_or_default())
++                .unwrap_or_default();
++            let _ = inner.ready.set(map);
++        }
++        inner.ready.get_mut().expect("initialised above")
++    }
++}
++
++impl IntoIterator for LazyFingerprints {
++    type Item = (i64, Vec<String>);
++    type IntoIter = std::collections::btree_map::IntoIter<i64, Vec<String>>;
++
++    fn into_iter(mut self) -> Self::IntoIter {
++        std::mem::take(&mut *self).into_iter()
++    }
++}
++
++impl PartialEq for LazyFingerprints {
++    fn eq(&self, other: &Self) -> bool {
++        **self == **other
++    }
++}
++
++impl fmt::Debug for LazyFingerprints {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        (**self).fmt(f)
++    }
++}
