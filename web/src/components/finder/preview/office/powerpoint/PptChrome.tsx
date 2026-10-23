@@ -37,6 +37,9 @@ export function PptChrome({ fileName, children }: { fileName: string; children: 
  */
 const ENGINE_AREAS = `
 .ppt-body div:has(> aside[aria-label]) { width: 256px !important; background: #f5f5f5 !important; }
+.ppt-body aside[aria-label] > button { background: transparent; border: none; padding: 0 0 0 34px; margin-bottom: 12px !important; color: #424242; }
+.ppt-body aside[aria-label] > button > canvas { width: 188px !important; border-radius: 4px; box-shadow: 0 0 0 1px #e0e0e0; }
+.ppt-body aside[aria-label] > button[aria-current="page"] > canvas { box-shadow: 0 0 0 3px #c43e1c; }
 .ppt-body div:has(> div > canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5; }
 .ppt-body div:has(> canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5 !important; margin: 53px 82px -40px 102px; }
 `
