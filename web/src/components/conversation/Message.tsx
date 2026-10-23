@@ -278,7 +278,7 @@ function ToolMessage({ msg }: { msg: ChatMessage }) {
   if (!msg.tool) return null
   const t = msg.tool
   return (
-    <div className="py-2 pl-7">
+    <div className="py-2">
       <div
         className={cn(
           "card-shadow max-w-[88%] overflow-hidden rounded-xl border bg-card",

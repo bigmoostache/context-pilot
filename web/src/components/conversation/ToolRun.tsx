@@ -136,7 +136,7 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
   }
 
   return (
-    <div className="mb-2 ml-7">
+    <div className="mb-2">
       <button
         type="button"
         onClick={toggle}
