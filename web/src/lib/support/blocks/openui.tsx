@@ -221,7 +221,11 @@ export function OpenUi({ source, onAccent }: { source: string; onAccent: boolean
   }
   return (
     <StoreContext value={store}>
-      <div className="my-3 text-[13px]">
+      {/* Only the dashboard breaks out of the 720px reading column: it is
+          centred on its message and widened up to 1100px, capped by the
+          conversation column (`@container` in AgentConversation), while
+          the surrounding prose keeps the normal width. */}
+      <div className="relative left-1/2 my-3 w-[max(100%,min(1100px,calc(100cqw-3rem)))] -translate-x-1/2 text-[13px]">
         {renderNode(program.root, { nodes: program.nodes, seen: new Set() })}
       </div>
     </StoreContext>

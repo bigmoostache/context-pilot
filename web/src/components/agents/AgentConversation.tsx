@@ -69,9 +69,7 @@ const MessageRow = memo(
         // click — made the browser recompute visibility and JUMP the scroll,
         // which read as "the whole app breaks" on interaction. Plain rows +
         // memo match the pre-refactor behaviour and stay smooth.
-        // Rows carrying an ```openui``` dashboard opt out of the reading-width
-        // cap (see the conversation column's `[&>.ou-wide]` rule).
-        className={msg.text?.includes("```openui") ? "ou-wide" : ""}
+        className=""
       >
         <Message
           msg={toChatMessage(msg)}
@@ -357,9 +355,9 @@ export function AgentConversation({
         )}
 
         {/* ── Conversation column ── */}
-        <div className="mx-2 flex min-w-0 flex-1 flex-col pb-2">
+        <div className="@container mx-2 flex min-w-0 flex-1 flex-col pb-2">
           <ScrollArea className="min-h-0 flex-1">
-            <div className="mx-auto flex max-w-[1200px] flex-col px-5 py-4 *:mx-auto *:w-full *:max-w-[720px] [&>.ou-wide]:max-w-none">
+            <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
               <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />
 
               {segments.map((seg) =>
