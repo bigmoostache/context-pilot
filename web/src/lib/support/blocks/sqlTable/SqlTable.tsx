@@ -16,6 +16,7 @@ import { Grid, type Col } from "./Grid"
 import { cells, parseConfig, toCsv, toObjects, type TableConfig } from "./model"
 import { FilterPanel, Toolbar } from "./Toolbar"
 import { useSqlTable, type SqlTableState } from "./useSqlTable"
+import { toXlsx } from "./xlsx"
 
 // ── OpenUI Lang — `SqlTable`: a live, configurable data table over entity SQL ─
 //
@@ -129,13 +130,28 @@ function Skeleton(): ReactNode {
   )
 }
 
+/** Table title plus the transient "Sent ✓" flash (nothing when both are empty). */
+function Header({ title, flash }: { title: string; flash: string | null }): ReactNode {
+  if (!title && !flash) return null
+  return (
+    <div className="flex items-center gap-2">
+      {title && <span className="text-[13px] font-semibold">{title}</span>}
+      {flash && (
+        <span className="text-[12px]" style={{ color: "var(--ok)" }}>
+          {flash}
+        </span>
+      )}
+    </div>
+  )
+}
+
 /** The error text the API client attached, or a generic fallback. */
 const errorText = (e: unknown): string =>
   e instanceof Error && e.message ? e.message : "Query failed"
 
-/** Download `text` as a file. */
-function download(name: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }))
+/** Download `blob` as a file. */
+function download(name: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
   a.download = name
@@ -178,12 +194,13 @@ export function SqlTable({ node }: { node: OpenUiNode }): ReactNode {
       ? `#${String(st.offset + i)}`
       : `${r[0]}·${String(st.offset + i)}`
 
-  const exportCsv = (): void => {
+  const exportXlsx = (): void => {
     if (!data) return
     const idx = cols.map((c) => c.index)
     download(
-      `${cfg.title || "query"}.csv`,
-      toCsv(
+      `${cfg.title || "query"}.xlsx`,
+      toXlsx(
+        cfg.title || "query",
         cols.map((c) => label(c.name)),
         rows.map((r) => idx.map((i) => r[i] ?? null)),
       ),
@@ -200,21 +217,7 @@ export function SqlTable({ node }: { node: OpenUiNode }): ReactNode {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {cfg.title && <span className="text-[13px] font-semibold">{cfg.title}</span>}
-        <code
-          className="truncate rounded-md px-1.5 py-0.5 font-mono text-[11px] opacity-70"
-          style={{ background: tint(color, 10) }}
-          title={cfg.sql}
-        >
-          {cfg.sql}
-        </code>
-        {flash && (
-          <span className="text-[12px]" style={{ color: "var(--ok)" }}>
-            {flash}
-          </span>
-        )}
-      </div>
+      <Header title={cfg.title} flash={flash} />
       {cfg.toolbar && data && (
         <Toolbar
           cfg={cfg}
@@ -224,7 +227,7 @@ export function SqlTable({ node }: { node: OpenUiNode }): ReactNode {
           color={color}
           filtersOpen={filtersOpen}
           onToggleFilters={() => setFiltersOpen(!filtersOpen)}
-          onExport={exportCsv}
+          onExport={exportXlsx}
           onSend={send}
         />
       )}

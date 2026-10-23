@@ -170,7 +170,7 @@ export function parseConfig(node: OpenUiNode, sql: string): TableConfig {
   const sizes = list(p["page_sizes"])
     .map(Number)
     .filter((n) => Number.isSafeInteger(n) && n > 0 && n <= 200)
-  const density = str(p["density"], "normal")
+  const density = str(p["density"], "compact")
   const send = typeof p["send"] === "string" ? p["send"] : undefined
   return {
     sql,
@@ -179,7 +179,7 @@ export function parseConfig(node: OpenUiNode, sql: string): TableConfig {
     pageSizes: [...new Set([...(sizes.length > 0 ? sizes : [10, 25, 50, 100]), pageSize])].toSorted(
       (a, b) => a - b,
     ),
-    density: DENSITIES.has(density) ? (density as Density) : "normal",
+    density: DENSITIES.has(density) ? (density as Density) : "compact",
     striped: flag(p["striped"], false),
     selectable: flag(p["selectable"], send !== undefined),
     send,

@@ -204,7 +204,7 @@ export interface ToolbarProps {
   onSend: () => void
 }
 
-/** Search box, filter toggle, columns menu, density, CSV export and send. */
+/** Search box, filter toggle, columns menu, density, Excel export and send. */
 export function Toolbar(p: ToolbarProps): ReactNode {
   const { cfg, st } = p
   const active = st.filters.length
@@ -248,8 +248,13 @@ export function Toolbar(p: ToolbarProps): ReactNode {
         <Rows3 className="size-3.5" /> <span className="capitalize">{st.density}</span>
       </button>
       {cfg.exportCsv && (
-        <button type="button" className={ICON_BTN} aria-label="Export CSV" onClick={p.onExport}>
-          <Download className="size-3.5" /> CSV
+        <button
+          type="button"
+          className={ICON_BTN}
+          aria-label="Export to Excel"
+          onClick={p.onExport}
+        >
+          <Download className="size-3.5" /> Excel
         </button>
       )}
       {cfg.send !== undefined && (

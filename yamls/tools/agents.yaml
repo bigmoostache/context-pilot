@@ -230,7 +230,7 @@ tools:
       entity_sql writes). Single read-only SELECT only; prefer it over pasting
       rows into a Table when the data lives in entities or is more than a screen.
       The user can sort (Shift = multi), search, filter, hide/pin/resize columns
-      and export CSV; sort/search/filters run server-side over the whole result.
+      and export to Excel; sort/search/filters run server-side over the whole result.
       Optional props: sort: "col desc, col2", hide: "a,b", pin: "a",
       format: "col=percent, c2=currency:EUR, c3=badge, c4=bar" (also number[:d],
       integer, bytes, duration, date, datetime, bool, code, link),
