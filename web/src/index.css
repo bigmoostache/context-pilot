@@ -757,6 +757,15 @@ html.mobile.standalone .mobile-shell {
   gap: 2px;
 }
 
+/* Footer zoom: keep only the "100%" preset dropdown. The −/+ steppers and
+   the slider track cost ~170px of footer width for no extra capability. */
+.univer-container footer div:has(> [role="track"]),
+.univer-container
+  footer
+  [data-u-comp="button"]:has(.univerjs-icon-reduce-icon, .univerjs-icon-increase-icon) {
+  display: none !important;
+}
+
 /* Sidebar agent title (AgentList): hovering the title text draws an underline in from
    the left; on leave it slides out to the right. The anchor flips with the
    hover state, so the bar always exits in the direction it was drawn. */
