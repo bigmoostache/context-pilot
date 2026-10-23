@@ -7,7 +7,6 @@ import {
   ImageAdd20Regular,
   Play16Regular,
   Shapes20Regular,
-  SlideAdd20Regular,
   TextAlignCenter20Regular,
   TextAlignJustify20Regular,
   TextAlignLeft20Regular,
@@ -22,6 +21,7 @@ import { Btn, Combo, Sep } from "../fluent/controls"
 import { OfficeRibbon } from "../fluent/Frame"
 import { StatusBar, StatusItem, Zoom } from "../fluent/StatusBar"
 import type { Cmd } from "../fluent/tokens"
+import { NewSlide } from "./NewSlide"
 import { usePptCmd } from "./pptCmd"
 
 const FAMILIES = ["Calibri", "Calibri Light", "Arial", "Helvetica", "Times New Roman", "Aptos"]
@@ -47,7 +47,6 @@ export function PptRibbon() {
 function HomeRibbon() {
   const undo = usePptCmd("undo")
   const redo = usePptCmd("redo")
-  const newSlide = usePptCmd("insertSlide", {})
   const grow = usePptCmd("fontSizeStep", { direction: "increase" })
   const shrink = usePptCmd("fontSizeStep", { direction: "decrease" })
   const bold = usePptCmd("bold")
@@ -59,7 +58,7 @@ function HomeRibbon() {
       <Btn cmd={undo} args={null} icon={<ArrowUndo20Regular />} />
       <Btn cmd={redo} args={null} icon={<ArrowRedo20Regular />} />
       <Sep />
-      <Btn cmd={newSlide} args={{}} icon={<SlideAdd20Regular />} />
+      <NewSlide />
       <Sep />
       <FontCombos />
       <Btn cmd={grow} args={{ direction: "increase" }} icon={<FontIncrease20Regular />} />
