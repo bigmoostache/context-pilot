@@ -1,0 +1,25 @@
+[package]
+name = "cp-office"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Office documents (docx/xlsx/pptx) as files: versioned read, validated atomic write"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme.workspace = true
+publish = false
+
+# The file on disk is the single source of truth: agents edit it directly, the
+# web editors (BetterOffice, in-browser WASM) load its bytes and save whole
+# files back. This crate only guards that hand-off: kind detection, an
+# optimistic-concurrency version, OOXML sanity check, atomic replace.
+[dependencies]
+cp-macros.workspace = true
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

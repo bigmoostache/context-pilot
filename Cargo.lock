@@ -788,6 +788,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cp-office"
+version = "0.2.14"
+dependencies = [
+ "cp-macros",
+ "tempfile",
+ "zip 8.6.0",
+]
+
+[[package]]
 name = "cp-oplog"
 version = "0.2.14"
 dependencies = [
