@@ -1,0 +1,34 @@
+--- a/crates/xlsx-model/src/workbook.rs	2026-10-23 15:08:45
++++ b/crates/xlsx-model/src/workbook.rs	2026-10-23 16:44:34
+@@ -663,6 +663,20 @@
+ 
+     pub fn hyperlink_at(&self, at: CellRef) -> Option<&Hyperlink> {
+         self.hyperlinks.iter().find(|link| link.range.contains(at))
++    }
++
++    /// the last row `used_range` reaches, without walking every cell: keys are
++    /// ordered by row first, so the last one holds the deepest cell. Every
++    /// whole-column criteria call asks for it, so it must not cost the sheet.
++    pub fn used_row_end(&self) -> Option<RowId> {
++        let cells = self.cells.last_key_value().map(|(&(row, _), _)| row);
++        let spans = self
++            .hyperlinks
++            .iter()
++            .map(|link| link.range)
++            .chain(self.merges.iter().copied())
++            .map(|range| range.end.row);
++        cells.into_iter().chain(spans).max()
+     }
+ 
+     pub fn used_range(&self) -> Option<CellRange> {
+@@ -933,8 +947,8 @@
+ 
+     fn used_rows(&self, sheet: SheetId) -> RowId {
+         self.sheet(sheet)
+-            .and_then(Sheet::used_range)
+-            .map_or(0, |range| range.end.row.saturating_add(1))
++            .and_then(Sheet::used_row_end)
++            .map_or(0, |row| row.saturating_add(1))
+     }
+ 
+     fn used_cols(&self, sheet: SheetId) -> ColId {
