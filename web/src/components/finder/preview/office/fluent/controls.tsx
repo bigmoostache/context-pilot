@@ -18,7 +18,7 @@ export function Btn<A>({
   shortcut,
 }: {
   cmd: Cmd<unknown, A>
-  args?: A
+  args?: A | undefined
   icon: ReactNode
   size?: "sm" | "lg"
   text?: string | undefined
