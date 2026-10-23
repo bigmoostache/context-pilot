@@ -12,9 +12,7 @@ import "@betteroffice/docx-react/styles.css"
 const LazyXlsx = lazy(() =>
   import("@betteroffice/xlsx-react").then((m) => ({ default: m.XlsxEditor })),
 )
-const LazyDocx = lazy(() =>
-  import("@betteroffice/docx-react").then((m) => ({ default: m.DocxEditor })),
-)
+const LazyDocx = lazy(() => import("./word/WordDocx"))
 
 /**
  * Edit a realm .docx/.xlsx/.pptx in the BetterOffice editor. The file on disk is
@@ -131,13 +129,7 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
               {xlsxReady !== version && <OpeningOverlay size={bytes.length} />}
             </>
           )}
-          {kind === "docx" && (
-            <LazyDocx
-              documentBuffer={bytes}
-              downloadOnSave={false}
-              onSave={(buf: ArrayBuffer) => save(new Uint8Array(buf))}
-            />
-          )}
+          {kind === "docx" && <LazyDocx bytes={bytes} fileName={node.name} onSave={save} />}
         </Suspense>
       </div>
     </div>
