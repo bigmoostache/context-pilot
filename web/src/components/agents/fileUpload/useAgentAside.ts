@@ -89,6 +89,8 @@ export function useAgentAside(fleetId: string, agentId: string, defaultHidden: b
   const [tab, setTab] = useState<AgentAsideTab>(() => readView(fleetId, agentId).tab)
   const [file, setFile] = useState<UploadedFile | null>(() => readView(fleetId, agentId).file)
   const [hidden, setHidden] = useState<boolean>(() => readHidden(fleetId, agentId, defaultHidden))
+  // Reported by AgentAside: a file or note preview is open (rail widened).
+  const [previewing, setPreviewing] = useState(false)
 
   // Re-seed the per-agent state when the fleet/agent key changes (the
   // component instance is reused across agent switches). Guarded by the
@@ -121,5 +123,5 @@ export function useAgentAside(fleetId: string, agentId: string, defaultHidden: b
     setHidden(false) // a file click always re-shows the rail (T677)
   }, [])
 
-  return { tab, setTab, file, setFile, hidden, setHidden, openFile }
+  return { tab, setTab, file, setFile, hidden, setHidden, openFile, previewing, setPreviewing }
 }

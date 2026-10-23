@@ -132,6 +132,7 @@ export function AgentAside({
   onSelectFile,
   hintShown = false,
   onHide,
+  onPreviewingChange,
 }: {
   files: AgentFile[]
   tasks: AgentTask[]
@@ -148,6 +149,8 @@ export function AgentAside({
   /** Hide the whole rail for this agent (T677) — the tab bar's right-aligned
    *  hide button. Re-showing is driven by the parent's floating reopen button. */
   onHide: () => void
+  /** Reports whether a file or note preview is open (the rail is widened). */
+  onPreviewingChange: (previewing: boolean) => void
 }) {
   // Per-section presence gates (T666): a tab is shown only when its section has
   // content, and the whole rail disappears when BOTH are empty (the conversation
@@ -166,11 +169,19 @@ export function AgentAside({
   const hasFiles = files.length > 0
   const hasTasks = tasks.length > 0
   const hasNotes = notes.length > 0
-  if (!hasFiles && !hasTasks && !hasNotes) return null
+  const empty = !hasFiles && !hasTasks && !hasNotes
 
   const openNote = activeTab === "notes" ? notes.find((n) => n.id === noteId) : undefined
   // A note preview takes the same widened rail as a file preview.
-  const previewing = (activeTab === "files" && selectedFile !== null) || openNote !== undefined
+  const previewing =
+    !empty && ((activeTab === "files" && selectedFile !== null) || openNote !== undefined)
+  // The conversation sizes its chrome off this exact flag (single source of truth).
+  useLayoutEffect(() => {
+    onPreviewingChange(previewing)
+    return () => onPreviewingChange(false) // rail unmounted (no files/tasks/notes left)
+  }, [onPreviewingChange, previewing])
+  if (empty) return null
+
   const back = () => {
     onSelectFile(null)
     setNoteId(null)

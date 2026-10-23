@@ -318,8 +318,8 @@ export function AgentConversation({
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
   const { answersByForm, onFormSubmit } = useAgentForms(agent.log, fleetId, agent.id)
 
-  // A file preview takes 70% of the row: the narrow chat drops per-message chrome.
-  const previewing = !aside.hidden && aside.tab === "files" && aside.file !== null
+  // A preview (file or note) takes 70% of the row: the narrow chat drops per-message chrome.
+  const previewing = !aside.hidden && aside.previewing
 
   return (
     <FleetIdContext value={fleetId}>

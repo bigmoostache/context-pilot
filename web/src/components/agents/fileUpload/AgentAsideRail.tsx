@@ -65,8 +65,8 @@ export function AgentAsideRail({
   // width is dynamic (T680): when a file preview is open the rail widens to
   // 70% of the conversation row (`70cqw`), so a fixed `--sidebar-w` offset
   // would only slide it partway and leave the wide preview poking in from the
-  // right (T689b). Mirror AgentAside's own width rule so the two always agree.
-  const previewing = aside.tab === "files" && aside.file !== null
+  // right (T689b). AgentAside reports its own width rule, so the two always agree.
+  const previewing = aside.previewing
   // A preview's 70cqw already includes the gutter; the list width does not.
   const offset = previewing ? "70cqw" : "(var(--sidebar-w) + 0.5rem)"
 
@@ -88,6 +88,7 @@ export function AgentAsideRail({
           onSelectFile={aside.setFile}
           hintShown={modHeld}
           onHide={() => aside.setHidden(true)}
+          onPreviewingChange={aside.setPreviewing}
         />
       </div>
 
