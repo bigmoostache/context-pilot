@@ -24,11 +24,11 @@ logo, tabs, groups and commands. Status: **proposal for review** (owner A1075).
 ## 2. Types
 
 ```ts
-/** The command shape all three engines return. */
-interface Cmd<V = unknown> {
+/** The command shape all three engines return. `A` = the command's args. */
+interface Cmd<V = unknown, A = unknown> {
   label: string
   state: { enabled: boolean; active?: boolean; value?: V }
-  execute: (args?: never) => unknown
+  execute: (args?: A) => unknown
 }
 
 type OfficeApp = "word" | "excel" | "powerpoint"
@@ -41,32 +41,46 @@ const FLUENT: {
   font: string            // "Segoe UI", system-ui fallback
   chrome: "#f5f5f5"; surface: "#ffffff"; ink: "#242424"; inkTab: "#424242"
   inkMuted: "#616161"; hover: "#ebebeb"; pressed: "#e0e0e0"; line: "#e0e0e0"
-  titleH: 48; tabsH: 36; statusH: 24; radius: 8
+  titleH: 48; tabsH: 36; radius: 8
 }
 const ACCENT: Record<OfficeApp, string>  // word #185abd, excel #107c41, powerpoint #c43e1c
-function officeVars(app: OfficeApp): CSSProperties  // --of-* CSS vars on the frame root
+const HEIGHTS: Record<OfficeApp, { statusH: number; ribbonH: number }>
+function officeVars(app: OfficeApp): CSSProperties  // --of-* CSS vars on the shell root
 ```
 
 App-specific heights (Excel formula bar, Word canvas offset) stay in the app.
 
 ## 4. Frame (`Frame.tsx`)
 
+Engine command hooks only work inside the engine's command context, so the
+frame is split in two (review A1076, blocker):
+
 ```tsx
-<OfficeFrame
-  app="word"
-  title={fileName}
-  saveState={state}                 // "idle" | "saving" | "saved" | "error" → title chip
-  onRename={(name) => …}            // omit = title not editable
-  commands={searchable}             // SearchItem[] for the title-bar search; omit = no search box
-  tabs={[{ id: "home", label: "Home", ribbon: <HomeRibbon /> }, …]}
-  defaultTab="home"
-  backstage={<FileBackstage />}     // omit = no File tab
-  tabsRight={<…/>}                  // e.g. Comments, Editing mode
-  status={<StatusBar>…</StatusBar>}
->
-  {engine}
-</OfficeFrame>
+<OfficeShell app="word" bodyStyle={WORD_BODY_VARS}>   // --of-* vars + canvas/pane bg hook
+  <OfficeTitleBar
+    title={fileName}
+    saveState={state}               // "idle" | "saving" | "saved" | "error" → title chip
+    onRename={(name) => …}          // omit = title not editable
+  />
+  <DocxEditor
+    toolbar={
+      <OfficeRibbon                 // INSIDE the engine: TabRow + RibbonCard + backstage
+        layout="classic"            // "classic" (two-row, Word/Excel) | "single" (PPT web, 40 px card, 32 px buttons)
+        tabs={[{ id: "home", label: "Home", ribbon: <HomeRibbon /> }, …]}
+        defaultTab="home"
+        backstage={<FileBackstage />}   // omit = no File tab
+        tabsRight={<…/>}                // e.g. Comments, Editing mode
+        commands={searchable}           // SearchItem[] → title-bar search via portal; omit = no search
+        status={<StatusBar>…</StatusBar>}  // portalled into OfficeShell's status slot
+      />
+    }
+  />
+</OfficeShell>
 ```
+
+`OfficeRibbon` portals the search box and the status bar into slots that
+`OfficeShell` renders outside the engine, so both keep access to commands
+(zoom, notes, word count) without an `onReady` API.
 
 - Title bar: logo (per app, inline SVG), document name, save chip, centred
   search (Option+Q focuses, typing filters `commands`, Enter runs, Esc closes).
@@ -92,7 +106,12 @@ App-specific heights (Excel formula bar, Word canvas offset) stay in the app.
 | `ColorPicker` | `cmd`, `toArgs(color)`, `theme: string[][]`, `standard: string[]`, `noneLabel?` | Word/Excel/PPT theme 10×6 grid, standard row, recent |
 | `Tooltip` | wraps any control: `title`, `shortcut?`, `description?` | 500 ms delay, Fluent card style |
 
-`Btn` tooltip defaults to `cmd.label` + `shortcut`.
+`Btn` tooltip defaults to `cmd.label` + `shortcut`. `Gallery` renders inline
+or inside any menu popover (`SplitBtn menu={<Gallery rows={3} …/>}`), with
+`ReactNode` previews (shapes, layouts, styles).
+
+Engine-drawn areas (Word canvas, PPT thumbnail pane / notes, Excel grid) are not
+kit components: the app styles them through `OfficeShell bodyStyle` CSS vars.
 
 ## 6. Menus (`menus.tsx`)
 
@@ -102,9 +121,11 @@ Keyboard: ↑/↓, Enter, Esc, typeahead; focus returns to the opener.
 
 ## 7. Status bar (`StatusBar.tsx`)
 
-`StatusBar` (left/right slots), `StatusItem({ text, onSelect? })`,
-`Zoom({ cmd: Cmd<number>, toArgs(scale), min, max, presets })` = − / slider / +
-/ percentage (click → presets menu).
+`StatusBar` (left/right slots, height from `heights.statusH`: Word 24, Excel
+and PowerPoint 23), `StatusItem({ text, icon?, cmd? | onSelect?, active? })`
+(Notes, Normal/Sorter toggles, word count dialog), `Zoom({ cmd: Cmd<number>,
+toArgs(scale), min, max, presets })` = − / slider / + / percentage (click →
+presets menu).
 
 ## 8. Migration
 
