@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { useXlsxCommand } from "@betteroffice/xlsx-react"
+import { EditorToolbar, useXlsxCommand } from "@betteroffice/xlsx-react"
 import type { XlsxCommandArgs } from "@betteroffice/xlsx-react"
 import {
   AlignCenter,
@@ -73,6 +73,30 @@ export function ExcelRibbon() {
         <Valued id="numberFormat" args={{ value: "percent" }} icon={<Percent size={16} />} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Ribbon plus the engine's name box and formula input in Excel's 32px row.
+ * Passing `toolbar` drops the stock formula bar, so it is mounted back here.
+ */
+export function ExcelToolbar() {
+  return (
+    <>
+      <ExcelRibbon />
+      <div
+        style={{
+          height: EXCEL.formulaH,
+          background: EXCEL.chrome,
+          padding: "0 8px",
+          display: "flex",
+          alignItems: "center",
+          fontFamily: EXCEL.font,
+        }}
+      >
+        <EditorToolbar.FormulaBar style={{ flex: 1, fontSize: 14.67, color: EXCEL.ink }} />
+      </div>
+    </>
   )
 }
 

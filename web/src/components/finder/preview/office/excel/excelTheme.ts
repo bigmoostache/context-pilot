@@ -19,6 +19,7 @@ export const EXCEL = {
   titleH: 48,
   tabsH: 36,
   ribbonH: 40,
+  formulaH: 32,
   statusH: 23,
 } as const
 
