@@ -457,7 +457,7 @@ const itemStyle: CSSProperties = {
 const iconSlot: CSSProperties = { width: 20, display: "inline-flex", justifyContent: "center" }
 
 const btnStyle: CSSProperties = {
-  height: 32,
+  height: "var(--of-btn-h)",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",

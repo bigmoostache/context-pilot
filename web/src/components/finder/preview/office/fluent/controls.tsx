@@ -36,8 +36,8 @@ export function Btn<A>({
       ariaPressed={active}
       onClick={() => void cmd.execute(args as A)}
       style={{
-        height: lg ? 66 : 32,
-        minWidth: lg ? 56 : 32,
+        height: lg ? 66 : "var(--of-btn-h)",
+        minWidth: lg ? 56 : "var(--of-btn-w)",
         flexDirection: lg ? "column" : "row",
         gap: lg ? 2 : 4,
         padding: text && !lg ? "0 8px" : 0,
@@ -86,11 +86,16 @@ export function RibbonGroup({
       <div
         role="group"
         aria-label={label}
-        style={{ display: "flex", alignItems: "center", gap: 2, flex: "none" }}
+        style={{
+          display: "flex",
+          alignItems: rows ? "flex-start" : "center",
+          gap: 2,
+          flex: "none",
+        }}
       >
         {children}
         {rows ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 10 }}>
             <div style={rowStyle}>{rows[0]}</div>
             <div style={rowStyle}>{rows[1]}</div>
           </div>
@@ -101,7 +106,8 @@ export function RibbonGroup({
   )
 }
 
-const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 2 }
+/** Classic rows: Word web packs 28 px buttons edge to edge. */
+const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 0 }
 
 /**
  * Typeable combo box (font name, font size, Excel name box). Shows the
@@ -277,7 +283,7 @@ function HoverButton({
 }
 
 const comboStyle: CSSProperties = {
-  height: 28,
+  height: "var(--of-combo-h)",
   display: "flex",
   alignItems: "center",
   background: "var(--of-surface)",

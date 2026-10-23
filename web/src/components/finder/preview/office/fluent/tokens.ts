@@ -83,12 +83,44 @@ export interface AppGeometry {
   /** Underline thickness and its gap above the tab's bottom edge. */
   tabLine: number
   tabLineBottom: number
+  /** Small ribbon button (and menu opener) size; combo box height. */
+  btnW: number
+  btnH: number
+  comboH: number
 }
 
+const SINGLE_LINE = { btnW: 32, btnH: 32, comboH: 28 } as const
+
 export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
-  word: { statusH: 24, ribbonH: 100, tabH: 31, tabPad: 12, tabLine: 2, tabLineBottom: 1 },
-  excel: { statusH: 23, ribbonH: 40, tabH: 36, tabPad: 10, tabLine: 3, tabLineBottom: 4 },
-  powerpoint: { statusH: 23, ribbonH: 40, tabH: 36, tabPad: 10, tabLine: 3, tabLineBottom: 4 },
+  word: {
+    statusH: 24,
+    ribbonH: 100,
+    tabH: 31,
+    tabPad: 12,
+    tabLine: 2,
+    tabLineBottom: 1,
+    btnW: 28,
+    btnH: 24,
+    comboH: 24,
+  },
+  excel: {
+    statusH: 23,
+    ribbonH: 40,
+    tabH: 36,
+    tabPad: 10,
+    tabLine: 3,
+    tabLineBottom: 4,
+    ...SINGLE_LINE,
+  },
+  powerpoint: {
+    statusH: 23,
+    ribbonH: 40,
+    tabH: 32,
+    tabPad: 10,
+    tabLine: 3,
+    tabLineBottom: 2,
+    ...SINGLE_LINE,
+  },
 }
 
 /** Measured per-app deviations from {@link FLUENT}; code stays shared. */
@@ -128,6 +160,9 @@ export function officeVars(app: OfficeApp): CSSProperties {
     "--of-tab-pad": `${String(h.tabPad)}px`,
     "--of-tab-line": `${String(h.tabLine)}px`,
     "--of-tab-line-bottom": `${String(h.tabLineBottom)}px`,
+    "--of-btn-w": `${String(h.btnW)}px`,
+    "--of-btn-h": `${String(h.btnH)}px`,
+    "--of-combo-h": `${String(h.comboH)}px`,
     fontFamily: t.font,
   } as CSSProperties
 }
