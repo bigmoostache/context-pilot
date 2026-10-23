@@ -83,6 +83,8 @@ pub(super) fn try_upload_route(mut request: Request, segments: &[&str], ctx: Rou
             .unwrap_or_else(|| inspect::finder::fs_upload_unique(ctx.state, id, ctx.query, request.as_reader())),
         ["api", "fleet", id, "fs", "office"] => rest::feature_gate(segments, ctx.flags)
             .unwrap_or_else(|| inspect::finder::fs_office_write(ctx.state, id, ctx.query, request.as_reader())),
+        ["api", "fleet", id, "fs", "office", "update"] => rest::feature_gate(segments, ctx.flags)
+            .unwrap_or_else(|| inspect::finder::fs_office_update(ctx.state, id, ctx.query, request.as_reader())),
         _ => return Some(request),
     };
     respond_json(request, &reply);
@@ -183,6 +185,7 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "fs", "office", "version"]) => {
             inspect::finder::fs_office_version(state, id, query)
         }
+        (&Method::Get, &["api", "fleet", id, "fs", "office", "log"]) => inspect::finder::fs_office_log(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (&Method::Get, &["api", "fleet", id, "conversation"]) => inspect::finder::conversation(state, id),
         (&Method::Post, &["api", "fleet", id, "command"]) => rest::command(state, id, body_bytes),

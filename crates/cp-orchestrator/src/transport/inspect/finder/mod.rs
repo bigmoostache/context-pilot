@@ -11,6 +11,8 @@
 //!   `conversation`.
 //! * [`office`] — docx/xlsx/pptx bytes, version and save for the in-browser
 //!   `BetterOffice` editors (on [`cp_office`]).
+//! * [`office_log`] — per-file CRDT state so open editors merge an agent's
+//!   edit in place (`fs/office/log`, `fs/office/update`).
 //! * [`mutate`] — writes: `fs_upload`, `fs_write`, `fs_mkdir`, `fs_rename`,
 //!   `fs_move`, `fs_trash`.
 //! * [`download`] — raw file / zipped-folder download (`fs_download`) and the
@@ -25,6 +27,7 @@ mod download;
 mod listing;
 mod mutate;
 mod office;
+mod office_log;
 pub(super) mod support;
 mod upload;
 
@@ -32,6 +35,7 @@ pub(crate) use download::{fs_download, fs_raw};
 pub(crate) use listing::{conversation, fs_descriptions, fs_list, fs_preview};
 pub(crate) use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
 pub(crate) use office::{fs_office_read, fs_office_version, fs_office_write};
+pub(crate) use office_log::{fs_office_log, fs_office_update};
 // Private re-export so sibling `upload` can reach these via `super::`.
 use mutate::{is_bare_name, rel_child};
 pub(crate) use upload::{fs_upload, fs_upload_unique};

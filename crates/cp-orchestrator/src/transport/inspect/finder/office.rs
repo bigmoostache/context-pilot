@@ -26,15 +26,22 @@ fn path_param(query: &str) -> Result<String, HttpReply> {
 }
 
 /// Map a [`cp_office`] refusal onto the HTTP reply the editor surfaces.
-fn reply_of(err: &OfficeError) -> HttpReply {
+pub(super) fn reply_of(err: &OfficeError) -> HttpReply {
     HttpReply::error(err.status(), &err.to_string())
 }
 
 /// Resolve a readable document path (realm or read-only preview roots).
-fn readable(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<PathBuf, HttpReply> {
+pub(super) fn readable(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<PathBuf, HttpReply> {
     let folder = fleet_folder(state, fleet_id)?;
     let relative = path_param(query)?;
     previewable_path(&folder, &relative).ok_or_else(|| HttpReply::error(403, "path outside agent realm"))
+}
+
+/// Resolve a writable document path (realm only, never the read-only roots).
+pub(super) fn confined_target(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<PathBuf, HttpReply> {
+    let folder = fleet_folder(state, fleet_id)?;
+    let relative = path_param(query)?;
+    confined_path(&folder, &relative).ok_or_else(|| HttpReply::error(403, "path outside agent realm"))
 }
 
 /// `GET /api/fleet/{id}/fs/office?path=` — the document's bytes and version.
