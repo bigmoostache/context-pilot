@@ -29,6 +29,41 @@ type SaveState = "idle" | "saving" | "saved" | "conflict" | "error"
  * polled version moves while nothing is unsaved.
  */
 export function OfficeEditor({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  // The BetterOffice engines parse on the main thread: a 2 MB workbook blocks
+  // the page ~20 s. Never open on mount (a restored tab would freeze the app);
+  // fetch and parse only after an explicit click.
+  const [open, setOpen] = useState(false)
+  if (!open) return <OpenGate node={node} onOpen={() => setOpen(true)} />
+  return <OfficeEditorBody fleetId={fleetId} node={node} />
+}
+
+/** Click-to-open placeholder shown before the editor loads. */
+function OpenGate({ node, onOpen }: { node: FinderNode; onOpen: () => void }) {
+  const mb = node.size == null ? null : node.size / (1024 * 1024)
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
+      <span className="text-[12.5px] text-muted-foreground">
+        {node.name}
+        {mb == null ? "" : ` · ${mb.toFixed(1)} MB`}
+      </span>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="rounded-md bg-(--signal) px-3 py-1.5 text-[12px] font-medium text-(--primary-foreground) transition-[filter] hover:brightness-105"
+      >
+        Open in editor
+      </button>
+      {mb != null && mb > 0.5 && (
+        <span className="text-[11px] text-muted-foreground/70">
+          Large file: the page may be unresponsive while it opens.
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** The loaded editor: fetches the document and mounts the BetterOffice editor. */
+function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode }) {
   const kind = officeKindOf(node.path)
   const doc = useFsOffice(fleetId, node.path)
   const polled = useFsOfficeVersion(fleetId, node.path)
