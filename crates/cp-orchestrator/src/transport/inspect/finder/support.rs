@@ -36,9 +36,20 @@ pub(super) fn confined_path(root: &str, relative: &str) -> Option<PathBuf> {
 /// files (prompts, reports) to `/tmp` and cite them in cards.
 const PREVIEW_TMP_ROOT: &str = "/tmp";
 
-/// [`confined_path`] widened with `/tmp` — for read-only file previews.
+/// Fleet-shared behaviours (skills, systems, commands) under `$HOME`. Agents
+/// cite them in cards; they hold prompts, never secrets, so they are exempt
+/// from the hidden-component ban that guards the rest of `~/.context-pilot`.
+fn behaviours_root() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".context-pilot").join("behaviours"))
+}
+
+/// [`confined_path`] widened with `/tmp` and the behaviours dir — for
+/// read-only file previews.
 pub(super) fn previewable_path(root: &str, relative: &str) -> Option<PathBuf> {
-    widened_path(root, relative, &[Path::new(PREVIEW_TMP_ROOT)], &cp_env::env().orch.finder_extra_roots)
+    let behaviours = behaviours_root();
+    let mut fixed = vec![Path::new(PREVIEW_TMP_ROOT)];
+    fixed.extend(behaviours.as_deref());
+    widened_path(root, relative, &fixed, &cp_env::env().orch.finder_extra_roots)
 }
 
 /// [`confined_path`] widened with `CP_FINDER_EXTRA_ROOTS` — for read-only
