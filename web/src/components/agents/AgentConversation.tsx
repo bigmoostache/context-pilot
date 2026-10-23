@@ -355,7 +355,7 @@ export function AgentConversation({
         )}
 
         {/* ── Conversation column ── */}
-        <div className="@container mx-2 flex min-w-0 flex-1 flex-col pb-2">
+        <div data-ou-pane className="mx-2 flex min-w-0 flex-1 flex-col pb-2">
           <ScrollArea className="min-h-0 flex-1">
             <div className="mx-auto flex max-w-[720px] flex-col px-5 py-4">
               <OpenedDivider agent={agent} parentName={parentName} onOpenAgent={onOpenAgent} />

@@ -1,4 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react"
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -178,6 +186,42 @@ function renderNode(id: string, ctx: Ctx): ReactNode {
   return <span className="text-[12px] text-(--danger)">Unknown component “{node.comp}”</span>
 }
 
+/** Widest a dashboard grows, and the margin it keeps from the pane edges (px). */
+const BREAKOUT_MAX = 1100
+const BREAKOUT_GAP = 24
+
+/**
+ * Only the dashboard breaks out of the 720px reading column (prose keeps it).
+ * Its message isn't necessarily centred in the conversation pane, so CSS
+ * centring can push it under the left sidebar: measure instead, widen up to
+ * {@link BREAKOUT_MAX}, centre on the message, then clamp inside the pane
+ * (`[data-ou-pane]`, the conversation column).
+ */
+function useBreakout(active: boolean): [RefObject<HTMLDivElement | null>, CSSProperties] {
+  const ref = useRef<HTMLDivElement>(null)
+  const [style, setStyle] = useState<CSSProperties>({})
+  useLayoutEffect(() => {
+    const el = ref.current
+    const host = el?.parentElement
+    const pane = el?.closest("[data-ou-pane]")
+    if (!active || !host || !pane) return
+    const fit = (): void => {
+      const p = pane.getBoundingClientRect()
+      const h = host.getBoundingClientRect()
+      const room = p.width - 2 * BREAKOUT_GAP
+      const w = Math.max(h.width, Math.min(BREAKOUT_MAX, room))
+      const centred = h.left + (h.width - w) / 2
+      const left = Math.max(p.left + BREAKOUT_GAP, Math.min(centred, p.right - BREAKOUT_GAP - w))
+      setStyle({ width: w, marginLeft: Math.round(left - h.left) })
+    }
+    const ro = new ResizeObserver(fit)
+    ro.observe(pane)
+    ro.observe(host)
+    return () => ro.disconnect()
+  }, [active])
+  return [ref, style]
+}
+
 /** Initial input values: each input's `value:` prop, else its first option / min. */
 function initialValues(nodes: Map<string, OpenUiNode>): Record<string, string> {
   const vals: Record<string, string> = {}
@@ -201,6 +245,7 @@ export function OpenUi({ source, onAccent }: { source: string; onAccent: boolean
   const [vals, setVals] = useState<Record<string, string>>(() =>
     program.ok ? initialValues(program.nodes) : {},
   )
+  const [ref, breakout] = useBreakout(program.ok)
   if (!program.ok) {
     return (
       <pre
@@ -221,11 +266,7 @@ export function OpenUi({ source, onAccent }: { source: string; onAccent: boolean
   }
   return (
     <StoreContext value={store}>
-      {/* Only the dashboard breaks out of the 720px reading column: it is
-          centred on its message and widened up to 1100px, capped by the
-          conversation column (`@container` in AgentConversation), while
-          the surrounding prose keeps the normal width. */}
-      <div className="relative left-1/2 my-3 w-[max(100%,min(1100px,calc(100cqw-3rem)))] -translate-x-1/2 text-[13px]">
+      <div ref={ref} className="my-3 text-[13px]" style={breakout}>
         {renderNode(program.root, { nodes: program.nodes, seen: new Set() })}
       </div>
     </StoreContext>
