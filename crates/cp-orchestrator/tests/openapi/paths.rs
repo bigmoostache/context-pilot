@@ -202,16 +202,6 @@ pub(super) fn paths() -> Value {
             "parameters": [qp("path")],
             "responses": merge(ok(r("FsPreview")), err())
         }})),
-        "/api/fleet/{id}/fs/sheet": with_agent(json!({ "get": {
-            "tags": ["fs"], "summary": "Spreadsheet data",
-            "parameters": [qp("path")],
-            "responses": merge(ok(r("SheetData")), err())
-        }})),
-        "/api/fleet/{id}/fs/slides": with_agent(json!({ "get": {
-            "tags": ["fs"], "summary": "Presentation slides (pptx resolved through master/layout)",
-            "parameters": [qp("path")],
-            "responses": merge(ok(r("SlideDeck")), err())
-        }})),
         "/api/fleet/{id}/fs/download": with_agent(json!({ "get": {
             "tags": ["fs"], "summary": "Download file or folder",
             "parameters": [qp("path")],
@@ -247,14 +237,6 @@ pub(super) fn paths() -> Value {
             "tags": ["fs"], "summary": "Office document version (polled to pick up agent edits)",
             "parameters": [qp("path")],
             "responses": merge(ok(r("OfficeVersion")), err())
-        }})),
-        "/api/fleet/{id}/fs/sheet/save": with_agent(json!({ "post": {
-            "tags": ["fs"], "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
-            "parameters": [qp("path")],
-            "requestBody": { "required": true, "content": {
-                "application/json": { "schema": { "type": "object", "additionalProperties": true } }
-            }},
-            "responses": merge(ok(r("SheetSaveResult")), err())
         }})),
         "/api/fleet/{id}/fs/write": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Write file",

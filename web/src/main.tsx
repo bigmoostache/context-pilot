@@ -37,7 +37,7 @@ migrateAgentStorage()
 
 /**
  * Stale-deploy guard: a rebuild deletes the old hashed chunks, so a tab still
- * on the previous bundle fails its next lazy import (e.g. SheetGrid). Reload
+ * on the previous bundle fails its next lazy import (e.g. an office editor). Reload
  * once to fetch the new bundle; the timestamp stops a loop if the chunk is
  * really missing.
  */

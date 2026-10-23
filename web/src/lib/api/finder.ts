@@ -7,9 +7,8 @@
 import type {
   FinderNode,
   FsPreview,
-  SheetData,
-  SheetSaveResult,
-  SlideDeck,
+  OfficeSaveResult,
+  OfficeVersion,
   UploadResult,
   UploadUniqueResult,
   WriteResult,
@@ -17,10 +16,8 @@ import type {
 import {
   getApiFleetByIdFs,
   getApiFleetByIdFsDescriptions,
+  getApiFleetByIdFsOfficeVersion,
   getApiFleetByIdFsPreview,
-  getApiFleetByIdFsSheet,
-  getApiFleetByIdFsSlides,
-  postApiFleetByIdFsSheetSave,
   postApiFleetByIdFsWrite,
 } from "./generated"
 import { BASE, getToken, sdk } from "./client"
@@ -28,19 +25,14 @@ import { sendUpload } from "./client/upload"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
-export type { FinderNode, FsPreview, SheetData, SheetSaveResult } from "./generated/types.gen"
+export type { FinderNode, FsPreview, OfficeSaveResult, OfficeVersion } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
-export type {
-  SlideDeck,
-  Slide,
-  SlideShape,
-  SlideTextBody,
-  SlideParagraph,
-  SlideRun,
-  SlideStroke,
-  SlideTable,
-  SlideTableCell,
-} from "./generated/types.gen"
+
+/** An office document's bytes plus the version they were read at. */
+export interface OfficeDoc {
+  bytes: Uint8Array
+  version: string
+}
 
 // ── GET endpoints (SDK) ──────────────────────────────────────────────
 
@@ -56,13 +48,9 @@ export function fetchFsPreview(fleetId: string, path: string): Promise<FsPreview
   return sdk(getApiFleetByIdFsPreview({ path: { id: fleetId }, query: { path } }))
 }
 
-export function fetchSheet(fleetId: string, path: string): Promise<SheetData> {
-  return sdk(getApiFleetByIdFsSheet({ path: { id: fleetId }, query: { path } }))
-}
-
-/** A pptx resolved to positioned shapes (master → layout → slide cascade). */
-export function fetchSlides(fleetId: string, path: string): Promise<SlideDeck> {
-  return sdk(getApiFleetByIdFsSlides({ path: { id: fleetId }, query: { path } }))
+/** Current version of an office document (polled to pick up agent edits). */
+export function fetchOfficeVersion(fleetId: string, path: string): Promise<OfficeVersion> {
+  return sdk(getApiFleetByIdFsOfficeVersion({ path: { id: fleetId }, query: { path } }))
 }
 
 // ── POST endpoints (SDK) ─────────────────────────────────────────────
@@ -72,17 +60,20 @@ export function writeFile(fleetId: string, path: string, content: string): Promi
 }
 
 /**
- * Save Univer edits to an xlsx/xlsm by patching the original file server-side
- * (formatting Univer doesn't model is kept). `snapshot` = `workbook.save()`.
+ * Save a whole office document back to disk through the upload channel.
+ * `base` = the version it was loaded at; the backend answers 409 when an
+ * agent rewrote the file since.
  */
-export function saveSheet(
+export function saveOffice(
   fleetId: string,
   path: string,
-  snapshot: Record<string, unknown>,
-): Promise<SheetSaveResult> {
-  return sdk(
-    postApiFleetByIdFsSheetSave({ path: { id: fleetId }, query: { path }, body: snapshot }),
-  )
+  bytes: Uint8Array,
+  base: string,
+): Promise<OfficeSaveResult> {
+  const q = `path=${encodeURIComponent(path)}&base=${encodeURIComponent(base)}`
+  const name = path.split("/").pop() ?? path
+  const blob = new Blob([bytes as BlobPart], { type: "application/octet-stream" })
+  return sendUpload<OfficeSaveResult>(`/api/fleet/${fleetId}/fs/office?${q}`, blob, name)
 }
 
 /** Upload one file into `dir` (must exist). Goes through the single upload
@@ -114,6 +105,24 @@ export function uploadUnique(
  *  once auth is on (C2). Kept only for the rare same-origin/no-auth caller. */
 export function rawUrl(fleetId: string, path: string): string {
   return `${BASE}/api/fleet/${fleetId}/fs/raw?path=${encodeURIComponent(path)}`
+}
+
+/** Fetch an office document's bytes and the version they were read at. */
+export async function fetchOffice(fleetId: string, path: string): Promise<OfficeDoc> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(
+    // ok:manual — binary body + X-Office-Version header, irreducible
+    `${BASE}/api/fleet/${fleetId}/fs/office?path=${encodeURIComponent(path)}`,
+    { headers, cache: "no-store" },
+  )
+  if (!res.ok) {
+    const body = await res.text().catch(() => res.statusText)
+    throw new Error(`${res.status}: ${body}`)
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer())
+  return { bytes, version: res.headers.get("X-Office-Version") ?? "" }
 }
 
 /** Trigger a browser download for a file in the agent's realm. */

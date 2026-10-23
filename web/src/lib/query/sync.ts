@@ -57,8 +57,8 @@ export const qk = {
   library: (id: string) => ["library", id] as const,
   fs: (id: string, path: string) => ["fs", id, path] as const,
   fsPreview: (id: string, path: string) => ["fs-preview", id, path] as const,
-  fsSheet: (id: string, path: string) => ["fs-sheet", id, path] as const,
-  fsSlides: (id: string, path: string) => ["fs-slides", id, path] as const,
+  fsOffice: (id: string, path: string) => ["fs-office", id, path] as const,
+  fsOfficeVersion: (id: string, path: string) => ["fs-office-version", id, path] as const,
   fsDescriptions: (id: string) => ["fs-descriptions", id] as const,
 } as const
 

@@ -324,31 +324,6 @@ pub(super) fn transport() -> Value {
             },
             "required": ["content", "size", "truncated"]
         },
-        "SheetTab": {
-            "type": "object",
-            "properties": {
-                "name": { "type": "string" },
-                "rows": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } }
-            },
-            "required": ["name", "rows"]
-        },
-        "SheetData": {
-            "type": "object",
-            "properties": {
-                "sheets": arr(r("SheetTab")),
-                "truncated": { "type": "boolean" },
-                "workbook": {
-                    "type": "object",
-                    "additionalProperties": true,
-                    "description": "Full Univer IWorkbookData snapshot (xlsx/xlsm only); `sheets` is empty when set."
-                },
-                "activeSheet": {
-                    "type": "string",
-                    "description": "Univer sheet id the workbook opens on (xlsx/xlsm only)."
-                }
-            },
-            "required": ["sheets", "truncated"]
-        },
         "OfficeVersion": {
             "type": "object",
             "properties": { "version": { "type": "string", "description": "mtime_ns-len fingerprint." } },
@@ -363,15 +338,6 @@ pub(super) fn transport() -> Value {
             "type": "object",
             "properties": { "written": { "type": "integer" }, "path": { "type": "string" } },
             "required": ["written", "path"]
-        },
-        "SheetSaveResult": {
-            "type": "object",
-            "properties": {
-                "written": { "type": "integer", "description": "Saved file size in bytes." },
-                "path": { "type": "string" },
-                "patched": { "type": "integer", "description": "Cells changed in the original file." }
-            },
-            "required": ["written", "path", "patched"]
         },
         "MkdirResult": {
             "type": "object",

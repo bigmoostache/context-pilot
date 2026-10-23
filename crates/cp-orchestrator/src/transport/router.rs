@@ -180,8 +180,6 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "library"]) => inspect::panels::library(state, id),
         (&Method::Get, &["api", "fleet", id, "fs"]) => inspect::finder::fs_list(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
-        (&Method::Get, &["api", "fleet", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
-        (&Method::Get, &["api", "fleet", id, "fs", "slides"]) => inspect::finder::fs_slides(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "office", "version"]) => {
             inspect::finder::fs_office_version(state, id, query)
         }
@@ -202,9 +200,6 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         }
         (&Method::Delete, &["api", "fleet", id, "library", "system", item]) => {
             rest::delete_library_system(state, id, item)
-        }
-        (&Method::Post, &["api", "fleet", id, "fs", "sheet", "save"]) => {
-            inspect::finder::fs_sheet_save(state, id, query, body_bytes)
         }
         (&Method::Post, &["api", "fleet", id, "fs", "write"]) => {
             inspect::finder::fs_write(state, id, query, body_bytes)

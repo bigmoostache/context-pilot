@@ -14,7 +14,6 @@ use cp_orchestrator::runtime::{Config, Runtime};
 // dev-dependencies linked into the bin-test target.
 use argon2 as _;
 use base64 as _;
-use calamine as _;
 use cp_base as _;
 use cp_env::model::features::Feature;
 use cp_env::spec::Target;
@@ -25,14 +24,12 @@ use cp_mod_utilities as _;
 use cp_office as _;
 use cp_oplog as _;
 use cp_vault as _;
-use csv as _;
 use flate2 as _;
 use minisign_verify as _;
 use nix as _;
 use notify as _;
 use openssl as _;
 use portable_pty as _;
-use quick_xml as _;
 use reqwest as _;
 use rusqlite as _;
 use serde as _;
@@ -42,9 +39,7 @@ use sha2 as _;
 #[cfg(test)]
 use tempfile as _;
 use tiny_http as _;
-use umya_spreadsheet as _;
 use utoipa as _;
-use zip as _;
 
 fn main() -> ExitCode {
     if let Some(exit) = early_exit_for_args() {

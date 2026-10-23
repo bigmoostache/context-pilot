@@ -22,7 +22,6 @@
 // them for the per-target `unused-crate-dependencies` lint.
 use argon2 as _;
 use base64 as _;
-use calamine as _;
 use cp_base as _;
 use cp_env as _;
 use cp_macros as _;
@@ -31,14 +30,12 @@ use cp_mod_utilities as _;
 use cp_office as _;
 use cp_oplog as _;
 use cp_vault as _;
-use csv as _;
 use dotenvy as _;
 use flate2 as _;
 use minisign_verify as _;
 use notify as _;
 use openssl as _;
 use portable_pty as _;
-use quick_xml as _;
 use reqwest as _;
 use rusqlite as _;
 use serde as _;
@@ -46,9 +43,7 @@ use serde_json as _;
 use serde_yaml as _;
 use sha2 as _;
 use tiny_http as _;
-use umya_spreadsheet as _;
 use utoipa as _;
-use zip as _;
 
 use std::os::unix::process::ExitStatusExt as _;
 use std::path::{Path, PathBuf};

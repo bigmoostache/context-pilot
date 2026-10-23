@@ -687,7 +687,7 @@ html.mobile.standalone .mobile-shell {
 
      * `rounded-full` — Tailwind emits a literal `9999px`, not a token;
      * arbitrary values (`rounded-[2px]`) and raw CSS radii — the scrollbar
-       thumb, the Finder slider track/thumb, the Univer container;
+       thumb, the Finder slider track/thumb;
      * inline `style={{ borderRadius }}` on any component.
 
    One universal rule catches all three. `!important` is load-bearing rather
@@ -695,75 +695,13 @@ html.mobile.standalone .mobile-shell {
    it every `rounded-full` pill would stay a pill.
 
    Position is NOT free: `no-descending-specificity` requires the bare `*` to
-   appear BEFORE any more-specific selector that sets the same property, so
-   this sits ahead of the `.univer-container` block below (which sets its own
-   `border-radius`) rather than at the end of the file. `!important` — not
-   source order — is what makes it win, so placing it earlier costs nothing.
+   appear BEFORE any more-specific selector that sets the same property.
+   `!important` — not source order — is what makes it win.
    Kept as one block so the whole decision reverts by deleting it. */
 *,
 *::before,
 *::after {
   border-radius: 0 !important;
-}
-
-/* ── Univer spreadsheet — theme integration ───────────────────────── */
-
-/*
- * Univer renders with its native light palette (white canvas) regardless
- * of app dark mode — same convention as Excel / Sheets / Numbers.
- * Structural overrides mirror the AG Grid themeQuartz config the user
- * approved: borderRadius 2, fontSize 13, headerFontWeight 400,
- * columnBorder false, spacing 6, wrapperBorder false, fontFamily
- * inherit (SF Pro).
- */
-
-.univer-container {
-  height: 100%;
-  font-size: 13px;
-  border-radius: 2px;
-  border: none;
-}
-
-/* ── structural overrides (themeQuartz parity) ────────────────── */
-
-/* Font: inherit SF Pro stack, 400 weight headers */
-.univer-container,
-.univer-container * {
-  font-family: inherit !important;
-}
-
-/* No wrapper border (wrapperBorder: false) — must precede higher-specificity selectors */
-.univer-container > div {
-  border: none !important;
-}
-
-/* Slim, lightweight header row — left-aligned, not centered */
-.univer-container [class*="sheet-bar"],
-.univer-container [class*="ribbon"] {
-  font-size: 12px;
-}
-
-.univer-container [data-u-comp="ribbon-header-menu"] > div {
-  justify-content: flex-start !important;
-}
-
-/* Toolbar: tighter, left-aligned, matches our header chrome */
-.univer-container [data-u-comp="ribbon-toolbar"] {
-  justify-content: flex-start !important;
-}
-
-.univer-container [class*="toolbar"] {
-  font-size: 12px;
-  gap: 2px;
-}
-
-/* Footer zoom: keep only the "100%" preset dropdown. The −/+ steppers and
-   the slider track cost ~170px of footer width for no extra capability. */
-.univer-container footer div:has(> [role="track"]),
-.univer-container
-  footer
-  [data-u-comp="button"]:has(.univerjs-icon-reduce-icon, .univerjs-icon-increase-icon) {
-  display: none !important;
 }
 
 /* Sidebar agent title (AgentList): hovering the title text draws an underline in from

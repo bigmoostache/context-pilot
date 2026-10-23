@@ -207,38 +207,25 @@ export function useFsPreview(
 }
 
 /**
- * Live spreadsheet preview for the Finder Quick Look pane. Fetches a
- * `csv`/`tsv`/`xlsx`/`xls`/`ods` file parsed to tables via the backend sheet
- * endpoint (bounded row/col/sheet caps; a non-spreadsheet → 415 → surfaced as a
- * query error so the caller renders the no-preview state).
- *
- * `enabled` gates the fetch to spreadsheet selections. Like {@link useFsPreview}
- * it is not a delta-covered resource and a Quick Look is a point-in-time read,
- * so there is no SSE bridge and the backstop poll is disabled (`pollMs: 0`).
+ * An office document's bytes + version for the in-browser editors. Fetched
+ * once per path (no poll); {@link useFsOfficeVersion} detects agent edits and
+ * the editor refetches this on purpose.
  */
-export function useFsSheet(
-  fleetId: string,
-  path: string,
-  enabled: boolean,
-): LiveQueryResult<api.SheetData> {
-  return useLive(qk.fsSheet(fleetId, path), () => api.fetchSheet(fleetId, path), {
-    enabled: enabled && !!fleetId && !!path,
+export function useFsOffice(fleetId: string, path: string): LiveQueryResult<api.OfficeDoc> {
+  return useLive(qk.fsOffice(fleetId, path), () => api.fetchOffice(fleetId, path), {
+    enabled: !!fleetId && !!path,
     pollMs: 0,
   })
 }
 
-/**
- * Live pptx preview: the deck resolved server-side to positioned shapes.
- * Point-in-time read like {@link useFsSheet} (no SSE bridge, no poll).
- */
-export function useFsSlides(
+/** Office document version, polled every 3 s so an agent's edit shows up. */
+export function useFsOfficeVersion(
   fleetId: string,
   path: string,
-  enabled: boolean,
-): LiveQueryResult<api.SlideDeck> {
-  return useLive(qk.fsSlides(fleetId, path), () => api.fetchSlides(fleetId, path), {
-    enabled: enabled && !!fleetId && !!path,
-    pollMs: 0,
+): LiveQueryResult<api.OfficeVersion> {
+  return useLive(qk.fsOfficeVersion(fleetId, path), () => api.fetchOfficeVersion(fleetId, path), {
+    enabled: !!fleetId && !!path,
+    pollMs: 3000,
   })
 }
 

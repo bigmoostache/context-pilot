@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { useFsPreview, useFsSheet, useFsSlides, useWriteFile } from "@/lib/live"
-import { downloadFile, rawUrl } from "@/lib/api"
+import { useFsPreview, useWriteFile } from "@/lib/live"
+import { rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited.
  *  Points at the MOBILE MarkdownEditor twin (@/mobile-components) — the leak
@@ -13,30 +13,6 @@ const LazyMarkdownEditor = lazy(() =>
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
-/** Lazy-loaded — Univer + ExcelJS (~46 MB) deferred until a sheet is previewed.
- *  Resolves to the mobile SheetGrid (a stub re-exporting the desktop Univer
- *  wrapper: the engine handles touch natively, so it is not forked). */
-const LazySheetGrid = lazy(() =>
-  import("./sheet/SheetGrid").then((m) => ({ default: m.SheetGrid })),
-)
-/** Lazy-loaded slide renderer (stub of the desktop one; it scales to the pane width). */
-const LazySlideDeck = lazy(() =>
-  import("./slides/SlideDeck").then((m) => ({ default: m.SlideDeck })),
-)
-
-/** Mobile LIVE pptx preview — same resolved deck as desktop, scaled to the screen. */
-export function LiveSlidesPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSlides(fleetId, node.path, true)
-  if (loading) return <PreviewStatus label="Loading presentation…" />
-  if (error || !data || data.slides.length === 0) return <Generic node={node} />
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Suspense fallback={<PreviewStatus label="Loading presentation…" />}>
-        <LazySlideDeck deck={data} />
-      </Suspense>
-    </div>
-  )
-}
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM
@@ -145,64 +121,6 @@ export function LivePdfPreview({ fleetId, node }: { fleetId: string; node: Finde
           </a>
         </div>
       </object>
-    </div>
-  )
-}
-
-// ── live spreadsheet (csv / xlsx / ods → Univer) ─────────────────
-/**
- * Mobile LIVE spreadsheet — lazy-loads the (unforked) Univer SheetGrid. Univer
- * ships its own touch handling (pan/select/scroll), so the engine is shared;
- * only the surrounding truncation note is mobile-sized here.
- */
-export function LiveSheetPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSheet(fleetId, node.path, true)
-  if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error && isTooLarge(error)) return <SheetTooLarge fleetId={fleetId} path={node.path} />
-  if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Suspense fallback={<PreviewStatus label="Loading spreadsheet…" />}>
-        <LazySheetGrid
-          sheets={data.sheets}
-          workbook={data.workbook}
-          activeSheet={data.activeSheet}
-          path={node.path}
-          fleetId={fleetId}
-        />
-      </Suspense>
-
-      {data.truncated && (
-        <div className="flex items-center border-t border-border bg-muted/20 px-3 py-1.5">
-          <span className="text-[11px] text-muted-foreground/50 italic">
-            Preview truncated — sheets are capped at 100 000 rows × 500 columns
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** The backend refuses workbooks over its size cap with a 413 "too large". */
-function isTooLarge(error: Error): boolean {
-  return error.message.includes("too large")
-}
-
-/** "Too large to preview" state with a download fallback. */
-function SheetTooLarge({ fleetId, path }: { fleetId: string; path: string }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-      <span className="text-[13px] text-muted-foreground">
-        Workbook too large to preview (over 25 MB)
-      </span>
-      <button
-        type="button"
-        className="rounded-md bg-muted px-4 py-2 text-[13px] font-medium hover:bg-muted/70"
-        onClick={() => void downloadFile(fleetId, path)}
-      >
-        Download
-      </button>
     </div>
   )
 }

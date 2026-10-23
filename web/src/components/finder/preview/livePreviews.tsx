@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState, lazy, Suspense } from "react"
 import { Check, Save } from "lucide-react"
 import type { FinderNode } from "@/lib/types"
-import { useFsPreview, useFsSheet, useFsSlides, useWriteFile } from "@/lib/live"
-import { downloadFile, rawUrl } from "@/lib/api"
+import { useFsPreview, useWriteFile } from "@/lib/live"
+import { rawUrl } from "@/lib/api"
 import { highlightCode } from "./codeHighlight"
 /** Lazy-loaded — TipTap + ProseMirror deferred until a markdown file is edited. */
 const LazyMarkdownEditor = lazy(() =>
@@ -10,32 +10,6 @@ const LazyMarkdownEditor = lazy(() =>
 )
 import { FileIcon } from "../support/macIcons"
 import { Generic, MarkdownPreview, PreviewStatus, TextPreview, TruncatedNote } from "./previewParts"
-/** Lazy-loaded — Univer + ExcelJS (~46 MB) deferred until a sheet is previewed. */
-const LazySheetGrid = lazy(() =>
-  import("./sheet/SheetGrid").then((m) => ({ default: m.SheetGrid })),
-)
-/** Lazy-loaded — the slide renderer is only needed once a deck is previewed. */
-const LazySlideDeck = lazy(() =>
-  import("./slides/SlideDeck").then((m) => ({ default: m.SlideDeck })),
-)
-
-/**
- * Render a LIVE pptx from the backend's `/fs/slides` endpoint: shapes, text,
- * tables and pictures already resolved through the master/layout cascade.
- * Legacy `.ppt` / `.odp` are refused by the backend (415) → generic fallback.
- */
-export function LiveSlidesPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSlides(fleetId, node.path, true)
-  if (loading) return <PreviewStatus label="Loading presentation…" />
-  if (error || !data || data.slides.length === 0) return <Generic node={node} />
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Suspense fallback={<PreviewStatus label="Loading presentation…" />}>
-        <LazySlideDeck deck={data} />
-      </Suspense>
-    </div>
-  )
-}
 
 /**
  * Fetch a live file's text content and render it: markdown through the rich GFM
@@ -148,67 +122,6 @@ export function LivePdfPreview({ fleetId, node }: { fleetId: string; node: Finde
           </a>
         </div>
       </object>
-    </div>
-  )
-}
-
-// ── live spreadsheet (csv / xlsx / ods → Univer) ─────────────────
-/**
- * Render a LIVE spreadsheet via Univer from the backend's `/fs/sheet`
- * endpoint (CSV/TSV parsed with quote handling, xlsx/xls/ods via calamine).
- * Univer provides a full spreadsheet engine: range selection, formatting,
- * formulas, sheet tabs, freeze panes, merge cells — all from the free
- * Apache 2.0 tier. XLSX download via ExcelJS reflects all edits.
- */
-export function LiveSheetPreview({ fleetId, node }: { fleetId: string; node: FinderNode }) {
-  const { data, loading, error } = useFsSheet(fleetId, node.path, true)
-  if (loading) return <PreviewStatus label="Loading spreadsheet…" />
-  if (error && isTooLarge(error)) return <SheetTooLarge fleetId={fleetId} path={node.path} />
-  if (error || !data || (!data.workbook && data.sheets.length === 0)) return <Generic node={node} />
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Suspense fallback={<PreviewStatus label="Loading spreadsheet…" />}>
-        <LazySheetGrid
-          sheets={data.sheets}
-          workbook={data.workbook}
-          activeSheet={data.activeSheet}
-          path={node.path}
-          fleetId={fleetId}
-        />
-      </Suspense>
-
-      {/* truncation status */}
-      {data.truncated && (
-        <div className="flex items-center border-t border-border bg-muted/20 px-3 py-1">
-          <span className="text-[10.5px] text-muted-foreground/50 italic">
-            Preview truncated — sheets are capped at 100 000 rows × 500 columns
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** The backend refuses workbooks over its size cap with a 413 "too large". */
-function isTooLarge(error: Error): boolean {
-  return error.message.includes("too large")
-}
-
-/** "Too large to preview" state with a download fallback. */
-function SheetTooLarge({ fleetId, path }: { fleetId: string; path: string }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6">
-      <span className="text-[12px] text-muted-foreground">
-        Workbook too large to preview (over 25 MB)
-      </span>
-      <button
-        type="button"
-        className="rounded-md bg-muted px-3 py-1 text-[11px] font-medium hover:bg-muted/70"
-        onClick={() => void downloadFile(fleetId, path)}
-      >
-        Download
-      </button>
     </div>
   )
 }
