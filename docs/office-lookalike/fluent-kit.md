@@ -2,7 +2,7 @@
 
 One toolbar template for the Word, Excel and PowerPoint lookalikes. The kit
 draws every piece of Office for the web chrome; an app supplies only its accent,
-logo, tabs, groups and commands. Status: **proposal for review** (owner A1075).
+logo, tabs, groups and commands. Status: **revised after A1076 + A1077 reviews** (owner A1075).
 
 ## 1. Principles
 
@@ -25,10 +25,10 @@ logo, tabs, groups and commands. Status: **proposal for review** (owner A1075).
 
 ```ts
 /** The command shape all three engines return. `A` = the command's args. */
-interface Cmd<V = unknown, A = unknown> {
+interface Cmd<V = unknown, A = void> {
   label: string
   state: { enabled: boolean; active?: boolean; value?: V }
-  execute: (args?: A) => unknown
+  execute: (args: A) => unknown
 }
 
 type OfficeApp = "word" | "excel" | "powerpoint"
@@ -70,6 +70,7 @@ frame is split in two (review A1076, blocker):
         defaultTab="home"
         backstage={<FileBackstage />}   // omit = no File tab
         tabsRight={<…/>}                // e.g. Comments, Editing mode
+        belowRibbon={<…/>}              // Excel formula bar; rendered between ribbon and engine body
         commands={searchable}           // SearchItem[] → title-bar search via portal; omit = no search
         status={<StatusBar>…</StatusBar>}  // portalled into OfficeShell's status slot
       />
@@ -101,7 +102,7 @@ frame is split in two (review A1076, blocker):
 | `Btn` | `cmd`, `icon`, `size?: "sm"\|"lg"`, `text?`, `args?`, `shortcut?` | toggle when `state.active` defined (aria-pressed) |
 | `SplitBtn` | `cmd`, `icon`, `menu: ReactNode`, `args?` | main half runs last-used args; chevron opens menu |
 | `DropBtn` | `label`, `icon`, `menu` | opens menu only (e.g. Line spacing) |
-| `Combo` | `cmd: Cmd<string\|number>`, `options`, `width`, `parse?`, `renderOption?` | typeable (font name/size), Enter applies, Esc reverts, ↑/↓ list |
+| `Combo` | `cmd: Cmd<string\|number>` or `onCommit(text)`, `options`, `width`, `parse?`, `renderOption?` | typeable (font name/size, Excel name box), Enter applies, Esc reverts, ↑/↓ list; `renderOption` = per-item preview (number formats) |
 | `Gallery` | `cmd: Cmd<string>`, `items: {value,label,preview}[]`, `rows?` | inline strip + expand popover (Styles) |
 | `ColorPicker` | `cmd`, `toArgs(color)`, `theme: string[][]`, `standard: string[]`, `noneLabel?` | Word/Excel/PPT theme 10×6 grid, standard row, recent |
 | `Tooltip` | wraps any control: `title`, `shortcut?`, `description?` | 500 ms delay, Fluent card style |
@@ -116,8 +117,12 @@ kit components: the app styles them through `OfficeShell bodyStyle` CSS vars.
 ## 6. Menus (`menus.tsx`)
 
 `Menu`, `MenuItem({ cmd | onSelect, icon?, checked?, shortcut? })`,
+`MenuSub({ label, icon?, children })` (Borders ▸ Line Color ▸ / Line Style ▸),
 `MenuSeparator`, `ContextMenu({ items, children })` for the canvas right-click.
-Keyboard: ↑/↓, Enter, Esc, typeahead; focus returns to the opener.
+Keyboard: ↑/↓, Enter, Esc, typeahead, → opens a submenu; focus returns to the opener.
+
+Global keys (KeyTips, Option+Q search) never fire while focus is inside the
+engine's text/cell editor; the engine owns arrows, Enter and Tab there.
 
 ## 7. Status bar (`StatusBar.tsx`)
 
