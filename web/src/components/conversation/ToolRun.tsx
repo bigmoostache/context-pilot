@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef, useState } from "react"
+import { memo, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { animate, createSpring, stagger, type JSAnimation } from "animejs"
 import { ChevronRight } from "lucide-react"
 import { parseAutoLine } from "@/lib/support/agentMessages"
@@ -81,7 +81,15 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
   const heightAnimRef = useRef<Animation | null>(null)
   const rowAnimsRef = useRef<JSAnimation[]>([])
   const firstRef = useRef(true)
-  const n = msgs.length
+  // Rows with neither verb nor intent (e.g. queue-flush echoes) carry nothing to show.
+  const rows = useMemo(
+    () =>
+      msgs
+        .map((m) => ({ id: m.id, ...parseAutoLine(m) }))
+        .filter((r) => r.verb.trim() !== "" || r.intent.trim() !== ""),
+    [msgs],
+  )
+  const n = rows.length
 
   useLayoutEffect(() => {
     if (firstRef.current) {
@@ -130,6 +138,8 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
     heightAnimRef.current = h
   }, [open])
 
+  if (n === 0) return null
+
   const toggle = () => {
     if (!open) setMounted(true)
     setOpen(!open)
@@ -158,18 +168,17 @@ export const ToolRun = memo(function ToolRun({ msgs }: { msgs: AgentMsg[] }) {
         <div ref={bodyRef} style={{ height: 0 }} className="overflow-hidden [overflow-anchor:none]">
           <div className="relative mt-1 ml-[5px] grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 py-0.5 pl-3">
             <span className="absolute inset-y-1.5 left-0 w-px bg-foreground/8" />
-            {msgs.map((m) => {
-              const { verb, intent } = parseAutoLine(m)
+            {rows.map(({ id, verb, intent }) => {
               return (
                 <div
-                  key={m.id}
+                  key={id}
                   data-row
                   className="relative col-span-2 grid grid-cols-subgrid items-baseline rounded-sm py-[3px] text-[11px] leading-tight"
                 >
                   <span className="absolute top-[9px] left-[-14.5px] size-[4px] rounded-full bg-muted-foreground/35" />
                   <span
                     data-slide
-                    className="text-[10px] tracking-wide text-muted-foreground/50 uppercase"
+                    className="text-[10px] font-medium tracking-wide text-signal/85 uppercase"
                   >
                     {verb}
                   </span>
