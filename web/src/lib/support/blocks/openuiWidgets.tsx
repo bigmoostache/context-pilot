@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react"
 import { use, useId, useState, type CSSProperties, type ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
@@ -306,10 +307,34 @@ export function Input({ id, node }: { id: string; node: OpenUiNode }): ReactNode
   )
 }
 
-/** Segmented choice bound to its id (`env = Select(["prod","staging"], label)`). */
+/** Segmented control only fits a few short options; anything longer is a dropdown. */
+const fitsSegmented = (options: string[]): boolean =>
+  options.length <= 4 && options.join("").length <= 28
+
+/** Choice bound to its id (`env = Select(["prod","staging"], label)`). */
 export function Select({ id, node }: { id: string; node: OpenUiNode }): ReactNode {
   const s = use(StoreContext)
   const options = stringLists(node)[0] ?? []
+  if (!fitsSegmented(options)) {
+    return (
+      <Field label={str(node.props["label"])}>
+        <span className="relative">
+          <select
+            className={cn(FIELD, "cursor-pointer appearance-none pr-8")}
+            value={s.vals[id] ?? ""}
+            onChange={(e) => s.set(id, e.target.value)}
+          >
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        </span>
+      </Field>
+    )
+  }
   return (
     <Field label={str(node.props["label"])}>
       <div className="flex gap-1 rounded-md bg-foreground/6 p-1">
@@ -336,24 +361,44 @@ export function Select({ id, node }: { id: string; node: OpenUiNode }): ReactNod
   )
 }
 
+/** Thumb styling for both engines: a card-coloured knob ringed in the tone. */
+const THUMB =
+  "[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-card [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-(--ou-tone) [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-card [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:ring-2 [&::-moz-range-thumb]:ring-(--ou-tone)"
+
 /** Range slider bound to its id (`pct = Slider(min: 0, max: 100, value: 25, label)`). */
 export function Slider({ id, node }: { id: string; node: OpenUiNode }): ReactNode {
   const s = use(StoreContext)
   const value = s.vals[id] ?? "0"
-  const style = { accentColor: toneColor(node.props["tone"]) } satisfies CSSProperties
+  const min = numProp(node, "min") ?? 0
+  const max = numProp(node, "max") ?? 100
+  const pct = max > min ? ((Number(value) - min) / (max - min)) * 100 : 0
+  const tone = toneColor(node.props["tone"])
+  const track = tint("var(--foreground)", 10)
+  const style = {
+    "--ou-tone": tone,
+    background: `linear-gradient(to right, ${tone} ${String(pct)}%, ${track} ${String(pct)}%)`,
+  } as CSSProperties
   return (
-    <Field label={`${str(node.props["label"])} · ${value}${str(node.props["unit"])}`}>
+    <div className="flex min-w-40 flex-1 flex-col gap-2">
+      <div className="flex items-baseline justify-between text-[13px]">
+        <span className="font-medium text-foreground">{str(node.props["label"])}</span>
+        <span className="text-muted-foreground tabular-nums">
+          {value}
+          {str(node.props["unit"])}
+        </span>
+      </div>
       <input
         type="range"
-        className="w-full"
+        aria-label={str(node.props["label"])}
+        className={cn("mt-1.5 h-2 w-full cursor-pointer appearance-none rounded-full", THUMB)}
         style={style}
-        min={numProp(node, "min") ?? 0}
-        max={numProp(node, "max") ?? 100}
+        min={min}
+        max={max}
         step={numProp(node, "step") ?? 1}
         value={value}
         onChange={(e) => s.set(id, e.target.value)}
       />
-    </Field>
+    </div>
   )
 }
 
