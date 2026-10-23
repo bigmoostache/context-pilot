@@ -1,4 +1,6 @@
+import { animate, createDrawable, createSpring } from "animejs"
 import { Check, CircleAlert, LoaderCircle, X } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { dismissUpload, useUploads, type UploadJob } from "@/lib/api/client/upload"
 
 /** Compact byte formatter: "812 KB", "12.3 MB". */
@@ -17,8 +19,15 @@ function fmtBytes(n: number): string {
 /** Leading status glyph: spinner while sending, check when done, alert on error. */
 const ICONS: Record<UploadJob["status"], React.ReactNode> = {
   uploading: <LoaderCircle className="size-4 animate-spin text-muted-foreground" />,
-  done: <Check className="size-4 text-emerald-500" />,
+  done: <Check className="size-4 text-emerald-500" strokeWidth={2.5} />,
   error: <CircleAlert className="size-4 text-destructive" />,
+}
+
+/** Status badge background: the done state warms to a soft emerald wash. */
+const BADGE: Record<UploadJob["status"], string> = {
+  uploading: "bg-muted",
+  done: "bg-emerald-500/12",
+  error: "bg-destructive/10",
 }
 
 /** Thin bottom-edge bar colour per status. */
@@ -34,14 +43,69 @@ function subtitle(job: UploadJob): string {
   return `${fmtBytes(job.loaded)} of ${fmtBytes(job.total)}`
 }
 
+const reducedMotion = (): boolean => window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+/**
+ * The "arrived" moment, played once when a job flips to `done`: the edge bar
+ * finishes its sweep then dissolves, the badge springs in with a ripple, and
+ * the check stroke draws itself.
+ */
+function useDoneFlourish(status: UploadJob["status"]) {
+  const badgeRef = useRef<HTMLSpanElement>(null)
+  const rippleRef = useRef<HTMLSpanElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (status !== "done" || reducedMotion()) return
+    const path = badgeRef.current?.querySelector("path")
+    const anims = [
+      barRef.current &&
+        animate(barRef.current, { opacity: [1, 0], delay: 280, duration: 420, ease: "out(2)" }),
+      badgeRef.current &&
+        animate(badgeRef.current, {
+          scale: [0.6, 1],
+          ease: createSpring({ stiffness: 260, damping: 11 }),
+        }),
+      rippleRef.current &&
+        animate(rippleRef.current, {
+          scale: [1, 2.1],
+          opacity: [0.45, 0],
+          duration: 650,
+          ease: "out(3)",
+        }),
+      path &&
+        animate(createDrawable(path), {
+          draw: ["0 0", "0 1"],
+          delay: 90,
+          duration: 380,
+          ease: "inOut(2)",
+        }),
+    ]
+    return () => {
+      for (const a of anims) a?.revert()
+    }
+  }, [status])
+  return { badgeRef, rippleRef, barRef }
+}
+
 function UploadToast({ job }: { job: UploadJob }) {
   const pct = job.total > 0 ? Math.min(100, Math.round((job.loaded / job.total) * 100)) : 0
   const width = job.status === "uploading" ? pct : 100
+  const { badgeRef, rippleRef, barRef } = useDoneFlourish(job.status)
   return (
     <div className="group pointer-events-auto relative w-80 overflow-hidden rounded-xl bg-popover/95 text-popover-foreground shadow-lg ring-1 ring-foreground/5 backdrop-blur-sm">
       <div className="flex items-center gap-3 px-3.5 py-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          {ICONS[job.status]}
+        <span className="relative flex size-8 shrink-0 items-center justify-center">
+          <span
+            ref={rippleRef}
+            aria-hidden
+            className="absolute inset-0 rounded-full bg-emerald-500 opacity-0"
+          />
+          <span
+            ref={badgeRef}
+            className={`relative flex size-8 items-center justify-center rounded-full transition-colors duration-300 ${BADGE[job.status]}`}
+          >
+            {ICONS[job.status]}
+          </span>
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium" title={job.name}>
@@ -66,7 +130,7 @@ function UploadToast({ job }: { job: UploadJob }) {
           </button>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-muted">
+      <div ref={barRef} className="absolute inset-x-0 bottom-0 h-0.5 bg-muted">
         <div
           className={`h-full transition-[width] duration-300 ease-out ${BAR[job.status]}`}
           style={{ width: `${width}%` }}
