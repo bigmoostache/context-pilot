@@ -1,4 +1,4 @@
-import { Fragment } from "react"
+import { Fragment, useState } from "react"
 import { useDocxCommand } from "@betteroffice/docx-react"
 import {
   ArrowRedo20Regular,
@@ -21,6 +21,7 @@ import {
   TextIndentDecreaseLtr20Regular,
   TextIndentIncreaseLtr20Regular,
   TextItalic20Regular,
+  TextLineSpacing20Regular,
   TextNumberListLtr20Regular,
   TextStrikethrough20Regular,
   TextSubscript20Regular,
@@ -28,6 +29,7 @@ import {
   TextUnderline20Regular,
 } from "@fluentui/react-icons"
 import { Btn, Combo, RibbonGroup } from "../fluent/controls"
+import { ColorPicker, DropBtn, Menu, MenuItem, SplitBtn } from "../fluent/menus"
 import { W } from "./WordBtn"
 import { FONT_SIZES, useFontStep, useWordCmd } from "./wordCmd"
 
@@ -105,16 +107,8 @@ function FontGroup() {
           <W id="strikethrough" icon={<TextStrikethrough20Regular />} />
           <W id="subscript" icon={<TextSubscript20Regular />} />
           <W id="superscript" icon={<TextSuperscript20Regular />} />
-          <W
-            id="highlightColor"
-            args={{ color: "yellow" }}
-            icon={<Highlight20Regular color="#c9a400" />}
-          />
-          <W
-            id="textColor"
-            args={{ color: { rgb: "C00000" } }}
-            icon={<TextColor20Regular color="#c00000" />}
-          />
+          <HighlightSplit />
+          <FontColorSplit />
         </Fragment>,
       ]}
     />
@@ -124,6 +118,7 @@ function FontGroup() {
 function ParagraphGroup() {
   const spacing = useWordCmd("lineSpacing")
   const twips = spacing.state.value
+  const lines = twips === undefined ? undefined : Math.round((twips / 240) * 100) / 100
   return (
     <RibbonGroup
       label="Paragraph"
@@ -141,16 +136,22 @@ function ParagraphGroup() {
           <Align value="center" icon={<TextAlignCenter20Regular />} />
           <Align value="right" icon={<TextAlignRight20Regular />} />
           <Align value="both" icon={<TextAlignJustify20Regular />} />
-          <Combo
-            label="Line Spacing"
-            width={64}
-            options={LINE_SPACINGS}
-            value={twips === undefined ? undefined : Math.round((twips / 240) * 100) / 100}
-            onCommit={(t) => {
-              const lines = Number(t)
-              if (Number.isFinite(lines) && lines > 0)
-                void spacing.execute({ value: Math.round(lines * 240) })
-            }}
+          <DropBtn
+            label="Line and Paragraph Spacing"
+            icon={<TextLineSpacing20Regular />}
+            menu={
+              <Menu label="Line Spacing">
+                {LINE_SPACINGS.map((l) => (
+                  <MenuItem
+                    key={l}
+                    label={String(l)}
+                    cmd={spacing}
+                    args={{ value: Math.round(l * 240) }}
+                    checked={lines === l}
+                  />
+                ))}
+              </Menu>
+            }
           />
         </Fragment>,
       ]}
@@ -166,6 +167,81 @@ function Align({
   icon: React.ReactNode
 }) {
   return <W id="alignment" args={{ value }} pressedValue={value} icon={icon} />
+}
+
+/** Word's highlight names, shown as swatches (the engine takes the name). */
+const HIGHLIGHTS: Record<string, string> = {
+  FFFF00: "yellow",
+  "00FF00": "green",
+  "00FFFF": "cyan",
+  FF00FF: "magenta",
+  "0000FF": "blue",
+  FF0000: "red",
+  "000080": "darkBlue",
+  "008080": "darkCyan",
+  "008000": "darkGreen",
+  "800080": "darkMagenta",
+  "800000": "darkRed",
+  "808000": "darkYellow",
+  "808080": "darkGray",
+  C0C0C0: "lightGray",
+  "000000": "black",
+}
+
+/** Text Highlight Color: main half reapplies the last pick (yellow first). */
+function HighlightSplit() {
+  const [hex, setHex] = useState("FFFF00")
+  const cmd = useWordCmd("highlightColor")
+  const keys = Object.keys(HIGHLIGHTS)
+  return (
+    <SplitBtn
+      cmd={cmd}
+      args={{ color: HIGHLIGHTS[hex] ?? "yellow" }}
+      icon={<Highlight20Regular color={`#${hex}`} />}
+      menu={
+        <ColorPicker
+          label="Highlight colours"
+          colors={[keys.slice(0, 8), keys.slice(8)]}
+          noneLabel="No Color"
+          onPick={(h) => {
+            if (h === null) {
+              void cmd.execute({ color: "none" })
+              return
+            }
+            setHex(h)
+            void cmd.execute({ color: HIGHLIGHTS[h] ?? "yellow" })
+          }}
+        />
+      }
+    />
+  )
+}
+
+/** Font Color: main half reapplies the last pick (dark red first). */
+function FontColorSplit() {
+  const [hex, setHex] = useState("C00000")
+  const cmd = useWordCmd("textColor")
+  return (
+    <SplitBtn
+      cmd={cmd}
+      args={{ color: { rgb: hex } }}
+      icon={<TextColor20Regular color={`#${hex}`} />}
+      menu={
+        <ColorPicker
+          label="Font colours"
+          noneLabel="Automatic"
+          onPick={(h) => {
+            if (h === null) {
+              void cmd.execute({ color: "auto" })
+              return
+            }
+            setHex(h)
+            void cmd.execute({ color: { rgb: h } })
+          }}
+        />
+      }
+    />
+  )
 }
 
 /** Paragraph style box: the engine's style list, shown and typed by name. */

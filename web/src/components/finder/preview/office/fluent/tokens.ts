@@ -41,6 +41,34 @@ export const ACCENT: Record<OfficeApp, string> = {
   powerpoint: "#c43e1c",
 }
 
+/** Office's default theme colours (top row of the picker), RGB hex without `#`. */
+export const THEME_COLORS: readonly string[] = [
+  "FFFFFF",
+  "000000",
+  "E8E8E8",
+  "0E2841",
+  "156082",
+  "E97132",
+  "196B24",
+  "0F9ED5",
+  "A02B93",
+  "4EA72E",
+]
+
+/** Office's standard colours row, RGB hex without `#`. */
+export const STANDARD_COLORS: readonly string[] = [
+  "C00000",
+  "FF0000",
+  "FFC000",
+  "FFFF00",
+  "92D050",
+  "00B050",
+  "00B0F0",
+  "0070C0",
+  "002060",
+  "7030A0",
+]
+
 /** Per-app bar heights in CSS px: status bar, ribbon card (classic two-row or single-line). */
 export const HEIGHTS: Record<OfficeApp, { statusH: number; ribbonH: number }> = {
   word: { statusH: 24, ribbonH: 92 },
