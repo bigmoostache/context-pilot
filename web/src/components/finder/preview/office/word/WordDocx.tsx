@@ -54,12 +54,14 @@ function isZip(bytes: Uint8Array) {
 }
 
 /**
- * Word for the web centres the page in the canvas minus a 16 px right gutter
- * (its scrollbar). The engine centres across the full width with a symmetric
- * gutter, which sits the page 8 px right of Word's.
+ * Word for the web centres the page in the canvas minus its right scrollbar
+ * gutter (18 px here puts the page edge on Word's pixel). The engine centres across the full width with a symmetric
+ * gutter, which sits the page 8 px right of Word's. Word's page edge is a 1 px
+ * #dadada hairline, not the engine's soft shadow.
  */
 const CANVAS_CSS =
-  ".word-canvas .docx-editor__scroll-container{scrollbar-gutter:auto;padding-right:16px;margin-top:-8px}"
+  ".word-canvas .docx-editor__scroll-container{scrollbar-gutter:auto;padding-right:18px;margin-top:-8px}" +
+  ".word-canvas .canvas-page>canvas{box-shadow:0 0 0 1px #dadada!important}"
 
 function EditorArea({
   bytes,
