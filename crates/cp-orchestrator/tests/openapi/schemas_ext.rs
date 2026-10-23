@@ -349,6 +349,16 @@ pub(super) fn transport() -> Value {
             },
             "required": ["sheets", "truncated"]
         },
+        "OfficeVersion": {
+            "type": "object",
+            "properties": { "version": { "type": "string", "description": "mtime_ns-len fingerprint." } },
+            "required": ["version"]
+        },
+        "OfficeSaveResult": {
+            "type": "object",
+            "properties": { "version": { "type": "string" }, "path": { "type": "string" } },
+            "required": ["version", "path"]
+        },
         "WriteResult": {
             "type": "object",
             "properties": { "written": { "type": "integer" }, "path": { "type": "string" } },

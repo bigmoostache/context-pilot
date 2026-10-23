@@ -640,6 +640,18 @@ export type MoveResult = {
     skipped: number;
 };
 
+export type OfficeSaveResult = {
+    path: string;
+    version: string;
+};
+
+export type OfficeVersion = {
+    /**
+     * mtime_ns-len fingerprint.
+     */
+    version: string;
+};
+
 export type OkResponse = {
     ok: boolean;
 };
@@ -2220,6 +2232,85 @@ export type PostApiFleetByIdFsMoveResponses = {
 };
 
 export type PostApiFleetByIdFsMoveResponse = PostApiFleetByIdFsMoveResponses[keyof PostApiFleetByIdFsMoveResponses];
+
+export type GetApiFleetByIdFsOfficeData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/office';
+};
+
+export type GetApiFleetByIdFsOfficeResponses = {
+    /**
+     * Document bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiFleetByIdFsOfficeResponse = GetApiFleetByIdFsOfficeResponses[keyof GetApiFleetByIdFsOfficeResponses];
+
+export type PostApiFleetByIdFsOfficeData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        base: string;
+    };
+    url: '/api/fleet/{id}/fs/office';
+};
+
+export type PostApiFleetByIdFsOfficeErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsOfficeError = PostApiFleetByIdFsOfficeErrors[keyof PostApiFleetByIdFsOfficeErrors];
+
+export type PostApiFleetByIdFsOfficeResponses = {
+    /**
+     * Success
+     */
+    200: OfficeSaveResult;
+};
+
+export type PostApiFleetByIdFsOfficeResponse = PostApiFleetByIdFsOfficeResponses[keyof PostApiFleetByIdFsOfficeResponses];
+
+export type GetApiFleetByIdFsOfficeVersionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+    };
+    url: '/api/fleet/{id}/fs/office/version';
+};
+
+export type GetApiFleetByIdFsOfficeVersionErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsOfficeVersionError = GetApiFleetByIdFsOfficeVersionErrors[keyof GetApiFleetByIdFsOfficeVersionErrors];
+
+export type GetApiFleetByIdFsOfficeVersionResponses = {
+    /**
+     * Success
+     */
+    200: OfficeVersion;
+};
+
+export type GetApiFleetByIdFsOfficeVersionResponse = GetApiFleetByIdFsOfficeVersionResponses[keyof GetApiFleetByIdFsOfficeVersionResponses];
 
 export type GetApiFleetByIdFsPreviewData = {
     body?: never;

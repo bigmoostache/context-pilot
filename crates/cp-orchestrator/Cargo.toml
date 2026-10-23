@@ -12,6 +12,7 @@ publish = false
 
 [dependencies]
 cp-macros.workspace = true
+cp-office.workspace = true
 cp-wire = { path = "../cp-wire", features = ["openapi"] }
 cp-oplog = { path = "../cp-oplog" }
 cp-vault = { path = "../cp-vault" }

@@ -31,6 +31,7 @@ use cp_env as _;
 use cp_macros as _;
 use cp_mod_bridge as _;
 use cp_mod_utilities as _;
+use cp_office as _;
 use cp_vault as _;
 use csv as _;
 use dotenvy as _;

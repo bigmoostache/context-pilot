@@ -817,6 +817,7 @@ dependencies = [
  "cp-macros",
  "cp-mod-bridge",
  "cp-mod-utilities",
+ "cp-office",
  "cp-oplog",
  "cp-vault",
  "cp-wire",

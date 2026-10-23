@@ -25,6 +25,7 @@
 mod download;
 mod listing;
 mod mutate;
+mod office;
 mod sheet;
 mod slides;
 pub(super) mod support;
@@ -33,6 +34,7 @@ mod upload;
 pub(crate) use download::{fs_download, fs_raw};
 pub(crate) use listing::{conversation, fs_descriptions, fs_list, fs_preview};
 pub(crate) use mutate::{fs_mkdir, fs_move, fs_rename, fs_trash, fs_write};
+pub(crate) use office::{fs_office_read, fs_office_version, fs_office_write};
 // Private re-export so sibling `upload` can reach these via `super::`.
 use mutate::{is_bare_name, rel_child};
 pub(crate) use sheet::{fs_sheet, fs_sheet_save};

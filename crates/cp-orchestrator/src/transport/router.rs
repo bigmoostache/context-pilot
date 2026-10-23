@@ -51,6 +51,7 @@ pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'
         ["api", "fleet", id, "avatar"] => files::handle_avatar(request, ctx.state, id),
         ["api", "fleet", id, "fs", "download"] => files::handle_download(request, ctx.state, id, ctx.query),
         ["api", "fleet", id, "fs", "raw"] => files::handle_raw(request, ctx.state, id, ctx.query),
+        ["api", "fleet", id, "fs", "office"] => files::handle_office(request, ctx.state, id, ctx.query),
         // IT: private-CA root download (design §13.5, re-homed from the maint
         // plane). Owns the `Request` for its non-JSON content type. Gate on
         // `can_manage_it` here (a `None` caller is god-mode, FR-v3-08); then
@@ -80,6 +81,8 @@ pub(super) fn try_upload_route(mut request: Request, segments: &[&str], ctx: Rou
             .unwrap_or_else(|| inspect::finder::fs_upload(ctx.state, id, ctx.query, request.as_reader())),
         ["api", "fleet", id, "fs", "upload-unique"] => rest::feature_gate(segments, ctx.flags)
             .unwrap_or_else(|| inspect::finder::fs_upload_unique(ctx.state, id, ctx.query, request.as_reader())),
+        ["api", "fleet", id, "fs", "office"] => rest::feature_gate(segments, ctx.flags)
+            .unwrap_or_else(|| inspect::finder::fs_office_write(ctx.state, id, ctx.query, request.as_reader())),
         _ => return Some(request),
     };
     respond_json(request, &reply);
@@ -179,6 +182,9 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "fs", "preview"]) => inspect::finder::fs_preview(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "sheet"]) => inspect::finder::fs_sheet(state, id, query),
         (&Method::Get, &["api", "fleet", id, "fs", "slides"]) => inspect::finder::fs_slides(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "office", "version"]) => {
+            inspect::finder::fs_office_version(state, id, query)
+        }
         (&Method::Get, &["api", "fleet", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (&Method::Get, &["api", "fleet", id, "conversation"]) => inspect::finder::conversation(state, id),
         (&Method::Post, &["api", "fleet", id, "command"]) => rest::command(state, id, body_bytes),

@@ -226,6 +226,28 @@ pub(super) fn paths() -> Value {
                 "*/*": { "schema": { "type": "string", "format": "binary" } }
             }}}
         }})),
+        "/api/fleet/{id}/fs/office": with_agent(json!({
+            "get": {
+                "tags": ["fs"], "summary": "Office document bytes (docx/xlsx/pptx); version in X-Office-Version",
+                "parameters": [qp("path")],
+                "responses": { "200": { "description": "Document bytes", "content": {
+                    "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+                }}}
+            },
+            "post": {
+                "tags": ["fs"], "summary": "Save office document (409 when base is stale)",
+                "parameters": [qp("path"), qp("base")],
+                "requestBody": { "required": true, "content": {
+                    "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }
+                }},
+                "responses": merge(ok(r("OfficeSaveResult")), err())
+            }
+        })),
+        "/api/fleet/{id}/fs/office/version": with_agent(json!({ "get": {
+            "tags": ["fs"], "summary": "Office document version (polled to pick up agent edits)",
+            "parameters": [qp("path")],
+            "responses": merge(ok(r("OfficeVersion")), err())
+        }})),
         "/api/fleet/{id}/fs/sheet/save": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Save spreadsheet edits (patches the original xlsx/xlsm)",
             "parameters": [qp("path")],

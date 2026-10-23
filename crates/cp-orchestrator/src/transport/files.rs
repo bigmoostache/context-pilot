@@ -131,6 +131,36 @@ pub(super) fn handle_raw(request: Request, state: &Arc<Mutex<Backend>>, id: &str
     }
 }
 
+/// A raw `(name, value)` response header.
+type HeaderPair<'bytes> = (&'bytes [u8], &'bytes [u8]);
+
+/// Serve an office document's bytes for the in-browser editors, with its
+/// version in `X-Office-Version` (sent back as `base` on save, compared with
+/// the polled `fs/office/version` to spot an agent's edit).
+pub(super) fn handle_office(request: Request, state: &Arc<Mutex<Backend>>, id: &str, query: &str) {
+    match inspect::finder::fs_office_read(state, id, query) {
+        Ok(file) => {
+            let mut response = Response::from_data(file.bytes).with_status_code(200u16);
+            let headers: [HeaderPair<'_>; 4] = [
+                (b"Content-Type", b"application/octet-stream"),
+                (b"Cache-Control", b"no-store"),
+                (b"X-Office-Version", file.version.as_bytes()),
+                (b"Access-Control-Expose-Headers", b"X-Office-Version"),
+            ];
+            for (name, value) in headers {
+                if let Ok(h) = Header::from_bytes(name, value) {
+                    response = response.with_header(h);
+                }
+            }
+            for header in cors_headers(&request) {
+                response = response.with_header(header);
+            }
+            let _sent = request.respond(response);
+        }
+        Err(reply) => respond_json(request, &reply),
+    }
+}
+
 /// Serve an agent's avatar image inline (Content-Type from the avatar store).
 pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &str) {
     let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
