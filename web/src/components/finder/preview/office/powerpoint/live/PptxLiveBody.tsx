@@ -1,11 +1,11 @@
 import { lazy, Suspense, useState } from "react"
 import type { FinderNode } from "@/lib/types"
-import { Generic, PreviewStatus } from "../previewParts"
-import { PptChrome } from "./powerpoint/PptChrome"
-import { PptRibbon } from "./powerpoint/PptRibbon"
+import { Generic, PreviewStatus } from "../../../previewParts"
+import { PptChrome } from "../PptChrome"
+import { PptRibbon } from "../PptRibbon"
 import { usePptxFonts } from "./pptxFonts"
 import { usePptxLive } from "./pptxLive"
-import { SaveBar, type SaveState } from "./saveBar"
+import { SaveBar, type SaveState } from "../../saveBar"
 
 const LazyPptx = lazy(() =>
   import("@betteroffice/pptx-react").then((m) => ({ default: m.PptxEditor })),

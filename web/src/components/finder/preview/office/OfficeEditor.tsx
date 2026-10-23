@@ -4,7 +4,7 @@ import { saveOffice } from "@/lib/api"
 import { useFsOffice, useFsOfficeVersion } from "@/lib/live"
 import { Generic, PreviewStatus } from "../previewParts"
 import { officeKindOf } from "../kinds"
-import { PptxLiveBody } from "./PptxLiveBody"
+import { PptxLiveBody } from "./powerpoint/live/PptxLiveBody"
 import { SaveBar, type SaveState } from "./saveBar"
 import "@betteroffice/docx-react/styles.css"
 

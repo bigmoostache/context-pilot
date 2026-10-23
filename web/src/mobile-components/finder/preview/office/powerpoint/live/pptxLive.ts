@@ -1,2 +1,2 @@
 // @generated mobile-mirror stub — do not edit; regenerate via pnpm mirror:scaffold
-export * from "@/components/finder/preview/office/PptxLiveBody"
+export * from "@/components/finder/preview/office/powerpoint/live/pptxLive"
