@@ -32,8 +32,11 @@ export function PptChrome({ fileName, children }: { fileName: string; children: 
  * so they are matched structurally: the strip wraps the slides `aside`, the
  * stage wraps the slide canvas. Values are measured on PowerPoint for the web.
  * Matches the DOM of @betteroffice/pptx-react 0.2.1-cp.20261023.1: recheck on pin bumps.
+ * Stage margins place the slide like PowerPoint web: the engine draws it at the stage's
+ * top-left, fitted to the stage size minus 40px, so the -40px bottom cancels that slack.
  */
 const ENGINE_AREAS = `
 .ppt-body div:has(> aside[aria-label]) { width: 256px !important; background: #f5f5f5 !important; }
-.ppt-body div:has(> canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5 !important; }
+.ppt-body div:has(> div > canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5; }
+.ppt-body div:has(> canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5 !important; margin: 53px 82px -40px 102px; }
 `
