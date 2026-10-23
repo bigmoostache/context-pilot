@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { ChevronDown12Regular } from "@fluentui/react-icons"
+import { useBelowAnchor } from "./anchor"
 import type { Cmd } from "./tokens"
 
 /**
@@ -133,6 +134,7 @@ export function Combo<V extends string | number, A>({
   const ref = useRef<HTMLDivElement>(null)
   const listId = useId()
   const enabled = cmd ? cmd.state.enabled : true
+  const at = useBelowAnchor(ref, open)
 
   const commit = (text: string) => {
     setDraft(null)
@@ -199,8 +201,8 @@ export function Combo<V extends string | number, A>({
           <ChevronDown12Regular />
         </button>
       </div>
-      {open ? (
-        <div id={listId} role="listbox" aria-label={label} style={listStyle}>
+      {open && at ? (
+        <div id={listId} role="listbox" aria-label={label} style={{ ...listStyle, ...at }}>
           {options.map((o) => (
             <button
               key={String(o)}
@@ -310,10 +312,7 @@ const chevronStyle: CSSProperties = {
 }
 
 const listStyle: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 2px)",
-  left: 0,
-  minWidth: "100%",
+  position: "fixed",
   maxHeight: 320,
   overflowY: "auto",
   padding: 4,

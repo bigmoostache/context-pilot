@@ -10,6 +10,7 @@ import {
   ChevronDown12Regular,
   ChevronRight16Regular,
 } from "@fluentui/react-icons"
+import { useBelowAnchor } from "./anchor"
 import { STANDARD_COLORS, THEME_COLORS, type Cmd } from "./tokens"
 
 /** Closes the whole open menu tree; set by the opener (DropBtn/SplitBtn). */
@@ -30,6 +31,7 @@ function Popover({
   onClose: () => void
   children: ReactNode
 }) {
+  const below = useBelowAnchor(anchorRef, true)
   useEffect(() => {
     const down = (e: PointerEvent) => {
       if (anchorRef.current && !anchorRef.current.contains(e.target as Node)) onClose()
@@ -37,9 +39,12 @@ function Popover({
     document.addEventListener("pointerdown", down)
     return () => document.removeEventListener("pointerdown", down)
   }, [anchorRef, onClose])
+  if (!below) return null
   return (
     <CloseContext value={onClose}>
-      <div style={{ ...popoverStyle, top: "calc(100% + 2px)", left: 0 }}>{children}</div>
+      <div style={{ ...popoverStyle, position: "fixed", top: below.top, left: below.left }}>
+        {children}
+      </div>
     </CloseContext>
   )
 }
