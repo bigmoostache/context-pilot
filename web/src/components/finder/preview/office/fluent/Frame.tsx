@@ -136,7 +136,7 @@ export function OfficeRibbon({
   }
 
   return (
-    <div style={{ flex: "none", fontFamily: "var(--of-font)", position: "relative" }}>
+    <div style={{ flex: "none", fontFamily: "var(--of-font)", position: "relative", zIndex: 1 }}>
       <TabRow
         tabs={tabList}
         active={current?.id ?? ""}

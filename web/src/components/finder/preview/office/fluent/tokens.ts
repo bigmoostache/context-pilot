@@ -72,7 +72,7 @@ export const STANDARD_COLORS: readonly string[] = [
 
 /** Per-app bar heights in CSS px: status bar, ribbon card (classic two-row or single-line). */
 export const HEIGHTS: Record<OfficeApp, { statusH: number; ribbonH: number }> = {
-  word: { statusH: 24, ribbonH: 92 },
+  word: { statusH: 24, ribbonH: 100 },
   excel: { statusH: 23, ribbonH: 40 },
   powerpoint: { statusH: 23, ribbonH: 40 },
 }

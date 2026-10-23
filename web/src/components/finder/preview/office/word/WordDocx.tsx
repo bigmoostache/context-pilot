@@ -47,8 +47,10 @@ export default function WordDocx({
 }
 
 /** A .docx is a zip: it starts with the local-file-header magic "PK\x03\x04". */
+const ZIP_MAGIC = [80, 75, 3, 4] as const
+
 function isZip(bytes: Uint8Array) {
-  return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+  return ZIP_MAGIC.every((b, i) => bytes[i] === b)
 }
 
 /**
@@ -57,7 +59,7 @@ function isZip(bytes: Uint8Array) {
  * gutter, which sits the page 8 px right of Word's.
  */
 const CANVAS_CSS =
-  ".word-canvas .docx-editor__scroll-container{scrollbar-gutter:auto;padding-right:16px}"
+  ".word-canvas .docx-editor__scroll-container{scrollbar-gutter:auto;padding-right:16px;margin-top:-8px}"
 
 function EditorArea({
   bytes,
