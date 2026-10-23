@@ -159,6 +159,13 @@ function ParagraphGroup() {
   )
 }
 
+const ALIGN_LABEL = {
+  left: "Align Left",
+  center: "Center",
+  right: "Align Right",
+  both: "Justify",
+} as const
+
 function Align({
   value,
   icon,
@@ -166,7 +173,15 @@ function Align({
   value: "left" | "center" | "right" | "both"
   icon: React.ReactNode
 }) {
-  return <W id="alignment" args={{ value }} pressedValue={value} icon={icon} />
+  return (
+    <W
+      id="alignment"
+      args={{ value }}
+      pressedValue={value}
+      label={ALIGN_LABEL[value]}
+      icon={icon}
+    />
+  )
 }
 
 /** Word's highlight names, shown as swatches (the engine takes the name). */

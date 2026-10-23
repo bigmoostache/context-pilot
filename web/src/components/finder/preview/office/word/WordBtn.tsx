@@ -15,6 +15,7 @@ export function W<K extends DocxCommandId>({
   text,
   size,
   pressedValue,
+  label,
 }: {
   id: K
   args?: DocxCommandArgs[K] | undefined
@@ -22,11 +23,14 @@ export function W<K extends DocxCommandId>({
   text?: string | undefined
   size?: "sm" | "lg"
   pressedValue?: DocxCommandValues[K] | undefined
+  /** Tooltip/aria label when the engine's is too generic ("Alignment"). */
+  label?: string | undefined
 }) {
   const cmd = useWordCmd(id, args)
+  const named = label === undefined ? cmd : { ...cmd, label }
   const bound =
     pressedValue === undefined
-      ? cmd
-      : { ...cmd, state: { ...cmd.state, active: cmd.state.value === pressedValue } }
+      ? named
+      : { ...named, state: { ...named.state, active: named.state.value === pressedValue } }
   return <Btn cmd={bound} args={args} icon={icon} text={text} size={size ?? "sm"} />
 }

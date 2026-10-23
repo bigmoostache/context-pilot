@@ -95,6 +95,7 @@ export function ReviewTab() {
           id="editingMode"
           args={{ mode: "suggesting" }}
           pressedValue="suggesting"
+          label="Track Changes"
           size="lg"
           icon={<Edit20Regular />}
           text="Track Changes"
