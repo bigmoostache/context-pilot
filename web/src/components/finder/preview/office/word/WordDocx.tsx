@@ -51,6 +51,14 @@ function isZip(bytes: Uint8Array) {
   return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
 }
 
+/**
+ * Word for the web centres the page in the canvas minus a 16 px right gutter
+ * (its scrollbar). The engine centres across the full width with a symmetric
+ * gutter, which sits the page 8 px right of Word's.
+ */
+const CANVAS_CSS =
+  ".word-canvas .docx-editor__scroll-container{scrollbar-gutter:auto;padding-right:16px}"
+
 function EditorArea({
   bytes,
   onSave,
@@ -78,9 +86,12 @@ function EditorArea({
           showRuler={false}
           showZoomControl={false}
           style={WORD_EDITOR_STYLE as CSSProperties}
-          className="size-full"
+          className="word-canvas size-full"
         />
       </WordEditorContext>
+      <style href="word-canvas" precedence="default">
+        {CANVAS_CSS}
+      </style>
     </div>
   )
 }
