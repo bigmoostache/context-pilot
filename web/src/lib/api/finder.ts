@@ -7,7 +7,9 @@
 import type {
   FinderNode,
   FsPreview,
+  OfficeLog,
   OfficeSaveResult,
+  OfficeUpdateResult,
   OfficeVersion,
   UploadResult,
   UploadUniqueResult,
@@ -16,6 +18,7 @@ import type {
 import {
   getApiFleetByIdFs,
   getApiFleetByIdFsDescriptions,
+  getApiFleetByIdFsOfficeLog,
   getApiFleetByIdFsOfficeVersion,
   getApiFleetByIdFsPreview,
   postApiFleetByIdFsWrite,
@@ -26,7 +29,33 @@ import { sendUpload } from "./client/upload"
 // ── Type re-exports (preserve import surface) ────────────────────────
 
 export type { FinderNode, FsPreview, OfficeSaveResult, OfficeVersion } from "./generated/types.gen"
+export type { OfficeLog, OfficeUpdateResult } from "./generated/types.gen"
 export type { WriteResult, UploadResult, UploadUniqueResult } from "./generated/types.gen"
+
+/** The live-update log of an office file; `withBase` adds the base bytes (base64). */
+export function fetchOfficeLog(
+  fleetId: string,
+  path: string,
+  withBase: boolean,
+): Promise<OfficeLog> {
+  const query = withBase ? { path, base: "1" } : { path }
+  return sdk(getApiFleetByIdFsOfficeLog({ path: { id: fleetId }, query }))
+}
+
+/**
+ * Post a live update built on log `seq`: the replica's full CRDT state and the
+ * document saved from it. The backend answers 409 when the log moved.
+ */
+export function postOfficeUpdate(
+  fleetId: string,
+  path: string,
+  { seq, state, file }: { seq: number; state: Uint8Array; file: Uint8Array },
+): Promise<OfficeUpdateResult> {
+  const q = `path=${encodeURIComponent(path)}&seq=${String(seq)}&stateLen=${String(state.length)}`
+  const name = path.split("/").pop() ?? path
+  const blob = new Blob([state as BlobPart, file as BlobPart], { type: "application/octet-stream" })
+  return sendUpload<OfficeUpdateResult>(`/api/fleet/${fleetId}/fs/office/update?${q}`, blob, name)
+}
 
 /** An office document's bytes plus the version they were read at. */
 export interface OfficeDoc {

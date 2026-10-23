@@ -238,6 +238,16 @@ pub(super) fn paths() -> Value {
             "parameters": [qp("path")],
             "responses": merge(ok(r("OfficeVersion")), err())
         }})),
+        "/api/fleet/{id}/fs/office/log": with_agent(json!({ "get": {
+            "tags": ["fs"], "summary": "Office live-update log: base version, seq, full CRDT state (base=1 adds base bytes)",
+            "parameters": [qp("path"), qp_opt("base")], "responses": merge(ok(r("OfficeLog")), err())
+        }})),
+        "/api/fleet/{id}/fs/office/update": with_agent(json!({ "post": {
+            "tags": ["fs"], "summary": "Post a live update: body = state bytes (stateLen) then file bytes; 409 when seq is stale",
+            "parameters": [qp("path"), qp("seq"), qp("stateLen")],
+            "requestBody": { "required": true, "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+            "responses": merge(ok(r("OfficeUpdateResult")), err())
+        }})),
         "/api/fleet/{id}/fs/write": with_agent(json!({ "post": {
             "tags": ["fs"], "summary": "Write file",
             "parameters": [qp("path")],

@@ -273,6 +273,15 @@ pub(super) fn deploy() -> Value {
         ] },
         // The `ItNetwork*` schemas live in [`schemas_net`](super::schemas_net),
         // together with the request bodies they share their field lists with.
+        // ── Live office updates (docs/design-office-live-updates.md) ────
+        "OfficeLog": obj(json!({
+            "baseVersion": string(),
+            "headVersion": string(),
+            "seq": { "type": "integer" },
+            "state": { "type": "string", "nullable": true, "description": "Base64 full CRDT state; null until a writer posts." },
+            "base": { "type": "string", "nullable": true, "description": "Base64 base bytes; only with base=1." }
+        }), &["baseVersion", "headVersion", "seq", "state", "base"]),
+        "OfficeUpdateResult": obj(json!({ "seq": { "type": "integer" }, "headVersion": string() }), &["seq", "headVersion"]),
     })
 }
 

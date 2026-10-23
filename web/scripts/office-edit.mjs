@@ -36,7 +36,10 @@ if (!values.path.toLowerCase().endsWith(".pptx")) {
 }
 
 const webDir = resolve(import.meta.dirname, "..")
-const pkg = join(webDir, "node_modules/.pnpm/@betteroffice+pptx@0.2.0/node_modules/@betteroffice/pptx")
+const pkg = join(
+  webDir,
+  "node_modules/.pnpm/@betteroffice+pptx@0.2.0/node_modules/@betteroffice/pptx",
+)
 const engine = await import(pathToFileURL(join(pkg, "dist/index.js")).href)
 await engine.initWasm(readFileSync(join(pkg, "dist/generated/pptx_wasm_bg.wasm")))
 const edit = (await import(pathToFileURL(resolve(editFile)).href)).default

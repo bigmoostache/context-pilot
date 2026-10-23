@@ -4,7 +4,8 @@ import { saveOffice } from "@/lib/api"
 import { useFsOffice, useFsOfficeVersion } from "@/lib/live"
 import { Generic, PreviewStatus } from "../previewParts"
 import { officeKindOf } from "../kinds"
-import { usePptxFonts } from "./pptxFonts"
+import { PptxLiveBody } from "./PptxLiveBody"
+import { SaveBar, type SaveState } from "./saveBar"
 import "@betteroffice/docx-react/styles.css"
 
 /** BetterOffice editors (Rust engines compiled to WASM) — loaded on first open. */
@@ -14,11 +15,6 @@ const LazyXlsx = lazy(() =>
 const LazyDocx = lazy(() =>
   import("@betteroffice/docx-react").then((m) => ({ default: m.DocxEditor })),
 )
-const LazyPptx = lazy(() =>
-  import("@betteroffice/pptx-react").then((m) => ({ default: m.PptxEditor })),
-)
-
-type SaveState = "idle" | "saving" | "saved" | "conflict" | "error"
 
 /**
  * Edit a realm .docx/.xlsx/.pptx in the BetterOffice editor. The file on disk is
@@ -32,6 +28,7 @@ export function OfficeEditor({ fleetId, node }: { fleetId: string; node: FinderN
   // tab doesn't fetch and parse; open only after an explicit click.
   const [open, setOpen] = useState(false)
   if (!open) return <OpenGate node={node} onOpen={() => setOpen(true)} />
+  if (officeKindOf(node.path) === "pptx") return <PptxLiveBody fleetId={fleetId} node={node} />
   return <OfficeEditorBody fleetId={fleetId} node={node} />
 }
 
@@ -71,7 +68,6 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
   const [state, setState] = useState<SaveState>("idle")
   // Version whose xlsx workbook finished opening (the engine signals onReady).
   const [xlsxReady, setXlsxReady] = useState("")
-  const pptxFonts = usePptxFonts(kind === "pptx")
   const { refetch } = doc
 
   useEffect(() => {
@@ -108,8 +104,6 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
   if (!kind) return <Generic node={node} />
   if (doc.loading) return <PreviewStatus label="Loading document…" />
   if (doc.error || !doc.data) return <Generic node={node} />
-  if (kind === "pptx" && pptxFonts.error) return <Generic node={node} />
-  if (kind === "pptx" && !pptxFonts.fonts) return <PreviewStatus label="Loading fonts…" />
 
   const { bytes, version } = doc.data
   return (
@@ -136,16 +130,6 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
               />
               {xlsxReady !== version && <OpeningOverlay size={bytes.length} />}
             </>
-          )}
-          {kind === "pptx" && (
-            <LazyPptx
-              file={bytes}
-              fileName={node.name}
-              fonts={pptxFonts.fonts ?? []}
-              onSave={save}
-              onChange={markDirty}
-              className="size-full"
-            />
           )}
           {kind === "docx" && (
             <LazyDocx
@@ -185,7 +169,7 @@ const OPEN_MS_PER_MB = 8000
 
 /**
  * Estimated open progress (0–95). The engine reports none, so the bar follows
- * an exponential curve reaching 90% at the size-based estimate, never 100%.
+ * an exponential curve reaching ~85% at the size-based estimate, capped at 95%.
  */
 function useEstimatedProgress(size: number): number {
   const [pct, setPct] = useState(0)
@@ -201,33 +185,4 @@ function useEstimatedProgress(size: number): number {
     }
   }, [size])
   return pct
-}
-
-/** One-line save status; a conflict offers to reload the agent's version. */
-function SaveBar({ state, onReload }: { state: SaveState; onReload: () => void }) {
-  if (state === "idle") return null
-  const label: Record<Exclude<SaveState, "idle">, string> = {
-    saving: "Saving…",
-    saved: "Saved",
-    conflict: "The file changed on disk since you opened it.",
-    error: "Save failed.",
-  }
-  return (
-    <div className="flex h-7 shrink-0 items-center gap-2 px-3 text-[11px] text-muted-foreground">
-      <span
-        className={state === "saved" ? "text-(--ok)" : state === "saving" ? "" : "text-(--danger)"}
-      >
-        {label[state]}
-      </span>
-      {state === "conflict" && (
-        <button
-          type="button"
-          onClick={onReload}
-          className="rounded-md bg-muted px-2 py-0.5 font-medium hover:bg-muted/70"
-        >
-          Reload (discard my edits)
-        </button>
-      )}
-    </div>
-  )
 }

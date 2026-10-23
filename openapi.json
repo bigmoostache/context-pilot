@@ -1843,6 +1843,37 @@
         ],
         "type": "object"
       },
+      "OfficeLog": {
+        "properties": {
+          "base": {
+            "description": "Base64 base bytes; only with base=1.",
+            "nullable": true,
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "string"
+          },
+          "headVersion": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer"
+          },
+          "state": {
+            "description": "Base64 full CRDT state; null until a writer posts.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseVersion",
+          "headVersion",
+          "seq",
+          "state",
+          "base"
+        ],
+        "type": "object"
+      },
       "OfficeSaveResult": {
         "properties": {
           "path": {
@@ -1855,6 +1886,21 @@
         "required": [
           "version",
           "path"
+        ],
+        "type": "object"
+      },
+      "OfficeUpdateResult": {
+        "properties": {
+          "headVersion": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "headVersion"
         ],
         "type": "object"
       },
@@ -4611,6 +4657,136 @@
           }
         },
         "summary": "Save office document (409 when base is stale)",
+        "tags": [
+          "fs"
+        ]
+      }
+    },
+    "/api/fleet/{id}/fs/office/log": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "base",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeLog"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Office live-update log: base version, seq, full CRDT state (base=1 adds base bytes)",
+        "tags": [
+          "fs"
+        ]
+      }
+    },
+    "/api/fleet/{id}/fs/office/update": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stateLen",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeUpdateResult"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Post a live update: body = state bytes (stateLen) then file bytes; 409 when seq is stale",
         "tags": [
           "fs"
         ]

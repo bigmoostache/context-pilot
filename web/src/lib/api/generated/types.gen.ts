@@ -640,9 +640,28 @@ export type MoveResult = {
     skipped: number;
 };
 
+export type OfficeLog = {
+    /**
+     * Base64 base bytes; only with base=1.
+     */
+    base: string | null;
+    baseVersion: string;
+    headVersion: string;
+    seq: number;
+    /**
+     * Base64 full CRDT state; null until a writer posts.
+     */
+    state: string | null;
+};
+
 export type OfficeSaveResult = {
     path: string;
     version: string;
+};
+
+export type OfficeUpdateResult = {
+    headVersion: string;
+    seq: number;
 };
 
 export type OfficeVersion = {
@@ -2133,6 +2152,67 @@ export type PostApiFleetByIdFsOfficeResponses = {
 };
 
 export type PostApiFleetByIdFsOfficeResponse = PostApiFleetByIdFsOfficeResponses[keyof PostApiFleetByIdFsOfficeResponses];
+
+export type GetApiFleetByIdFsOfficeLogData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        base?: string;
+    };
+    url: '/api/fleet/{id}/fs/office/log';
+};
+
+export type GetApiFleetByIdFsOfficeLogErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiFleetByIdFsOfficeLogError = GetApiFleetByIdFsOfficeLogErrors[keyof GetApiFleetByIdFsOfficeLogErrors];
+
+export type GetApiFleetByIdFsOfficeLogResponses = {
+    /**
+     * Success
+     */
+    200: OfficeLog;
+};
+
+export type GetApiFleetByIdFsOfficeLogResponse = GetApiFleetByIdFsOfficeLogResponses[keyof GetApiFleetByIdFsOfficeLogResponses];
+
+export type PostApiFleetByIdFsOfficeUpdateData = {
+    body: Blob | File;
+    path: {
+        id: string;
+    };
+    query: {
+        path: string;
+        seq: string;
+        stateLen: string;
+    };
+    url: '/api/fleet/{id}/fs/office/update';
+};
+
+export type PostApiFleetByIdFsOfficeUpdateErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiFleetByIdFsOfficeUpdateError = PostApiFleetByIdFsOfficeUpdateErrors[keyof PostApiFleetByIdFsOfficeUpdateErrors];
+
+export type PostApiFleetByIdFsOfficeUpdateResponses = {
+    /**
+     * Success
+     */
+    200: OfficeUpdateResult;
+};
+
+export type PostApiFleetByIdFsOfficeUpdateResponse = PostApiFleetByIdFsOfficeUpdateResponses[keyof PostApiFleetByIdFsOfficeUpdateResponses];
 
 export type GetApiFleetByIdFsOfficeVersionData = {
     body?: never;
