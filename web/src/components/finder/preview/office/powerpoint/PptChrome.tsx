@@ -42,6 +42,7 @@ const ENGINE_AREAS = `
 .ppt-body aside[aria-label] > button > canvas { width: 188px !important; height: auto !important; aspect-ratio: 16 / 9; border-radius: 4px; box-shadow: 0 0 0 1px #e0e0e0; }
 .ppt-body aside[aria-label] > button[aria-current="page"] > canvas { box-shadow: 0 0 0 3px #c43e1c; }
 .ppt-body div:has(> div > canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5; }
-.ppt-body div:has(> canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5 !important; margin: 53px 66px -40px 102px; }
+.ppt-body div:has(> canvas[data-testid="pptx-slide-canvas"]) { background: #f5f5f5 !important; margin: 53px 66px -48px 87px; }
+.ppt-body canvas[data-testid="pptx-slide-canvas"] { box-shadow: 0 1.6px 3.6px rgba(0,0,0,.13), 0 .3px .9px rgba(0,0,0,.11); }
 .ppt-body label:has(textarea), .ppt-body label:has(textarea) textarea { background: transparent !important; }
 `
