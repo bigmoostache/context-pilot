@@ -9,6 +9,10 @@ Reference: Word for the web editor, light theme, 1440×900, captured headless
 (`/tmp/wh/ref/web-editor.png`, DOM spec `/tmp/wh/ref/spec.json`). Locale of the
 reference is FR; we ship EN labels with the same geometry.
 
+User decisions (2026-10-23): Microsoft cloud controls (Share, Dictate, Editor,
+Add-ins, Catch up, waffle, Settings, account) are **removed**; tabs the engine
+cannot support (References, Draw, Design, Help) are **hidden**.
+
 ## 0. Rules
 
 1. **No dead element.** Every visible control does what Word does, or it is
