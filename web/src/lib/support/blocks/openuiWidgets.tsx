@@ -1,8 +1,9 @@
 import { ChevronDown } from "lucide-react"
-import { use, useId, useState, type CSSProperties, type ReactNode } from "react"
+import { use, useState, type CSSProperties, type ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
 
+import { Sparkline } from "./charts/openuiCharts"
 import {
   OPENUI_SEND_EVENT,
   StoreContext,
@@ -25,61 +26,6 @@ import type { OpenUiNode } from "./openuiParse"
 // `{inputId}` placeholders from that store and posts the result as a real user
 // message (via the `openui:send` window event that `useAgentForms` relays to the
 // existing send path) — the frontend only renders and forwards, no logic.
-
-/** Points of a polyline through `values`, scaled into a `w`×`h` box. */
-function linePoints(values: number[], w: number, h: number): [number, number][] {
-  const min = Math.min(...values)
-  const span = Math.max(...values) - min || 1
-  const step = values.length > 1 ? w / (values.length - 1) : 0
-  return values.map((v, i) => [i * step, h - ((v - min) / span) * (h - 4) - 2])
-}
-
-/** Smooth area sparkline (gradient fill + stroke + end dot). Pure SVG. */
-export function Sparkline({
-  values,
-  color,
-  height = 44,
-}: {
-  values: number[]
-  color: string
-  height?: number
-}): ReactNode {
-  const gradientId = `ou-g${useId().replaceAll(":", "")}`
-  const w = 200
-  const pts = linePoints(values, w, height)
-  const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")
-  const last = pts.at(-1) ?? [0, 0]
-  return (
-    <svg
-      viewBox={`0 0 ${String(w)} ${String(height)}`}
-      className="w-full overflow-visible"
-      style={{ height }}
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.18} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <polygon
-        points={`0,${String(height)} ${line} ${String(w)},${String(height)}`}
-        fill={`url(#${gradientId})`}
-      />
-      <polyline
-        points={line}
-        fill="none"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-      <circle cx={last[0]} cy={last[1]} r={3} fill={color} />
-    </svg>
-  )
-}
 
 /** Big-number stat with optional delta chip and trend sparkline (`Metric(…, [1,2,3])`). */
 export function Metric({ node }: { node: OpenUiNode }): ReactNode {
@@ -113,55 +59,6 @@ export function Metric({ node }: { node: OpenUiNode }): ReactNode {
   )
 }
 
-/** Radial gauge (`Ring(value: 0..100, label, tone)`). */
-export function Ring({ node }: { node: OpenUiNode }): ReactNode {
-  const pct = Math.max(0, Math.min(100, numProp(node, "value") ?? 0))
-  const color = toneColor(node.props["tone"])
-  const r = 34
-  const c = 2 * Math.PI * r
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg
-        viewBox="0 0 84 84"
-        className="size-24 -rotate-90"
-        aria-label={`${String(pct)}%`}
-        role="img"
-      >
-        <circle
-          cx={42}
-          cy={42}
-          r={r}
-          fill="none"
-          stroke={tint("var(--foreground)", 8)}
-          strokeWidth={6}
-        />
-        <circle
-          cx={42}
-          cy={42}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={6}
-          strokeLinecap="round"
-          strokeDasharray={`${String((pct / 100) * c)} ${String(c)}`}
-          className="transition-[stroke-dasharray] duration-700"
-        />
-        <text
-          x={42}
-          y={42}
-          dy="0.35em"
-          textAnchor="middle"
-          className="rotate-90 fill-current text-[17px] font-semibold"
-          style={{ transformOrigin: "42px 42px" }}
-        >
-          {Math.round(pct)}%
-        </text>
-      </svg>
-      <span className="text-[12px] text-muted-foreground">{str(node.props["label"])}</span>
-    </div>
-  )
-}
-
 /** Themed progress bar (`Progress(value: 0..100, label, tone)`). */
 export function Progress({ node }: { node: OpenUiNode }): ReactNode {
   const pct = Math.max(0, Math.min(100, numProp(node, "value") ?? 0))
@@ -179,51 +76,6 @@ export function Progress({ node }: { node: OpenUiNode }): ReactNode {
           style={{ width: `${String(pct)}%`, background: color }}
         />
       </div>
-    </div>
-  )
-}
-
-/** Bar chart with per-bar hover readout (`BarChart([…], labels…)`). */
-export function BarChart({ node }: { node: OpenUiNode }): ReactNode {
-  const [hover, setHover] = useState<number | null>(null)
-  const values = numbersArg(node)
-  if (values.length === 0) return null
-  const labels = stringLists(node)[0] ?? []
-  const max = Math.max(...values, 1)
-  const color = toneColor(node.props["tone"])
-  return (
-    <div className="relative flex h-44 items-end gap-2 pt-6">
-      {[0, 1, 2, 3].map((g) => (
-        <div
-          key={g}
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 h-px bg-foreground/6"
-          style={{ bottom: `calc(${String(g * 33.3)}% * 0.82 + 18px)` }}
-        />
-      ))}
-      {values.map((v, i) => (
-        <div
-          key={i}
-          className="relative flex h-full flex-1 flex-col items-center justify-end gap-1.5"
-          onPointerEnter={() => setHover(i)}
-          onPointerLeave={() => setHover(null)}
-        >
-          {hover === i && (
-            <span className="absolute -top-6 rounded-md bg-popover px-1.5 py-0.5 text-[11px] font-medium tabular-nums shadow-sm ring-1 ring-foreground/10">
-              {v}
-            </span>
-          )}
-          <div
-            className="w-full max-w-10 rounded-t-sm transition-opacity duration-150"
-            style={{
-              height: `${String(Math.max(2, (v / max) * 82))}%`,
-              background: color,
-              opacity: hover === null || hover === i ? 1 : 0.4,
-            }}
-          />
-          <span className="text-[11px] text-muted-foreground">{labels[i] ?? ""}</span>
-        </div>
-      ))}
     </div>
   )
 }

@@ -12,10 +12,19 @@ import { cn } from "@/lib/utils"
 
 import { parseOpenUi, type OpenUiNode } from "./openuiParse"
 import {
+  AreaChart,
+  BarChart,
+  LineChart,
+  PieChart,
+  RadarChart,
+  RadialChart,
+  Ring,
+  SparklineNode,
+} from "./charts/openuiCharts"
+import {
   StoreContext,
   firstText,
   numProp,
-  numbersArg,
   str,
   stringLists,
   toneColor,
@@ -24,14 +33,11 @@ import {
 import {
   ActionButton,
   Badge,
-  BarChart,
   Input,
   Metric,
   Progress,
-  Ring,
   Select,
   Slider,
-  Sparkline,
   Table,
 } from "./openuiWidgets"
 import { SqlTable } from "./sqlTable/SqlTable"
@@ -153,13 +159,13 @@ const RENDERERS: Record<string, Renderer> = {
   Metric: (_id, node) => <Metric node={node} />,
   Progress: (_id, node) => <Progress node={node} />,
   Ring: (_id, node) => <Ring node={node} />,
-  Sparkline: (_id, node) => {
-    const values = numbersArg(node)
-    return values.length > 1 ? (
-      <Sparkline values={values} color={toneColor(node.props["tone"])} />
-    ) : null
-  },
+  Sparkline: (_id, node) => <SparklineNode node={node} />,
   BarChart: (_id, node) => <BarChart node={node} />,
+  AreaChart: (_id, node) => <AreaChart node={node} />,
+  LineChart: (_id, node) => <LineChart node={node} />,
+  RadarChart: (_id, node) => <RadarChart node={node} />,
+  RadialChart: (_id, node) => <RadialChart node={node} />,
+  PieChart: (_id, node) => <PieChart node={node} />,
   Table: (_id, node) => <Table node={node} />,
   SqlTable: (_id, node) => <SqlTable node={node} />,
   Button: (_id, node) => <ActionButton node={node} />,

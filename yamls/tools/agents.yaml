@@ -218,7 +218,17 @@ tools:
       Content: Heading("text", level) · Text("text", muted) · Badge("text", tone) ·
       Metric(label, value, delta, tone, [trend numbers]) · Progress(value 0..100, label, tone) ·
       Ring(value 0..100, label, tone) · Sparkline([1,4,2,8], tone) ·
-      BarChart([1,4,2,8], ["Mon","Tue",…], tone) · Table(["h1","h2"], ["a","b"], …).
+      Table(["h1","h2"], ["a","b"], …).
+      Charts (shadcn/Recharts, hover tooltips): the string list = x labels, EACH
+      number list = one series, in order. AreaChart / BarChart / LineChart /
+      RadarChart(["Mon","Tue","Wed"], [3,5,4], [1,2,2], series: "Runs, Passed",
+      tones: "signal, ok"). Common props: title, description, height (px), unit
+      ("%", " s", "$"), legend (default on for 2+ series), indicator: dot|line|dashed|none,
+      total: true (sum row in tooltip). Area/Line: curve: natural|linear|step,
+      dots; Area: stacked, gradient: false; Bar: stacked, horizontal.
+      PieChart([40,30,30], ["A","B","C"], donut, center: "1,045", caption: "lints") ·
+      RadialChart([72,54], ["Cache","Ctx"], max: 100, center, caption): one value per
+      slice/ring, coloured by tones (palette by default).
       Inputs (value bound to the binding id): Input("placeholder", label, value) ·
       Select(["prod","staging"], label) · Slider(min, max, step, value, label, unit).
       Button("label", send: "text {inputId}", tone, variant: ghost): `send` posts the
