@@ -48,6 +48,7 @@ const MessageRow = memo(
     onShowInFinder,
     onDelete,
     onBranch,
+    hideActions,
   }: {
     msg: AgentMsg
     fleetId: string
@@ -55,6 +56,8 @@ const MessageRow = memo(
     onShowInFinder: ((path: string) => void) | undefined
     onDelete: (msg: AgentMsg) => void
     onBranch: (msg: AgentMsg) => void
+    /** drop the timestamp + action row (narrow chat beside a file preview) */
+    hideActions: boolean
   }) {
     return (
       <div
@@ -77,6 +80,7 @@ const MessageRow = memo(
           onShowInFinder={onShowInFinder}
           onDelete={() => onDelete(msg)}
           onBranch={() => onBranch(msg)}
+          hideActions={hideActions}
         />
         {msg.fileRef && (
           <div className="pb-1.5 pl-7">
@@ -88,7 +92,7 @@ const MessageRow = memo(
       </div>
     )
   },
-  (a, b) => a.msg === b.msg && a.fleetId === b.fleetId,
+  (a, b) => a.msg === b.msg && a.fleetId === b.fleetId && a.hideActions === b.hideActions,
 )
 
 /**
@@ -236,7 +240,6 @@ export function AgentConversation({
   onRemoveFile,
   onShowInFinder,
   onUnarchive,
-  leftRailHidden = false,
   onBranch,
   parentName,
   onOpenAgent,
@@ -256,11 +259,6 @@ export function AgentConversation({
   onShowInFinder?: ((path: string) => void) | undefined
   /** restore this agent from the archive — only rendered when the agent is archived (T709) */
   onUnarchive?: (() => void) | undefined
-  /** Whether the left agent-list rail is hidden (T680). Forwarded to the right
-   *  aside so a file preview widens to half the viewport when the left rail is
-   *  collapsed. Defaults to false (the 40vw behaviour) so nothing breaks if a
-   *  caller omits it. */
-  leftRailHidden?: boolean | undefined
   /** open the Branch dialog on a message of this agent (branch out) */
   onBranch?: ((agentId: string, msg: AgentMsg) => void) | undefined
   /** name of the parent agent when this one was branched out of it (undefined
@@ -322,10 +320,13 @@ export function AgentConversation({
   // Form derivations: answered-state lookup + submit handler (docs/forms.md §5).
   const { answersByForm, onFormSubmit } = useAgentForms(agent.log, fleetId, agent.id)
 
+  // A file preview takes 70% of the row: the narrow chat drops per-message chrome.
+  const previewing = !aside.hidden && aside.tab === "files" && aside.file !== null
+
   return (
     <FleetIdContext value={fleetId}>
       <main
-        className="relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
+        className="@container relative flex min-w-0 flex-1 flex-row overflow-hidden bg-background"
         // Filter is applied ONLY while dragging. A permanent `blur(0px)` (the old
         // idle value) is still a non-`none` filter, so it promotes the ENTIRE
         // conversation to a single GPU compositor layer. On a very tall agent
@@ -376,6 +377,7 @@ export function AgentConversation({
                     onShowInFinder={onShowInFinder}
                     onDelete={handleDelete}
                     onBranch={handleBranch}
+                    hideActions={previewing}
                   />
                 ) : (
                   <MessageRow
@@ -386,6 +388,7 @@ export function AgentConversation({
                     onShowInFinder={onShowInFinder}
                     onDelete={handleDelete}
                     onBranch={handleBranch}
+                    hideActions={previewing}
                   />
                 ),
               )}
@@ -425,7 +428,6 @@ export function AgentConversation({
           tasks={agent.tasks ?? []}
           notes={agent.notes ?? []}
           aside={aside}
-          leftRailHidden={leftRailHidden}
         />
 
         <CreateCommandDialog

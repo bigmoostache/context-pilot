@@ -34,6 +34,7 @@ export function FormMessageRow({
   onShowInFinder,
   onDelete,
   onBranch,
+  hideActions,
 }: {
   msg: AgentMsg
   fleetId: string
@@ -44,6 +45,8 @@ export function FormMessageRow({
   onShowInFinder: ((path: string) => void) | undefined
   onDelete: (msg: AgentMsg) => void
   onBranch: ((msg: AgentMsg) => void) | undefined
+  /** drop the timestamp + action row (narrow chat beside a file preview) */
+  hideActions: boolean
 }) {
   const text = msg.text ?? ""
   const answerBlock = parseFormAnswerBlock(text)
@@ -68,6 +71,7 @@ export function FormMessageRow({
       onShowInFinder={onShowInFinder}
       onDelete={() => onDelete(msg)}
       onBranch={onBranch ? () => onBranch(msg) : undefined}
+      hideActions={hideActions}
       renderForm={(spec) => (
         <FormWidget
           spec={spec}

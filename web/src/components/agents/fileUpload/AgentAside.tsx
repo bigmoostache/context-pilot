@@ -96,10 +96,14 @@ function useTabMotion(rootRef: RefObject<HTMLDivElement | null>, activeTab: Asid
   }, [rootRef, activeTab])
 }
 
-/** Rail width class: sidebar width for lists, 40vw (50vw with the left rail hidden) for a preview. */
-function railWidth(previewing: boolean, leftRailHidden: boolean): string {
+/**
+ * Rail width class: sidebar width for lists; for a preview, 70% of the
+ * conversation row (the `@container` <main>), `mr-2` gutter included, so the
+ * chat keeps the other 30%.
+ */
+function railWidth(previewing: boolean): string {
   if (!previewing) return "w-(--sidebar-w)"
-  return leftRailHidden ? "w-[50vw] max-w-[50vw]" : "w-[40vw] max-w-[40vw]"
+  return "w-[calc(70cqw-0.5rem)] max-w-[calc(70cqw-0.5rem)]"
 }
 
 /**
@@ -126,7 +130,6 @@ export function AgentAside({
   onTabChange,
   selectedFile,
   onSelectFile,
-  leftRailHidden,
   hintShown = false,
   onHide,
 }: {
@@ -139,10 +142,6 @@ export function AgentAside({
   onTabChange: (tab: "files" | "tasks" | "notes") => void
   selectedFile: UploadedFile | null
   onSelectFile: (file: UploadedFile | null) => void
-  /** Whether the left agent-list rail is hidden. When it is AND a file is
-   *  previewing, the aside widens to half the viewport (50vw) instead of 40vw,
-   *  claiming the space the collapsed left rail freed up (T680). */
-  leftRailHidden: boolean
   /** Whether ⌘/Ctrl is currently held (T688) — reveals the "H" hint badge on the
    *  tab bar's hide button, mirroring the header rail's shortcut affordance. */
   hintShown?: boolean
@@ -182,7 +181,7 @@ export function AgentAside({
       ref={rootRef}
       className={
         "card-shadow my-2 mr-2 flex shrink-0 flex-col overflow-hidden border-l border-border/70 bg-surface-2 transition-[width,max-width] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none " +
-        railWidth(previewing, leftRailHidden)
+        railWidth(previewing)
       }
     >
       <TooltipProvider>

@@ -35,7 +35,6 @@ export function AgentAsideRail({
   tasks,
   notes,
   aside,
-  leftRailHidden,
 }: {
   fleetId: string
   agentId: string
@@ -43,9 +42,6 @@ export function AgentAsideRail({
   tasks: AgentTask[]
   notes: AgentNote[]
   aside: ReturnType<typeof useAgentAside>
-  /** Whether the left agent-list rail is hidden — forwarded to {@link AgentAside}
-   *  so a file preview widens to half the viewport when it is (T680). */
-  leftRailHidden: boolean
 }) {
   // ⌘/Ctrl+H toggles the whole details rail — the exact header pattern
   // (useModifierShortcuts + a HintBadge that reveals the "H" while the modifier
@@ -67,17 +63,18 @@ export function AgentAsideRail({
   // The hide slide pulls the rail fully off the RIGHT edge via a negative
   // margin-right equal to its ACTUAL current width plus the `mr-2` gutter. That
   // width is dynamic (T680): when a file preview is open the rail widens to
-  // 40vw (or 50vw with the left rail hidden), so a fixed `--sidebar-w` offset
+  // 70% of the conversation row (`70cqw`), so a fixed `--sidebar-w` offset
   // would only slide it partway and leave the wide preview poking in from the
   // right (T689b). Mirror AgentAside's own width rule so the two always agree.
   const previewing = aside.tab === "files" && aside.file !== null
-  const asideWidth = previewing ? (leftRailHidden ? "50vw" : "40vw") : "var(--sidebar-w)"
+  // A preview's 70cqw already includes the gutter; the list width does not.
+  const offset = previewing ? "70cqw" : "(var(--sidebar-w) + 0.5rem)"
 
   return (
     <>
       <div
         className="flex shrink-0 transition-[margin-right] duration-300 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none"
-        style={{ marginRight: aside.hidden ? `calc(-1 * (${asideWidth} + 0.5rem))` : 0 }}
+        style={{ marginRight: aside.hidden ? `calc(-1 * ${offset})` : 0 }}
       >
         <AgentAside
           files={files}
@@ -89,7 +86,6 @@ export function AgentAsideRail({
           onTabChange={aside.setTab}
           selectedFile={aside.file}
           onSelectFile={aside.setFile}
-          leftRailHidden={leftRailHidden}
           hintShown={modHeld}
           onHide={() => aside.setHidden(true)}
         />

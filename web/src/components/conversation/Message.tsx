@@ -33,6 +33,8 @@ interface MessageProps {
   onBranch?: (() => void) | undefined
   /** render a ` ```form ` block's widget in place (form-bearing rows only) */
   renderForm?: ((spec: FormSpec) => ReactNode) | undefined
+  /** drop the timestamp + copy/branch/delete row (narrow chat beside a file preview) */
+  hideActions?: boolean | undefined
 }
 
 export function Message({
@@ -43,6 +45,7 @@ export function Message({
   onDelete,
   onBranch,
   renderForm,
+  hideActions = false,
 }: MessageProps) {
   if (msg.role === "tool" && msg.tool) return <ToolMessage msg={msg} />
   if (msg.role === "user")
@@ -55,6 +58,7 @@ export function Message({
         onDelete={onDelete}
         onBranch={onBranch}
         renderForm={renderForm}
+        hideActions={hideActions}
       />
     )
   return (
@@ -66,6 +70,7 @@ export function Message({
       onDelete={onDelete}
       onBranch={onBranch}
       renderForm={renderForm}
+      hideActions={hideActions}
     />
   )
 }
@@ -197,6 +202,7 @@ function UserMessage({
   onDelete,
   onBranch,
   renderForm,
+  hideActions = false,
 }: MessageProps) {
   return (
     <div className="flex flex-col items-end gap-1 py-2">
@@ -210,16 +216,22 @@ function UserMessage({
           renderForm={renderForm}
         />
       </div>
-      <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
-        {msg.pending && <PendingSpinner />}
-        <User className="size-2.5" />
-        {msg.ts}
-      </span>
-      <div className="flex items-center gap-2">
-        <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
-        {onBranch && <BranchButton align="end" onBranch={onBranch} />}
-        {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
-      </div>
+      {hideActions ? (
+        msg.pending && <PendingSpinner />
+      ) : (
+        <>
+          <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
+            {msg.pending && <PendingSpinner />}
+            <User className="size-2.5" />
+            {msg.ts}
+          </span>
+          <div className="flex items-center gap-2">
+            <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
+            {onBranch && <BranchButton align="end" onBranch={onBranch} />}
+            {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -232,6 +244,7 @@ function AssistantMessage({
   onDelete,
   onBranch,
   renderForm,
+  hideActions = false,
 }: MessageProps) {
   return (
     <div className="flex flex-col gap-1.5 py-2">
@@ -253,16 +266,18 @@ function AssistantMessage({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2 pl-7">
-        <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
-        {!msg.streaming && (
-          <>
-            <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
-            {onBranch && <BranchButton align="start" onBranch={onBranch} />}
-            {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
-          </>
-        )}
-      </div>
+      {!hideActions && (
+        <div className="flex items-center gap-2 pl-7">
+          <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+          {!msg.streaming && (
+            <>
+              <CopyButton text={msg.text ?? ""} align="start" label="Copy message" />
+              {onBranch && <BranchButton align="start" onBranch={onBranch} />}
+              {onDelete && <DeleteButton align="start" onDelete={onDelete} />}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

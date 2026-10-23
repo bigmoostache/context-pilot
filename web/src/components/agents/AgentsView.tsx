@@ -152,7 +152,6 @@ export function AgentsView({
           pendingFiles={sel.pendingFiles}
           onRemoveFile={(i) => sel.setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
           onShowInFinder={onShowInFinder}
-          leftRailHidden={!railOpen}
           onBranch={actions.openBranch}
           parentName={parentNameOf(agents, agent)}
           onOpenAgent={sel.setSelectedId}
