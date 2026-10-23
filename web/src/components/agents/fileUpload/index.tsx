@@ -1,4 +1,5 @@
 import { AlertTriangle, FolderOpen, Pencil, Plus, X } from "lucide-react"
+import { useEffect, useState } from "react"
 import { kindOf, extOf } from "@/components/finder/support/kind"
 import { FileIcon } from "@/components/finder/support/macIcons"
 import { Tip } from "@/components/ui/tip"
@@ -50,7 +51,7 @@ export function MessageFileChip({
 }) {
   const parent = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : ""
   // No agent → can't verify; assume present rather than cry wolf.
-  const { data, loading, error } = useFs(fleetId ?? "", parent)
+  const { data, loading, error, updatedAt, refetch } = useFs(fleetId ?? "", parent)
   // The matching listing node (by full realm path, falling back to basename).
   const node = data?.find((n) => n.path === file.path || n.name === file.name)
   // A 4xx on the parent listing means the directory can't be served — it
@@ -63,7 +64,17 @@ export function MessageFileChip({
   // A statusless error (a real network blip → `TypeError: Failed to fetch`)
   // does NOT match, so a transient fault never greys a genuinely-present file.
   const parentUnservable = /^4\d\d/.test(error?.message ?? "")
-  const missing = !!fleetId && !loading && (parentUnservable || (!!data && !node))
+  const negative = parentUnservable || (!!data && !node)
+  // The listing cache never goes stale on its own (staleTime: Infinity), so it
+  // usually predates the file the agent just wrote and presented. A negative
+  // verdict only counts once the listing was fetched after this chip mounted;
+  // until then refetch it and render the chip as present.
+  const [mountedAt] = useState(() => Date.now())
+  const fresh = updatedAt >= mountedAt
+  useEffect(() => {
+    if (fleetId && negative && !fresh) refetch()
+  }, [fleetId, negative, fresh, refetch])
+  const missing = !!fleetId && !loading && negative && fresh
   // Real, on-disk size — the listing node's byte count. `undefined` while the
   // listing loads, when there is no agent to query, or when the file is gone;
   // the chip then omits the size label rather than echo the untrusted YAML.

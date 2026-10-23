@@ -7,7 +7,7 @@
 // from here instead of reaching back through the ./index barrel (which would
 // close a ./index → ./mutations → ./index loop that import-x/no-cycle rejects).
 
-import { useEffect } from "react"
+import { useCallback, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { BACKSTOP_POLL_MS } from "../query/queryClient"
 import { ensureSync } from "../query/sync"
@@ -19,6 +19,10 @@ export interface LiveQueryResult<T> {
   data: T | undefined
   loading: boolean
   error: Error | null
+  /** Epoch ms of the last settled fetch (success or error); 0 before any.
+   *  Lets callers tell a verdict cached before some event from a fresh one. */
+  updatedAt: number
+  /** Stable across renders (safe in effect deps). */
   refetch: () => void
 }
 
@@ -54,12 +58,16 @@ export function useLive<T>(
     refetchInterval: pollMs > 0 ? pollMs : false,
   })
 
+  const { refetch: qRefetch } = q
+  const refetch = useCallback(() => {
+    void qRefetch()
+  }, [qRefetch])
+
   return {
     data: q.data,
     loading: q.isLoading,
     error: q.error instanceof Error ? q.error : null,
-    refetch: () => {
-      void q.refetch()
-    },
+    updatedAt: Math.max(q.dataUpdatedAt, q.errorUpdatedAt),
+    refetch,
   }
 }
