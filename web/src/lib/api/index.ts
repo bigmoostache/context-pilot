@@ -58,7 +58,6 @@ import {
   postApiFleetByIdRetire,
   postApiFleetByIdUnretire,
   postApiFleetByIdRename,
-  postApiFleetByIdAvatar,
   postApiFleetByIdCommand,
   postApiFleetByIdLibraryCommand,
   putApiFleetByIdLibraryCommandByItem,
@@ -67,6 +66,7 @@ import {
   postApiTicket,
 } from "./generated"
 import { buildCommandEnvelope, sdk } from "./client"
+import { sendUpload } from "./client/upload"
 
 export { getToken, setToken } from "./client"
 export * from "./client/errors"
@@ -140,7 +140,7 @@ export function fetchFleetMeta(fleetId: string): Promise<Fleet> {
 // ── Agent avatar ──────────────────────────────────────────────────────
 
 export function uploadAvatar(fleetId: string, file: File): Promise<{ ok: boolean }> {
-  return sdk(postApiFleetByIdAvatar({ path: { id: fleetId }, body: file }))
+  return sendUpload<{ ok: boolean }>(`/api/fleet/${fleetId}/avatar`, file, file.name || "avatar")
 }
 
 /** Build the URL to an agent's avatar image (for use as `<img src>`). */

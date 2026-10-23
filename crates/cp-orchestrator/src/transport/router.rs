@@ -12,6 +12,30 @@ use tiny_http::{Method, Request};
 
 use super::{RouteCtx, auth, files, inspect, it, respond_json, rest};
 
+/// Entry point for every route that owns the `Request` instead of returning
+/// JSON from a buffered body: raw-bytes GETs ([`try_raw_route`]) and streaming
+/// POST uploads ([`try_upload_route`]). `None` = handled, `Some(request)` =
+/// no match, continue the JSON pipeline.
+pub(super) fn try_owned_route(
+    request: Request,
+    method: &Method,
+    segments: &[&str],
+    ctx: RouteCtx<'_>,
+) -> Option<Request> {
+    match *method {
+        Method::Get => try_raw_route(request, segments, ctx),
+        Method::Post => try_upload_route(request, segments, ctx),
+        Method::Head
+        | Method::Put
+        | Method::Delete
+        | Method::Connect
+        | Method::Options
+        | Method::Trace
+        | Method::Patch
+        | Method::NonStandard(_) => Some(request),
+    }
+}
+
 /// GET-only dispatcher for the raw-bytes routes (avatar image, fs download / raw
 /// preview, IT CA cert) that own the `Request` to write a non-JSON body and so
 /// cannot go through [`route_rest`]. Returns `None` when a route handled (and
@@ -42,6 +66,23 @@ pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'
         }
         _ => return Some(request),
     }
+    None
+}
+
+/// POST-only dispatcher for the file-upload routes (`fs/upload`,
+/// `fs/upload-unique`). These stream the request body straight to disk instead
+/// of going through the bounded in-memory [`read_body`](super::read_body), so an
+/// upload has no size cap. Same `None` = handled / `Some(request)` = not mine
+/// contract as [`try_raw_route`].
+pub(super) fn try_upload_route(mut request: Request, segments: &[&str], ctx: RouteCtx<'_>) -> Option<Request> {
+    let reply = match *segments {
+        ["api", "fleet", id, "fs", "upload"] => rest::feature_gate(segments, ctx.flags)
+            .unwrap_or_else(|| inspect::finder::fs_upload(ctx.state, id, ctx.query, request.as_reader())),
+        ["api", "fleet", id, "fs", "upload-unique"] => rest::feature_gate(segments, ctx.flags)
+            .unwrap_or_else(|| inspect::finder::fs_upload_unique(ctx.state, id, ctx.query, request.as_reader())),
+        _ => return Some(request),
+    };
+    respond_json(request, &reply);
     None
 }
 
@@ -155,12 +196,6 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         }
         (&Method::Delete, &["api", "fleet", id, "library", "system", item]) => {
             rest::delete_library_system(state, id, item)
-        }
-        (&Method::Post, &["api", "fleet", id, "fs", "upload"]) => {
-            inspect::finder::fs_upload(state, id, query, body_bytes)
-        }
-        (&Method::Post, &["api", "fleet", id, "fs", "upload-unique"]) => {
-            inspect::finder::fs_upload_unique(state, id, query, body_bytes)
         }
         (&Method::Post, &["api", "fleet", id, "fs", "sheet", "save"]) => {
             inspect::finder::fs_sheet_save(state, id, query, body_bytes)

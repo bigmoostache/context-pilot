@@ -60,7 +60,8 @@ pub(crate) use rest::backend::{Backend, Paths};
 /// command handler then rejected with `400` — the "big messages don't go
 /// through" symptom (T274). 32 MiB allows ~32M characters, effectively no limit
 /// for text, yet still a finite `DoS` guard. Kept in lockstep with the agent
-/// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path).
+/// intake's `MAX_CONNECTION_BUFFER` (the other cap on the same path). File
+/// uploads are exempt: [`router::try_upload_route`] streams them to disk uncapped.
 const MAX_BODY: u64 = 32 * 1024 * 1024;
 
 /// Bind an HTTP server to `addr` and serve the product cockpit until the process
@@ -182,16 +183,14 @@ fn handle(mut request: Request, state: &Arc<Mutex<Backend>>) {
         return;
     }
 
-    // File download — returns raw bytes, not JSON. Delegated to [`try_raw_route`]
-    // (a GET-only dispatcher that owns the `Request` for its non-JSON body):
-    // `None` means it handled and consumed the request; `Some(request)` gives it
-    // back for the rest of the pipeline.
-    if method == Method::Get {
-        let get_ctx = RouteCtx::new(state, &query, auth_token.as_deref(), auth_user.as_ref());
-        match router::try_raw_route(request, &segments, get_ctx) {
-            Some(returned) => request = returned,
-            None => return,
-        }
+    // Routes that own the `Request` — raw-bytes GETs (downloads, avatar, CA cert)
+    // and streaming POST uploads (no body cap). Delegated to
+    // [`router::try_owned_route`]: `None` means it handled and consumed the
+    // request; `Some(request)` gives it back for the JSON pipeline below.
+    let owned_ctx = RouteCtx::new(state, &query, auth_token.as_deref(), auth_user.as_ref());
+    match router::try_owned_route(request, &method, &segments, owned_ctx) {
+        Some(returned) => request = returned,
+        None => return,
     }
 
     // Read the body up-front (only POST routes consume it). The mutable borrow

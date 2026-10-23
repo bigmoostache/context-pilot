@@ -59,11 +59,17 @@ mod tests {
     /// * `route_rest()` tuple arms — `(&Method::Get, &["api", …]) =>` (the `&`
     ///   reference patterns `clippy::pattern_type_mismatch` mandates over `&[&str]`);
     /// * `try_raw_route()` slice arms — `["api", …] =>` matched on `*segments`,
-    ///   all GET (the raw-bytes dispatcher only runs for GET);
+    ///   all GET (the raw-bytes dispatcher only runs for GET); the same shape
+    ///   inside `try_upload_route()` (streaming uploads) is POST;
     /// * `handle()` special routes — `if … segments … == ["api", …]`, also GET.
     fn extract_routes_from_source(src: &str, routes: &mut BTreeSet<Route>) {
+        // Method of bare slice arms, tracked by the enclosing dispatcher fn.
+        let mut slice_method = "GET";
         for line in src.lines() {
             let t = line.trim();
+            if t.contains("fn ") && t.contains('(') {
+                slice_method = if t.contains("fn try_upload_route(") { "POST" } else { "GET" };
+            }
 
             // ── route_rest() tuple arms: (&Method::Get, &["api", ...]) ──
             if let Some(rest) = t.strip_prefix("(&Method::").or_else(|| t.strip_prefix("(Method::"))
@@ -74,13 +80,13 @@ mod tests {
                 let _new = routes.insert((method_raw.trim().to_uppercase(), path));
             }
 
-            // ── try_raw_route() slice arms: ["api", ...] => (all GET) ──
+            // ── try_raw_route() / try_upload_route() slice arms: ["api", ...] => ──
             if t.starts_with("[\"api\"")
                 && t.contains("=>")
                 && let Some(segs) = extract_bracket_segments(t)
             {
                 let path = segments_to_path(&segs);
-                let _new = routes.insert(("GET".to_owned(), path));
+                let _new = routes.insert((slice_method.to_owned(), path));
             }
 
             // ── Special routes in handle(): if let ["api", ...] = segments ──

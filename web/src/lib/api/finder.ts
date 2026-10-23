@@ -21,11 +21,10 @@ import {
   getApiFleetByIdFsSheet,
   getApiFleetByIdFsSlides,
   postApiFleetByIdFsSheetSave,
-  postApiFleetByIdFsUpload,
-  postApiFleetByIdFsUploadUnique,
   postApiFleetByIdFsWrite,
 } from "./generated"
 import { BASE, getToken, sdk } from "./client"
+import { sendUpload } from "./client/upload"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
@@ -86,27 +85,24 @@ export function saveSheet(
   )
 }
 
+/** Upload one file into `dir` (must exist). Goes through the single upload
+ *  channel (progress toast, no size cap). */
 export function uploadFile(fleetId: string, dir: string, file: File): Promise<UploadResult> {
-  return sdk(
-    postApiFleetByIdFsUpload({
-      path: { id: fleetId },
-      query: { path: dir, name: file.name },
-      body: file,
-    }),
-  )
+  const q = `path=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`
+  return sendUpload<UploadResult>(`/api/fleet/${fleetId}/fs/upload?${q}`, file, file.name)
 }
 
+/** Upload into `dir` (auto-created), never overwriting. Same channel. */
 export function uploadUnique(
   fleetId: string,
   dir: string,
   file: File,
 ): Promise<UploadUniqueResult> {
-  return sdk(
-    postApiFleetByIdFsUploadUnique({
-      path: { id: fleetId },
-      query: { path: dir, name: file.name },
-      body: file,
-    }),
+  const q = `path=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`
+  return sendUpload<UploadUniqueResult>(
+    `/api/fleet/${fleetId}/fs/upload-unique?${q}`,
+    file,
+    file.name,
   )
 }
 

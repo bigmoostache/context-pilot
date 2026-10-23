@@ -14,8 +14,9 @@ use super::{is_bare_name, rel_child};
 
 /// `POST /api/fleet/{id}/fs/upload?path={dir}&name={file}` — upload one file.
 ///
-/// The request body is the file's raw bytes (the transport caps it at
-/// `MAX_BODY`); `path` is the confined destination directory (empty = realm
+/// The request body is the file's raw bytes, streamed straight to disk with no
+/// size cap (the transport routes uploads around its in-memory `MAX_BODY`
+/// read); `path` is the confined destination directory (empty = realm
 /// root) and `name` is the bare destination filename. One file per request —
 /// the Finder fires N concurrent uploads for a multi-file selection, sidestepping
 /// multipart parsing entirely.
@@ -24,7 +25,12 @@ use super::{is_bare_name, rel_child};
 /// escape) and must already exist; `name` must be a bare filename (no path
 /// separators, not `.`/`..`) so the write can never land outside the realm.
 /// Returns `{ written, path }` (bytes written + the realm-relative path).
-pub(crate) fn fs_upload(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload(
+    state: &Mutex<Backend>,
+    fleet_id: &str,
+    query: &str,
+    body: &mut dyn std::io::Read,
+) -> HttpReply {
     let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -48,15 +54,35 @@ pub(crate) fn fs_upload(state: &Mutex<Backend>, fleet_id: &str, query: &str, bod
         return HttpReply::error(404, "destination directory not found");
     }
 
-    let dest = dir.join(&name);
-    if std::fs::write(&dest, body).is_err() {
+    let Some(written) = stream_to(&dir.join(&name), body) else {
         return HttpReply::error(502, "write failed");
-    }
+    };
 
     HttpReply::ok(&serde_json::json!({
-        "written": body.len(),
+        "written": written,
         "path": rel_child(&relative_dir, &name),
     }))
+}
+
+/// Stream `body` into `dest` with no size cap, via a hidden sibling temp file
+/// renamed into place once the body is fully received — an aborted upload never
+/// leaves a truncated file at `dest`. Returns the byte count, `None` on any I/O
+/// error (the temp file is removed).
+fn stream_to(dest: &std::path::Path, body: &mut dyn std::io::Read) -> Option<u64> {
+    let dir = dest.parent()?;
+    let name = dest.file_name()?.to_string_lossy();
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let partial = dir.join(format!(".{name}.{stamp}.uploading"));
+    let copied = std::fs::File::create(&partial).and_then(|mut file| {
+        let n = std::io::copy(body, &mut file)?;
+        file.sync_all()?;
+        Ok(n)
+    });
+    let landed = copied.and_then(|n| std::fs::rename(&partial, dest).map(|()| n));
+    if landed.is_err() {
+        let _removed = std::fs::remove_file(&partial);
+    }
+    landed.ok()
 }
 
 /// `POST /api/fleet/{id}/fs/upload-unique?path={dir}&name={name}` — upload a
@@ -79,7 +105,12 @@ pub(crate) fn fs_upload(state: &Mutex<Backend>, fleet_id: &str, query: &str, bod
 /// `{ path, name, size }` — the realm-relative path of the **stored** file, its
 /// final (possibly suffixed) name, and the byte count — everything the composer
 /// needs to compose the `file-upload` message block.
-pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, fleet_id: &str, query: &str, body: &[u8]) -> HttpReply {
+pub(crate) fn fs_upload_unique(
+    state: &Mutex<Backend>,
+    fleet_id: &str,
+    query: &str,
+    body: &mut dyn std::io::Read,
+) -> HttpReply {
     let folder = match fleet_folder(state, fleet_id) {
         Ok(f) => f,
         Err(reply) => return reply,
@@ -114,15 +145,14 @@ pub(crate) fn fs_upload_unique(state: &Mutex<Backend>, fleet_id: &str, query: &s
     };
 
     let final_name = unique_name(&dir, &name);
-    let dest = dir.join(&final_name);
-    if std::fs::write(&dest, body).is_err() {
+    let Some(size) = stream_to(&dir.join(&final_name), body) else {
         return HttpReply::error(502, "write failed");
-    }
+    };
 
     HttpReply::ok(&serde_json::json!({
         "path": rel_child(&relative_dir, &final_name),
         "name": final_name,
-        "size": body.len(),
+        "size": size,
     }))
 }
 
