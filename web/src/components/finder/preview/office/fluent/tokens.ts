@@ -118,7 +118,7 @@ export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
     tabH: 32,
     tabPad: 10,
     tabLine: 3,
-    tabLineBottom: 2,
+    tabLineBottom: 1,
     ...SINGLE_LINE,
   },
 }
