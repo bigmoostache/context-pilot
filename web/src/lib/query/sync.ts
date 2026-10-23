@@ -65,6 +65,10 @@ export const qk = {
 /** The two delta-covered cache families — they must NEVER be invalidated (the
  *  push plane owns them). Everything else agent-scoped is inspection. */
 const DELTA_COVERED = new Set(["agents", "agent"])
+/** Keys that track their own freshness: an office document reloads only when
+ *  its polled version moves. Refetching its bytes on every agent `invalidate`
+ *  hands the editor a new buffer, which reopens the deck every ~10 s. */
+const SELF_SYNCED = new Set(["fs-office"])
 
 // ── The bridge ────────────────────────────────────────────────────────
 
@@ -203,7 +207,8 @@ function invalidateInspection(client: QueryClient, fleetId: string): void {
         key.length >= 2 &&
         key[1] === fleetId &&
         typeof key[0] === "string" &&
-        !DELTA_COVERED.has(key[0])
+        !DELTA_COVERED.has(key[0]) &&
+        !SELF_SYNCED.has(key[0])
       )
     },
   })
