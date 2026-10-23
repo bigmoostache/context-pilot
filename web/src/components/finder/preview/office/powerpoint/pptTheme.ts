@@ -25,16 +25,5 @@ export const PPT = {
   statusH: 23,
 } as const
 
-/** Ribbon tab labels, in PowerPoint's order. Only Home carries commands here. */
-export const PPT_TABS = [
-  "Home",
-  "Insert",
-  "Draw",
-  "Design",
-  "Transitions",
-  "Animations",
-  "Slide Show",
-  "Review",
-  "View",
-  "Help",
-] as const
+/** Ribbon tabs that carry live commands. Add a tab only with its ribbon. */
+export const PPT_TABS = ["Home"] as const

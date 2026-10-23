@@ -77,7 +77,7 @@ export function PptRibbon() {
   )
 }
 
-/** File + ribbon tabs; Home is the only live tab, the rest are decorative. */
+/** Tab row. Only tabs with live commands are listed (no dead controls). */
 function PptTabs() {
   return (
     <div
@@ -89,9 +89,8 @@ function PptTabs() {
         alignItems: "flex-start",
       }}
     >
-      <span style={{ ...tab(false), color: PPT.inkTab }}>File</span>
       {PPT_TABS.map((label) => (
-        <span key={label} role="tab" aria-selected={label === "Home"} style={tab(label === "Home")}>
+        <span key={label} role="tab" aria-selected style={tab(true)}>
           {label}
         </span>
       ))}
