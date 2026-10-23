@@ -1,4 +1,4 @@
-import { ChevronDown, GitBranch, Terminal, Trash2, User } from "lucide-react"
+import { ChevronDown, GitBranch, Terminal, Trash2 } from "lucide-react"
 import type { ReactNode } from "react"
 import type { ChatMessage } from "@/lib/types"
 import { splitFormSegments, type FormSpec } from "@/components/agents/forms/helpers"
@@ -219,18 +219,13 @@ function UserMessage({
       {hideActions ? (
         msg.pending && <PendingSpinner />
       ) : (
-        <>
-          <span className="flex items-center gap-1 pr-1 text-[10px] text-muted-foreground/60">
-            {msg.pending && <PendingSpinner />}
-            <User className="size-2.5" />
-            {msg.ts}
-          </span>
-          <div className="flex items-center gap-2">
-            <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
-            {onBranch && <BranchButton align="end" onBranch={onBranch} />}
-            {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
-          </div>
-        </>
+        <div className="flex items-center gap-2">
+          {msg.pending && <PendingSpinner />}
+          <span className="text-[10px] text-muted-foreground/60">{msg.ts}</span>
+          <CopyButton text={msg.text ?? ""} align="end" label="Copy message" />
+          {onBranch && <BranchButton align="end" onBranch={onBranch} />}
+          {onDelete && <DeleteButton align="end" onDelete={onDelete} />}
+        </div>
       )}
     </div>
   )
