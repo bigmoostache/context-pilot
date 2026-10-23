@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fetchOfficeLog, postOfficeUpdate, type OfficeLog } from "@/lib/api"
 import { useFsOfficeVersion } from "@/lib/live"
 
-/** The slice of the editor's CRDT replica this hook drives. */
+/**
+ * The slice of the editor's CRDT replica this hook drives. The pinned
+ * pptx-react runs the engine in a worker, so every replica call is async.
+ */
 interface Replica {
-  encodeStateAsUpdate: () => Uint8Array
-  applyUpdate: (update: Uint8Array) => unknown
+  encodeStateAsUpdate: () => Promise<Uint8Array>
+  applyUpdate: (update: Uint8Array) => Promise<unknown>
 }
 
 /** What the editor opens: the log's base bytes plus its latest full state. */
@@ -80,7 +83,7 @@ export function usePptxLive(fleetId: string, path: string) {
       const replica = replicaRef.current
       if (log.baseVersion === session?.baseVersion && replica) {
         if (log.state != null && log.seq !== seqRef.current) {
-          replica.applyUpdate(await fromB64(log.state))
+          await replica.applyUpdate(await fromB64(log.state))
         }
         adopt(log)
       } else if (allowReopen && !dirtyRef.current) {
@@ -101,10 +104,10 @@ export function usePptxLive(fleetId: string, path: string) {
     async (bytes: Uint8Array): Promise<void> => {
       const replica = replicaRef.current
       if (!replica) throw new Error("editor not ready")
-      const post = () =>
+      const post = async () =>
         postOfficeUpdate(fleetId, path, {
           seq: seqRef.current,
-          state: replica.encodeStateAsUpdate(),
+          state: await replica.encodeStateAsUpdate(),
           file: bytes,
         })
       const res = await post().catch(async (e: unknown) => {

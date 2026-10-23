@@ -7,6 +7,10 @@ settings:
 overrides:
   '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz
   '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz
+  '@betteroffice/pptx': file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz
+  '@betteroffice/pptx-i18n': file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz
+  '@betteroffice/docx': file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz
+  '@betteroffice/docx-i18n': file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz
 
 importers:
 
@@ -16,14 +20,14 @@ importers:
         specifier: ^1.5.0
         version: 1.5.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/docx-react':
-        specifier: 0.4.3
-        version: 0.4.3(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: file:vendor/betteroffice/betteroffice-docx-react-0.4.4-cp.20261023.1.tgz
+        version: file:vendor/betteroffice/betteroffice-docx-react-0.4.4-cp.20261023.1.tgz(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/fonts':
         specifier: 0.4.0
         version: 0.4.0
       '@betteroffice/pptx-react':
-        specifier: 0.2.0
-        version: 0.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz
+        version: file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/xlsx-react':
         specifier: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz
         version: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -120,6 +124,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
+      recharts:
+        specifier: ^3.10.1
+        version: 3.10.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-is@19.3.1)(react@19.2.7)(redux@5.0.1)
       rehype-katex:
         specifier: ^7.0.1
         version: 7.0.1
@@ -360,11 +367,13 @@ packages:
       '@types/react':
         optional: true
 
-  '@betteroffice/docx-i18n@0.4.3':
-    resolution: {integrity: sha512-8CSSjdurL6V2hkWuENOb2It4vEvnx3CCj9ZiZZ3iZW5oYk3RhGUN5gopLLsriNrGsqLduuOULWSUNf9CEJ9aew==}
+  '@betteroffice/docx-i18n@file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-stknx5WsznC23dbjFzjC7kVp6Y/TUReNephxcqxcB6umF9ERblvT2PqqyA1G2qxQAbD9A52YAz5118iwv6pGJw==, tarball: file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz}
+    version: 0.4.4-cp.20261023.1
 
-  '@betteroffice/docx-react@0.4.3':
-    resolution: {integrity: sha512-4xUp8RB5i+iBR+ANLwYw7sahMHvmMnRTn/i0RA8N/F9rxeVpLhCd6EYF5sgXHa6dYcFNS8Fj21ZgrUYcrm6iyg==}
+  '@betteroffice/docx-react@file:vendor/betteroffice/betteroffice-docx-react-0.4.4-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-Dhzg617DOoo0+CPcAfyxTZ8/XAGGtq0z3yAazERwBVoeWJDoJbQhBDLcrF/Od3EUZWieTmf+B0u39lhffMNAJA==, tarball: file:vendor/betteroffice/betteroffice-docx-react-0.4.4-cp.20261023.1.tgz}
+    version: 0.4.4-cp.20261023.1
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -374,10 +383,11 @@ packages:
       react-dom:
         optional: true
 
-  '@betteroffice/docx@0.4.3':
-    resolution: {integrity: sha512-CEErXJH3iCsi2a61gTNkAofLCzSTcktLmp710gGhMwbBfOqwQ2yI7dRFBV3ElGa9JxkS03IfejvLX0sAvlTrUQ==}
+  '@betteroffice/docx@file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-n6QLYb0v3CrLCOWU4oaz86wXQ6Mk3kDrnt1o/EYTGMui5Va8bmerPcGDJjLq7SYamdSSQVDboaEGBFg7OP6XCQ==, tarball: file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz}
+    version: 0.4.4-cp.20261023.1
     peerDependencies:
-      '@betteroffice/fonts': ^0
+      '@betteroffice/fonts': workspace:^0
     peerDependenciesMeta:
       '@betteroffice/fonts':
         optional: true
@@ -390,17 +400,20 @@ packages:
       '@betteroffice/fonts-cjk':
         optional: true
 
-  '@betteroffice/pptx-i18n@0.2.0':
-    resolution: {integrity: sha512-v+mrz02exXGB0hcQL1W0cBKASU3r++F1u1yZxaqXGZ2K7IjFT3bKDT7rhQL1aGQpTNdkt9h6cienS3APD5BFow==}
+  '@betteroffice/pptx-i18n@file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-/x2HpXLMlWN3qQUXtueowtvX4FKJakQsu2bMux2UfZ7Pw3sdo/R29OnHIFnDuS8butEFM65AnPL6y9rw9E3HQA==, tarball: file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz}
+    version: 0.2.1-cp.20261023.1
 
-  '@betteroffice/pptx-react@0.2.0':
-    resolution: {integrity: sha512-/F4BrpSlEZ4os6petOJQP4DruUJAGWIJVZO/V/CPjqexg4W8z6ot1iEXjPMu+xr+yc1r6bO8gWJPMHiW/SEJjQ==}
+  '@betteroffice/pptx-react@file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-TKTP24zlMoIYvAgJY4vR8qNldxlYm4w4eo2dBGdC3TixNXeKFnnFs+g9FR/1ddafzwABREAaqKi7TB2tLadlJA==, tarball: file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz}
+    version: 0.2.1-cp.20261023.1
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@betteroffice/pptx@0.2.0':
-    resolution: {integrity: sha512-pNPQ58tlA+pVibERbLdQNskvP7a0GIMf4jhkCU/gPp8043Ichf6gB3PSb4ra9sfqoIaWqOaZKCWyptovA2+Q0A==}
+  '@betteroffice/pptx@file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz':
+    resolution: {integrity: sha512-AJh9Uo4Tu8xqgXZGj7waMU7uHcXsbzvodkY7KZq0H56Z+QqT5MLe7GGg6HT7OSEFl2zOPJ7lhDzQAM0UTTbNIg==, tarball: file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz}
+    version: 0.2.1-cp.20261023.1
 
   '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz':
     resolution: {integrity: sha512-c3UnF3dezxDK8hQxH2zuscqFWyP9djx+tbfyLFOwq43NXAlma4RgfT6wMS9zx2vJgIqiEtX6hAvluO/8DqhwEg==, tarball: file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz}
@@ -1273,6 +1286,17 @@ packages:
   '@radix-ui/rect@1.1.3':
     resolution: {integrity: sha512-JtyZR+mqgBibTo8xea3B6ZRmzZiM/YeVBtUkas6zMuXjAlfIFIW2FgqeM9eLyvEaYX66vr6DJMK+4U6LV0KhNw==}
 
+  '@reduxjs/toolkit@2.13.0':
+    resolution: {integrity: sha512-f6jwVRfwW30+tnllz4YcsHHpPYYOE7abcHkyUCovD+P7DyhdAI5prz2Fh/8TLhakjpN+7aIEion1s5L/tvlYlA==}
+    peerDependencies:
+      react: ^16.9.0 || ^17.0.0 || ^18 || ^19
+      react-redux: ^7.2.1 || ^8.1.3 || ^9.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-redux:
+        optional: true
+
   '@rolldown/binding-android-arm64@1.0.3':
     resolution: {integrity: sha512-454rs7jHngixp/NMxd5srYD57OnzSlZ/eFTETjORQHLwJG1lRtmNOJcBerZlfu4GjKqeq8aCCIQrMdHyhI51Hw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1374,6 +1398,12 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@standard-schema/utils@0.3.0':
+    resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
   '@tailwindcss/node@4.3.1':
     resolution: {integrity: sha512-6NDaqRoAMSXD1mr/RXu0HBvNE9a2n5tHPsxu9XHLws8o4Twes5rBM2205SUUiJ9goAtadrN6xTGX0UDEwp/N4A==}
@@ -2652,6 +2682,9 @@ packages:
       supports-color:
         optional: true
 
+  decimal.js-light@2.5.1:
+    resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
+
   decode-named-character-reference@1.3.0:
     resolution: {integrity: sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q==}
 
@@ -3071,6 +3104,9 @@ packages:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
 
+  eventemitter3@5.0.4:
+    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
+
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
@@ -3372,6 +3408,9 @@ packages:
   ignore@7.0.5:
     resolution: {integrity: sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg==}
     engines: {node: '>= 4'}
+
+  immer@11.2.9:
+    resolution: {integrity: sha512-IQ4UEtXjZjyefyWjtLEDXUSrF6T2hwjKPi6BIJl3bY/2XXW24d6cNGdXJSBOA/+KNnuiXkZY6DR0C3efolhitA==}
 
   import-fresh@3.3.1:
     resolution: {integrity: sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ==}
@@ -4272,11 +4311,26 @@ packages:
     peerDependencies:
       react: ^19.2.7
 
+  react-is@19.3.1:
+    resolution: {integrity: sha512-RRieF6IyxQBkcK6pP8xOHprLTPW6QjRkbGdImtqNme+/hYVwCZkLQLdlZGOhUqXwkS9IEynaGvPJtv6XB/cz0Q==}
+
   react-markdown@10.1.0:
     resolution: {integrity: sha512-qKxVopLT/TyA6BX3Ue5NwabOsAzm0Q7kAPwq6L+wWDwisYs7R8vZ0nRXqq6rkueboxpkjvLGU9fWifiX/ZZFxQ==}
     peerDependencies:
       '@types/react': '>=18'
       react: '>=18'
+
+  react-redux@9.3.0:
+    resolution: {integrity: sha512-KQopgqFo/p/fgmAs5qz6p5RWaNAzq40WAu7fJIXnQpYxFPbJYtsJPWvGeF2rOBaY/kEuV77AVsX8TsQzKm+A/g==}
+    peerDependencies:
+      '@types/react': ^18.2.25 || ^19
+      react: ^18.0 || ^19
+      redux: ^5.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      redux:
+        optional: true
 
   react-remove-scroll-bar@2.3.8:
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
@@ -4315,6 +4369,22 @@ packages:
   readdirp@5.0.0:
     resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
     engines: {node: '>= 20.19.0'}
+
+  recharts@3.10.1:
+    resolution: {integrity: sha512-QXFrvt6IVcw7eeZCoyXTwkIJAX3Dv1nyVhMicXJ47GsGDDpcN8z6o644DibE9XjpBTThtsomLKnTV6lc+cVFUA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-is: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  redux-thunk@3.1.0:
+    resolution: {integrity: sha512-NW2r5T6ksUKXCabzhL9z+h206HQw/NJkcLm1GPImRQ8IzfXwRGqjVhKJGauHirT0DAuyy6hjdnMZaRoAcy0Klw==}
+    peerDependencies:
+      redux: ^5.0.0
+
+  redux@5.0.1:
+    resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
 
   refa@0.12.1:
     resolution: {integrity: sha512-J8rn6v4DBb2nnFqkqwy6/NnTYMcgLA+sLr0iIO41qpv0n+ngb7ksag2tMRl0inb1bbO/esUwzW1vbJi7K0sI0g==}
@@ -4678,6 +4748,9 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
+  tiny-invariant@1.3.3:
+    resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
+
   tinybench@6.2.2:
     resolution: {integrity: sha512-nIZ2N2dFpjBsg2hgitKu7mA+FvsIJuGJOwysRngmVRRmWgR/UyPjwJj8c/fT/dhm8EkHnF5EOogRf+0Z2qrimA==}
     engines: {node: '>=20.0.0'}
@@ -4900,6 +4973,9 @@ packages:
 
   vfile@6.0.3:
     resolution: {integrity: sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==}
+
+  victory-vendor@37.3.6:
+    resolution: {integrity: sha512-SbPDPdDBYp+5MJHhBCAyI7wKM3d5ivekigc2Dk2s7pgbZ9wIgIBYGVw4zGHBml/qTFbexrofXW6Gu4noGxrOwQ==}
 
   vite@8.0.16:
     resolution: {integrity: sha512-h9bXPmJichP5fLmVQo3PyaGSDE2n3aPuomeAlVRm0JLmt4rY6zmPKd59HYI4LNW8oTK7tlTsuC7l/m7awx9Jcw==}
@@ -5201,12 +5277,12 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@betteroffice/docx-i18n@0.4.3': {}
+  '@betteroffice/docx-i18n@file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz': {}
 
-  '@betteroffice/docx-react@0.4.3(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@betteroffice/docx-react@file:vendor/betteroffice/betteroffice-docx-react-0.4.4-cp.20261023.1.tgz(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@betteroffice/docx': 0.4.3(@betteroffice/fonts@0.4.0)
-      '@betteroffice/docx-i18n': 0.4.3
+      '@betteroffice/docx': file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz(@betteroffice/fonts@0.4.0)
+      '@betteroffice/docx-i18n': file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz
       '@radix-ui/react-select': 2.4.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       clsx: 2.1.1
       sonner: 2.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -5218,22 +5294,22 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@betteroffice/docx@0.4.3(@betteroffice/fonts@0.4.0)':
+  '@betteroffice/docx@file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz(@betteroffice/fonts@0.4.0)':
     optionalDependencies:
       '@betteroffice/fonts': 0.4.0
 
   '@betteroffice/fonts@0.4.0': {}
 
-  '@betteroffice/pptx-i18n@0.2.0': {}
+  '@betteroffice/pptx-i18n@file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz': {}
 
-  '@betteroffice/pptx-react@0.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@betteroffice/pptx-react@file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@betteroffice/pptx': 0.2.0
-      '@betteroffice/pptx-i18n': 0.2.0
+      '@betteroffice/pptx': file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz
+      '@betteroffice/pptx-i18n': file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@betteroffice/pptx@0.2.0': {}
+  '@betteroffice/pptx@file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz': {}
 
   '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz': {}
 
@@ -6063,6 +6139,18 @@ snapshots:
 
   '@radix-ui/rect@1.1.3': {}
 
+  '@reduxjs/toolkit@2.13.0(react-redux@9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1))(react@19.2.7)':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      '@standard-schema/utils': 0.3.0
+      immer: 11.2.9
+      redux: 5.0.1
+      redux-thunk: 3.1.0(redux@5.0.1)
+      reselect: 5.2.0
+    optionalDependencies:
+      react: 19.2.7
+      react-redux: 9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1)
+
   '@rolldown/binding-android-arm64@1.0.3':
     optional: true
 
@@ -6115,6 +6203,10 @@ snapshots:
   '@rolldown/pluginutils@1.0.1': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@standard-schema/spec@1.1.0': {}
+
+  '@standard-schema/utils@0.3.0': {}
 
   '@tailwindcss/node@4.3.1':
     dependencies:
@@ -7415,6 +7507,8 @@ snapshots:
     optionalDependencies:
       supports-color: 10.2.2
 
+  decimal.js-light@2.5.1: {}
+
   decode-named-character-reference@1.3.0:
     dependencies:
       character-entities: 2.0.2
@@ -7992,6 +8086,8 @@ snapshots:
 
   esutils@2.0.3: {}
 
+  eventemitter3@5.0.4: {}
+
   expect-type@1.4.0: {}
 
   exsolve@1.1.0: {}
@@ -8320,6 +8416,8 @@ snapshots:
   ignore@5.3.2: {}
 
   ignore@7.0.5: {}
+
+  immer@11.2.9: {}
 
   import-fresh@3.3.1:
     dependencies:
@@ -9476,6 +9574,8 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
+  react-is@19.3.1: {}
+
   react-markdown@10.1.0(@types/react@19.2.17)(react@19.2.7):
     dependencies:
       '@types/hast': 3.0.4
@@ -9493,6 +9593,15 @@ snapshots:
       vfile: 6.0.3
     transitivePeerDependencies:
       - supports-color
+
+  react-redux@9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1):
+    dependencies:
+      '@types/use-sync-external-store': 0.0.6
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.17
+      redux: 5.0.1
 
   react-remove-scroll-bar@2.3.8(@types/react@19.2.17)(react@19.2.7):
     dependencies:
@@ -9524,6 +9633,32 @@ snapshots:
   react@19.2.7: {}
 
   readdirp@5.0.0: {}
+
+  recharts@3.10.1(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-is@19.3.1)(react@19.2.7)(redux@5.0.1):
+    dependencies:
+      '@reduxjs/toolkit': 2.13.0(react-redux@9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1))(react@19.2.7)
+      clsx: 2.1.1
+      decimal.js-light: 2.5.1
+      es-toolkit: 1.52.0
+      eventemitter3: 5.0.4
+      immer: 11.2.9
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      react-is: 19.3.1
+      react-redux: 9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1)
+      reselect: 5.2.0
+      tiny-invariant: 1.3.3
+      use-sync-external-store: 1.6.0(react@19.2.7)
+      victory-vendor: 37.3.6
+    transitivePeerDependencies:
+      - '@types/react'
+      - redux
+
+  redux-thunk@3.1.0(redux@5.0.1):
+    dependencies:
+      redux: 5.0.1
+
+  redux@5.0.1: {}
 
   refa@0.12.1:
     dependencies:
@@ -9995,6 +10130,8 @@ snapshots:
 
   tapable@2.3.3: {}
 
+  tiny-invariant@1.3.3: {}
+
   tinybench@6.2.2: {}
 
   tinyexec@1.3.1: {}
@@ -10273,6 +10410,23 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
+
+  victory-vendor@37.3.6:
+    dependencies:
+      '@types/d3-array': 3.2.2
+      '@types/d3-ease': 3.0.2
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-scale': 4.0.9
+      '@types/d3-shape': 3.2.0
+      '@types/d3-time': 3.0.4
+      '@types/d3-timer': 3.0.2
+      d3-array: 3.2.4
+      d3-ease: 3.0.1
+      d3-interpolate: 3.0.1
+      d3-scale: 4.0.2
+      d3-shape: 3.2.0
+      d3-time: 3.1.0
+      d3-timer: 3.0.1
 
   vite@8.0.16(@types/node@24.13.2)(jiti@2.7.0)(yaml@2.9.0):
     dependencies:

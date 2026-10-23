@@ -22,10 +22,15 @@ allowBuilds:
   protobufjs: true
   unrs-resolver: true
 
-# BetterOffice xlsx engine built from upstream main (Web Worker editor, not yet
-# on npm: 0.3.0 parses on the main thread, a 2 MB workbook froze the page ~20 s).
-# Tarballs live in vendor/betteroffice/; xlsx-react's own deps on the engine
-# and i18n packages must resolve there too, not from the registry.
+# BetterOffice editors (xlsx, pptx, docx) are built from the pinned submodule
+# vendor/betteroffice + our patches (deploy/betteroffice/build-web-packages.sh),
+# the same commit cp-office-engine runs, so browser and engine replicas share a
+# CRDT schema. Tarballs live in vendor/betteroffice/; each react package's deps
+# on its engine and i18n packages must resolve there too, not from the registry.
 overrides:
   "@betteroffice/xlsx": "file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz"
   "@betteroffice/xlsx-i18n": "file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz"
+  "@betteroffice/pptx": "file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz"
+  "@betteroffice/pptx-i18n": "file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz"
+  "@betteroffice/docx": "file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz"
+  "@betteroffice/docx-i18n": "file:vendor/betteroffice/betteroffice-docx-i18n-0.4.4-cp.20261023.1.tgz"
