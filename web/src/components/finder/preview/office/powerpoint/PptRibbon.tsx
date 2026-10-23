@@ -160,12 +160,17 @@ function PptStatus() {
   }
   return (
     <StatusBar
-      left={<StatusItem text="English (U.S.)" />}
+      left={
+        <span style={{ marginLeft: 10 }}>
+          <StatusItem text="English (U.S.)" />
+        </span>
+      }
       right={
-        <>
+        // PowerPoint web insets both ends: text from x25, zoom ending 27px from the edge.
+        <span style={{ display: "flex", alignItems: "center", gap: 2, marginRight: 11 }}>
           <StatusItem cmd={showCmd} icon={<Play16Regular />} />
           <Zoom cmd={zoomCmd} toArgs={(scale) => ({ scale })} />
-        </>
+        </span>
       }
     />
   )
