@@ -1,6 +1,6 @@
 # cp-office-engine: CRDT-only office editing
 
-Status: proposal, not built. Supersedes the transport part of `design-office-live-updates.md` (the opaque update log stays, but the engine now lives in the backend).
+Status: phase 0 done (2026-10-23, go for all three formats), phase 1 in progress. Supersedes the transport part of `design-office-live-updates.md` (the opaque update log stays, but the engine now lives in the backend).
 Scope: `.docx`, `.xlsx`, `.pptx` in the Finder, all three at once.
 
 ## Decisions (user, 2026-10-23)
@@ -41,19 +41,32 @@ The native crates expose what we need (checked in `/tmp/betteroffice/crates`):
 | pptx | `Presentation::open_collaborative(bytes, client_id)` | same three | `Presentation::save` |
 | docx | `docx-edit` (yrs `Doc`, `apply_update_v1`, `apply_update_chunks_v1`) | via `yrs_doc()` | `betteroffice-docx` `Document::save` |
 
-docx needs a spike: the docx collaborative-open path and `save()` from the edited replica live in two crates, and the glue the WASM build uses has to be found.
+docx has no native path from an edited replica to a file: `betteroffice-docx::Document::save` serialises its own parsed model, and the CRDT → .docx step (`saveYrsDocx`, ~900 lines) exists only in TypeScript. So docx runs in a **Node/Bun sidecar** using `@betteroffice/docx` headless (`createYrsSession`, `openDocx`, `applyUpdate`, `saveYrsDocx`). Porting that step to Rust is out of scope.
+
+### Phase 0 results
+
+| Format | Engine | Result |
+|---|---|---|
+| xlsx | Rust | WASM accepts the native base; a 58-byte browser update applied natively and saved is in the file. Open: 0.5 s small, 1.9 s Dalia (1.8 MB). |
+| pptx | Rust | Same, 502-byte update, apply+save 29 ms, open 11 ms. Only with a WASM built from the **same commit**: npm 0.2.0 rejects the native state (`unsupported deck schema version`). |
+| docx | Node | Headless in Node: 1.3 MB file opens in 0.33 s, 737-byte update, `saveYrsDocx` keeps it. |
+
+Native xlsx+pptx binary: 12 MB, cold release build 95 s. Spike code: `/tmp/bo-spike`, `/tmp/bo-p0`.
 
 ## Shared base: the browser joins from the engine
 
-CRDT updates only merge between replicas built on the same base. Instead of every browser opening the file bytes and hoping to reach the same base, the browser joins from the engine's state:
+CRDT updates only merge between replicas built on the same base. Phase 0 showed that native and WASM build the same base from the same bytes, but the full state is too big to ship on open (Dalia: 40 MB). So the browser opens the **epoch's base bytes** and only fetches what changed since:
 
-1. `GET office/open?path=` → the orchestrator asks the engine, which opens the file (or reuses the resident document) and returns `{doc_id, epoch, file_bytes, state_update, seq}`.
-2. The editor opens `file_bytes` with `initialUpdate = state_update`.
-3. From then on it applies remote updates and sends its own.
+1. `GET office/open?path=` → the engine opens the file (or reuses the resident document) and returns `{doc_id, epoch, base_version}`.
+2. The editor fetches the base bytes (`GET office/base?doc=&epoch=`) and opens them collaboratively.
+3. It sends its state vector; the engine answers `encode_diff_v1(sv)`: only the edits made since the base (usually a few KB).
+4. From then on it applies remote updates and sends its own.
+
+The base bytes are the file as it was when the epoch started, kept in memory by the engine. They are **not** the current file on disk: after the engine saves, disk bytes differ, and a replica opened from them would not merge. A new epoch (new base = current disk) starts on an external write or when the document is reopened after release.
 
 `epoch` changes on every full reload (see below). Any update tagged with an old epoch is rejected with 409, and the editor reloads.
 
-Risk: the engine (native) and the browser (WASM) must build identical bases from the same bytes. Same source, same commit, but it has to be proven by a test per format (phase 0). If it fails for a format, that format falls back to the browser being the only writer of state (today's behaviour) until fixed.
+This holds only when browser and engine run the same BetterOffice commit (see "Importing the engine"). A test per format guards it in CI.
 
 ## Protocol
 
@@ -100,15 +113,22 @@ It is released when it has no subscriber and is clean, after a 60 s grace period
 ## Importing the engine
 
 - `vendor/betteroffice/` in the workspace: the upstream crates at a pinned commit, plus our `.diff` patches (the six existing xlsx patches move here too, so the WASM and native builds share them).
-- New crate `crates/cp-office-engine` (our code, our lints): process main loop, socket protocol, document registry, watcher, save scheduler. Depends on the vendored crates by path.
+- New crate `crates/cp-office-engine` (our code, our lints): process main loop, socket protocol, document registry, watcher, save scheduler. Depends on the vendored crates by path. Hosts xlsx and pptx natively.
+- docx sidecar: a small Node/Bun script (`cp-office-engine/docx-sidecar/`) running `@betteroffice/docx` from the same commit. The Rust engine spawns and supervises it, and forwards docx frames to it over stdin/stdout; the orchestrator only ever talks to the Rust engine.
+- **One pinned commit for everything**: the native crates, the docx sidecar package and all three browser editors are built from the same vendored tree. xlsx already ships that way (`web/vendor/betteroffice/*.tgz`); pptx and docx move off npm to the same scheme.
 - The vendored crates are excluded from our lint, structure and hash-chain checks (listed as a third-party tree). Our checks apply to `cp-office-engine` only.
 - Same commit builds the WASM for the web editors, so browser and engine never drift.
-- Size: the engine pulls in calc, layout and render crates; expect a large binary and a long first build. To measure in phase 0.
+- Size (measured): 12 MB binary, 95 s cold release build for xlsx+pptx.
 
 ## Phases
 
-0. **Spike (1 day)**: build the three native crates from the vendored tree; for each format, prove that native `open_collaborative` + `encode_state_as_update_v1` is accepted as `initialUpdate` by the WASM editor, and that a browser update applied natively then `save()`d round-trips. Measure binary size, build time, open time natively. Find the docx collaborative-open + save path. Go/no-go per format.
-1. **Engine + routes, three formats**: `cp-office-engine` process, orchestrator routes and fan-out, editors switch to delta-only sending, Ctrl+S = flush, idle save, watcher + reset. Remove the whole-file upload path.
+0. **Spike**: done, go for all three (results above).
+1. **Engine + routes, three formats**:
+   1. Vendor the pinned BetterOffice tree; build pptx and docx browser packages from it (off npm).
+   2. `cp-office-engine` process (xlsx + pptx native) + docx sidecar.
+   3. Orchestrator routes and fan-out.
+   4. Editors: join via base bytes + diff, delta-only sending, Ctrl+S = flush, `reset` → reload.
+   5. Idle save, watcher + reset. Remove the whole-file upload path.
 2. **Reload that keeps the view**: sheet/slide, scroll, selection restored after `reset`.
 3. **Durability**: update journal replayed after an engine crash; memory cap with LRU release.
 4. **Agent CRDT tool** (optional): an agent edit applied in place without reload.
@@ -117,7 +137,5 @@ Deploy needs an orchestrator restart (drops every agent), so it waits for the us
 
 ## Open questions
 
-- docx: confirm the native path from collaborative replica to `save()` (phase 0).
-- Base determinism native vs WASM per format (phase 0).
 - Several realms/agents opening the same file: one resident document keyed by absolute path, shared by all.
 - Should the engine run one process per format or one for all three? Start with one.
