@@ -61,8 +61,16 @@ function HomeRibbon() {
       <NewSlide />
       <Sep />
       <FontCombos />
-      <Btn cmd={grow} args={{ direction: "increase" }} icon={<FontIncrease20Regular />} />
-      <Btn cmd={shrink} args={{ direction: "decrease" }} icon={<FontDecrease20Regular />} />
+      <Btn
+        cmd={{ ...grow, label: "Increase Font Size" }}
+        args={{ direction: "increase" }}
+        icon={<FontIncrease20Regular />}
+      />
+      <Btn
+        cmd={{ ...shrink, label: "Decrease Font Size" }}
+        args={{ direction: "decrease" }}
+        icon={<FontDecrease20Regular />}
+      />
       <Btn cmd={bold} args={null} icon={<TextBold20Regular />} />
       <Btn cmd={italic} args={null} icon={<TextItalic20Regular />} />
       <Btn cmd={underline} args={null} icon={<TextUnderline20Regular />} />
@@ -72,9 +80,9 @@ function HomeRibbon() {
       <Align value="r" icon={<TextAlignRight20Regular />} />
       <Align value="just" icon={<TextAlignJustify20Regular />} />
       <Sep />
-      <Tool value="select" icon={<Cursor20Regular />} />
-      <Tool value="textBox" icon={<TextField20Regular />} />
-      <Tool value="shape:rect" icon={<Shapes20Regular />} />
+      <Tool value="select" label="Select" icon={<Cursor20Regular />} />
+      <Tool value="textBox" label="Text Box" icon={<TextField20Regular />} />
+      <Tool value="shape:rect" label="Rectangle" icon={<Shapes20Regular />} />
       <Btn cmd={image} args={null} icon={<ImageAdd20Regular />} />
     </>
   )
@@ -106,14 +114,36 @@ function FontCombos() {
 
 type ParagraphAlignment = PptxCommandArgs["alignment"]["value"]
 
-function Align({ value, icon }: { value: ParagraphAlignment; icon: React.ReactNode }) {
-  const cmd = usePptCmd("alignment", { value })
-  return <Btn cmd={cmd} args={{ value }} icon={icon} />
+const ALIGN_LABEL: Record<ParagraphAlignment, string> = {
+  l: "Align Left",
+  ctr: "Center",
+  r: "Align Right",
+  just: "Justify",
 }
 
-function Tool({ value, icon }: { value: PptxEditorTool; icon: React.ReactNode }) {
+/** Alignment reports a value, not `active`: pressed when the paragraph's alignment is this one. */
+function Align({ value, icon }: { value: ParagraphAlignment; icon: React.ReactNode }) {
+  const cmd = usePptCmd("alignment", { value })
+  return <Btn cmd={pressedWhen(cmd, ALIGN_LABEL[value], value)} args={{ value }} icon={icon} />
+}
+
+/** The current tool is a value too: pressed when it is this one. */
+function Tool({
+  value,
+  label,
+  icon,
+}: {
+  value: PptxEditorTool
+  label: string
+  icon: React.ReactNode
+}) {
   const cmd = usePptCmd("tool", { value })
-  return <Btn cmd={cmd} args={{ value }} icon={icon} />
+  return <Btn cmd={pressedWhen(cmd, label, value)} args={{ value }} icon={icon} />
+}
+
+/** `cmd` renamed to `label`, pressed when its value equals `pressed`. */
+function pressedWhen<V, A>(cmd: Cmd<V, A>, label: string, pressed: V): Cmd<V, A> {
+  return { ...cmd, label, state: { ...cmd.state, active: cmd.state.value === pressed } }
 }
 
 /** Status bar: slideshow + zoom, both live commands; the language is static text. */
