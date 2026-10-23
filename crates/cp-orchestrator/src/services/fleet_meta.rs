@@ -115,8 +115,15 @@ impl AvatarStore {
     /// map — avatars are cosmetic, never a hard dependency.
     #[must_use]
     pub fn load(agents_dir: &Path) -> Self {
-        let index_path = agents_dir.join("agent-avatars.json");
-        let dir = agents_dir.join("agent-avatars");
+        Self::load_named(agents_dir, "agent-avatars")
+    }
+
+    /// Same as [`Self::load`] under another name: `<base>/<name>.json` index +
+    /// `<base>/<name>/` files. Also backs the cockpit favicon (`"branding"`).
+    #[must_use]
+    pub fn load_named(base: &Path, name: &str) -> Self {
+        let index_path = base.join(format!("{name}.json"));
+        let dir = base.join(name);
         let types = std::fs::read(&index_path)
             .ok()
             .and_then(|b| serde_json::from_slice::<HashMap<String, String>>(&b).ok())

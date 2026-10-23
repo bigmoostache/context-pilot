@@ -124,6 +124,11 @@ export type BodyPayload = {
     bytes: Array<number>;
 };
 
+export type Branding = {
+    favicon_version: string | null;
+    title: string | null;
+};
+
 export type ClaudeAccountSummary = {
     email: string;
     expires_at?: number | null;
@@ -1273,6 +1278,47 @@ export type PostApiAuthUsersByUserIdLogoutResponses = {
 };
 
 export type PostApiAuthUsersByUserIdLogoutResponse = PostApiAuthUsersByUserIdLogoutResponses[keyof PostApiAuthUsersByUserIdLogoutResponses];
+
+export type GetApiBrandingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/branding';
+};
+
+export type GetApiBrandingErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type GetApiBrandingError = GetApiBrandingErrors[keyof GetApiBrandingErrors];
+
+export type GetApiBrandingResponses = {
+    /**
+     * Success
+     */
+    200: Branding;
+};
+
+export type GetApiBrandingResponse = GetApiBrandingResponses[keyof GetApiBrandingResponses];
+
+export type GetApiBrandingFaviconData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/branding/favicon';
+};
+
+export type GetApiBrandingFaviconResponses = {
+    /**
+     * Favicon image bytes
+     */
+    200: Blob | File;
+};
+
+export type GetApiBrandingFaviconResponse = GetApiBrandingFaviconResponses[keyof GetApiBrandingFaviconResponses];
 
 export type GetApiClaudeAccountsData = {
     body?: never;
@@ -3562,6 +3608,83 @@ export type PostApiSettingsResponses = {
 };
 
 export type PostApiSettingsResponse = PostApiSettingsResponses[keyof PostApiSettingsResponses];
+
+export type PostApiSettingsBrandingData = {
+    body: {
+        title: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/settings/branding';
+};
+
+export type PostApiSettingsBrandingErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiSettingsBrandingError = PostApiSettingsBrandingErrors[keyof PostApiSettingsBrandingErrors];
+
+export type PostApiSettingsBrandingResponses = {
+    /**
+     * Success
+     */
+    200: Branding;
+};
+
+export type PostApiSettingsBrandingResponse = PostApiSettingsBrandingResponses[keyof PostApiSettingsBrandingResponses];
+
+export type DeleteApiSettingsFaviconData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/settings/favicon';
+};
+
+export type DeleteApiSettingsFaviconErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type DeleteApiSettingsFaviconError = DeleteApiSettingsFaviconErrors[keyof DeleteApiSettingsFaviconErrors];
+
+export type DeleteApiSettingsFaviconResponses = {
+    /**
+     * Success
+     */
+    200: Branding;
+};
+
+export type DeleteApiSettingsFaviconResponse = DeleteApiSettingsFaviconResponses[keyof DeleteApiSettingsFaviconResponses];
+
+export type PostApiSettingsFaviconData = {
+    body: Blob | File;
+    path?: never;
+    query?: never;
+    url: '/api/settings/favicon';
+};
+
+export type PostApiSettingsFaviconErrors = {
+    /**
+     * Error
+     */
+    default: Error;
+};
+
+export type PostApiSettingsFaviconError = PostApiSettingsFaviconErrors[keyof PostApiSettingsFaviconErrors];
+
+export type PostApiSettingsFaviconResponses = {
+    /**
+     * Success
+     */
+    200: Branding;
+};
+
+export type PostApiSettingsFaviconResponse = PostApiSettingsFaviconResponses[keyof PostApiSettingsFaviconResponses];
 
 export type PostApiTicketData = {
     body?: never;

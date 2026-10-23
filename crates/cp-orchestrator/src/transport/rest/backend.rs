@@ -67,6 +67,8 @@ pub struct Backend {
     pub names: NameOverrides,
     /// Agent profile picture store (T338).
     pub avatars: AvatarStore,
+    /// Cockpit favicon image (`<agents_dir>/branding/favicon`), see `config::branding`.
+    pub branding: AvatarStore,
     /// Auth store — `None` when auth is disabled (`CP_AUTH_ENABLED=false`).
     /// Contains the SQLite-backed user/session/ACL database (design doc §5).
     pub auth: Option<AuthStore>,
@@ -155,6 +157,7 @@ impl Backend {
             retired: RetiredStore::load(&agents_dir),
             names: NameOverrides::load(&agents_dir),
             avatars: AvatarStore::load(&agents_dir),
+            branding: AvatarStore::load_named(&agents_dir, "branding"),
             releases,
             provision_flag_path,
             pkce_session: None,
@@ -223,6 +226,7 @@ impl Backend {
             retired: RetiredStore::default(),
             names: NameOverrides::default(),
             avatars: AvatarStore::default(),
+            branding: AvatarStore::default(),
             agents_dir,
             dirty_fleets: HashSet::new(),
             liveness: HashMap::new(),

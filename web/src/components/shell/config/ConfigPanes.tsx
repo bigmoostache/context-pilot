@@ -5,6 +5,7 @@ import { Check, Lock } from "lucide-react"
 import { UsagePage } from "@/components/fleets/UsagePage"
 import { UpdatePane } from "./UpdatePane"
 import { SecretsPane } from "./SecretsPane"
+import { BrandingSection } from "./BrandingSection"
 import { ItNetworkPane } from "./it/ItNetworkPane"
 import { ItPane } from "./it/ItPane"
 import { useProviders } from "@/lib/support/models"
@@ -139,6 +140,7 @@ function ServiceRow({ label, available }: { label: string; available: boolean })
 function GeneralPane() {
   return (
     <Stack>
+      <BrandingSection />
       <AllowedModelsSection />
 
       <ToggleRow name="Auto-continuation" detail="Let the agent keep working without a nudge" />

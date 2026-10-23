@@ -115,6 +115,15 @@ pub(super) fn deploy() -> Value {
             "required": ["status"]
         },
         // ── Settings & profile (auth-rbac) ──────────────────────
+        // Tab title + favicon cache-bust token; `null` = built-in default.
+        "Branding": {
+            "type": "object",
+            "properties": {
+                "title": { "type": "string", "nullable": true },
+                "favicon_version": { "type": "string", "nullable": true }
+            },
+            "required": ["title", "favicon_version"]
+        },
         "AppSettings": {
             "type": "object",
             "properties": {

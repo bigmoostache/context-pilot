@@ -49,6 +49,7 @@ pub(super) fn try_owned_route(
 pub(super) fn try_raw_route(request: Request, segments: &[&str], ctx: RouteCtx<'_>) -> Option<Request> {
     match *segments {
         ["api", "fleet", id, "avatar"] => files::handle_avatar(request, ctx.state, id),
+        ["api", "branding", "favicon"] => files::handle_favicon(request, ctx.state),
         ["api", "fleet", id, "fs", "download"] => files::handle_download(request, ctx.state, id, ctx.query),
         ["api", "fleet", id, "fs", "raw"] => files::handle_raw(request, ctx.state, id, ctx.query),
         ["api", "fleet", id, "fs", "office"] => files::handle_office(request, ctx.state, id, ctx.query),
@@ -127,6 +128,10 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Delete, &["api", "auth", "sessions", sid]) => auth::revoke_session(state, sid, auth_user),
         (&Method::Get, &["api", "settings"]) => rest::get_settings(state, auth_user),
         (&Method::Post, &["api", "settings"]) => rest::update_settings(state, body_bytes, auth_user),
+        (&Method::Get, &["api", "branding"]) => rest::get_branding(state),
+        (&Method::Post, &["api", "settings", "branding"]) => rest::update_branding(state, body_bytes, auth_user),
+        (&Method::Post, &["api", "settings", "favicon"]) => rest::upload_favicon(state, body_bytes, auth_user),
+        (&Method::Delete, &["api", "settings", "favicon"]) => rest::delete_favicon(state, auth_user),
         (&Method::Get, &["api", "auth", "users"]) => auth::list_users(state, auth_user),
         (&Method::Post, &["api", "auth", "users"]) => auth::create_user(state, body_bytes, auth_user),
         (&Method::Delete, &["api", "auth", "users", user_id]) => auth::delete_user(state, user_id, auth_user),
@@ -185,7 +190,9 @@ pub(super) fn route_rest(method: &Method, segments: &[&str], ctx: RouteCtx<'_>) 
         (&Method::Get, &["api", "fleet", id, "fs", "office", "version"]) => {
             inspect::finder::fs_office_version(state, id, query)
         }
-        (&Method::Get, &["api", "fleet", id, "fs", "office", "log"]) => inspect::finder::fs_office_log(state, id, query),
+        (&Method::Get, &["api", "fleet", id, "fs", "office", "log"]) => {
+            inspect::finder::fs_office_log(state, id, query)
+        }
         (&Method::Get, &["api", "fleet", id, "fs", "descriptions"]) => inspect::finder::fs_descriptions(state, id),
         (&Method::Get, &["api", "fleet", id, "conversation"]) => inspect::finder::conversation(state, id),
         (&Method::Post, &["api", "fleet", id, "command"]) => rest::command(state, id, body_bytes),

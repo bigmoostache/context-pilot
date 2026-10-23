@@ -164,7 +164,19 @@ pub(super) fn handle_office(request: Request, state: &Arc<Mutex<Backend>>, id: &
 /// Serve an agent's avatar image inline (Content-Type from the avatar store).
 pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &str) {
     let avatar = state.lock().ok().and_then(|b| b.avatars.get(id));
-    match avatar {
+    respond_image(request, avatar, "no avatar");
+}
+
+/// `GET /api/branding/favicon` (public) — the uploaded cockpit favicon, or 404
+/// when the built-in one applies. Cache-busted by the client (`?v=`).
+pub(super) fn handle_favicon(request: Request, state: &Arc<Mutex<Backend>>) {
+    let favicon = state.lock().ok().and_then(|b| b.branding.get(rest::FAVICON_KEY));
+    respond_image(request, favicon, "no favicon");
+}
+
+/// Answer with stored image bytes + content type, or a JSON 404 `missing`.
+fn respond_image(request: Request, image: Option<(Vec<u8>, String)>, missing: &str) {
+    match image {
         Some((bytes, ctype)) => {
             let mut response = Response::from_data(bytes).with_status_code(200u16);
             if let Ok(h) = Header::from_bytes(&b"Content-Type"[..], ctype.as_bytes()) {
@@ -178,6 +190,6 @@ pub(super) fn handle_avatar(request: Request, state: &Arc<Mutex<Backend>>, id: &
             }
             let _sent = request.respond(response);
         }
-        None => respond_json(request, &rest::HttpReply::error(404, "no avatar")),
+        None => respond_json(request, &rest::HttpReply::error(404, missing)),
     }
 }

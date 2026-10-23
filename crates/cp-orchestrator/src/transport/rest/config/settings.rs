@@ -79,7 +79,7 @@ fn may_set_access_control(want: bool, caller: Option<&User>) -> bool {
 /// onboarding flag)? Per design §13.5 product config keeps a management gate:
 /// `can_manage_users` (manager+). When access control is disabled (single-user
 /// appliance) everyone is.
-fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
+pub(super) fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
     let access_control = state.lock().is_ok_and(|b| b.access_control);
     if !access_control {
         return true;

@@ -10,6 +10,7 @@ import type {
   AuthMe,
   AuthStatus,
   AuthUser,
+  Branding,
   CreateUserResponse,
   Features,
   ForceLogoutResponse,
@@ -21,6 +22,8 @@ import {
   deleteApiFleetByIdAclByUserId,
   deleteApiAuthSessionsById,
   deleteApiAuthUsersByUserId,
+  deleteApiSettingsFavicon,
+  getApiBranding,
   getApiFleetByIdAcl,
   getApiAuthMe,
   getApiAuthSessions,
@@ -38,8 +41,10 @@ import {
   postApiAuthUsers,
   postApiAuthUsersByUserIdLogout,
   postApiSettings,
+  postApiSettingsBranding,
 } from "./generated"
 import { sdk } from "./client"
+import { sendUpload } from "./client/upload"
 
 // ── Type re-exports (preserve import surface) ────────────────────────
 
@@ -49,6 +54,7 @@ export type {
   AclEntry,
   AuthStatus,
   AppSettings,
+  Branding,
   Features,
 } from "./generated/types.gen"
 
@@ -131,6 +137,34 @@ export function updateSettings(patch: {
   access_control?: boolean
 }): Promise<AppSettings> {
   return sdk(postApiSettings({ body: patch }))
+}
+
+// ── Branding (tab title + favicon, orchestrator-wide) ────────────────
+
+/** Tab title + favicon version; `null` fields mean the built-in default. Public. */
+export function fetchBranding(): Promise<Branding> {
+  return sdk(getApiBranding())
+}
+
+/** Admin: set the tab title (empty restores the default). */
+export function updateBrandingTitle(title: string): Promise<Branding> {
+  return sdk(postApiSettingsBranding({ body: { title } }))
+}
+
+/** Admin: replace the favicon with an uploaded image. */
+export function uploadFavicon(file: File): Promise<Branding> {
+  return sendUpload<Branding>("/api/settings/favicon", file, file.name || "favicon")
+}
+
+/** Admin: restore the built-in favicon. */
+export function resetFavicon(): Promise<Branding> {
+  return sdk(deleteApiSettingsFavicon())
+}
+
+/** URL of the uploaded favicon, cache-busted by its upload version. */
+export function faviconUrl(version: string): string {
+  const base = (import.meta.env["VITE_API_URL"] as string | undefined) || ""
+  return `${base}/api/branding/favicon?v=${encodeURIComponent(version)}`
 }
 
 // ── Admin: user management ───────────────────────────────────────────

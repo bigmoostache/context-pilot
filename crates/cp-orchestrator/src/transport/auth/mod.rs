@@ -94,10 +94,11 @@ pub(crate) fn authenticate(
 fn is_public_route(segments: &[&str]) -> bool {
     matches!(
         segments,
-        ["api", "health" | "stream" | "features"]
+        ["api", "health" | "stream" | "features" | "branding"]
             | ["api", "vault", "snapshot"] // gated by the bridge token in its handler
             | ["api", "auth", "login" | "register" | "status"]
             | ["api", "fleet", _, "avatar"]
+            | ["api", "branding", "favicon"]
     )
 }
 

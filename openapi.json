@@ -446,6 +446,23 @@
         ],
         "type": "object"
       },
+      "Branding": {
+        "properties": {
+          "favicon_version": {
+            "nullable": true,
+            "type": "string"
+          },
+          "title": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "favicon_version"
+        ],
+        "type": "object"
+      },
       "ClaudeAccountSummary": {
         "properties": {
           "email": {
@@ -3220,6 +3237,57 @@
         "summary": "Force-logout user (admin)",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/branding": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Branding"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Tab title + favicon version (public, pre-login)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/branding/favicon": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Favicon image bytes"
+          }
+        },
+        "summary": "Uploaded favicon image (public; 404 = built-in)",
+        "tags": [
+          "settings"
         ]
       }
     },
@@ -7037,6 +7105,123 @@
           }
         },
         "summary": "Update new-agent defaults / onboarding flag (admin)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/branding": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Branding"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the tab title (admin; empty = default)",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/favicon": {
+      "delete": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Branding"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Restore the built-in favicon (admin)",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Branding"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Upload the favicon (admin; raw image bytes)",
         "tags": [
           "settings"
         ]

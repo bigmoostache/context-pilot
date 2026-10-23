@@ -154,6 +154,33 @@ fn hand_written_schemas() -> Value {
     merge(merge(merge(schemas::core(), schemas_ext::transport()), schemas_ext2::deploy()), schemas_net::network())
 }
 
+/// Cockpit branding routes (tab title + favicon). Kept here because `paths.rs`
+/// sits at its line budget.
+fn branding_paths() -> Value {
+    let binary = json!({ "type": "string", "format": "binary" });
+    json!({
+        "/api/branding": get("settings", "Tab title + favicon version (public, pre-login)", r("Branding")),
+        "/api/branding/favicon": { "get": {
+            "tags": ["settings"], "summary": "Uploaded favicon image (public; 404 = built-in)",
+            "responses": { "200": { "description": "Favicon image bytes", "content": {
+                "image/*": { "schema": binary.clone() }
+            }}}
+        }},
+        "/api/settings/branding": post("settings", "Set the tab title (admin; empty = default)", Some(json!({
+            "type": "object",
+            "properties": { "title": { "type": "string" } },
+            "required": ["title"]
+        })), r("Branding")),
+        "/api/settings/favicon": merge(
+            post("settings", "Upload the favicon (admin; raw image bytes)", Some(binary), r("Branding")),
+            json!({ "delete": {
+                "tags": ["settings"], "summary": "Restore the built-in favicon (admin)",
+                "responses": merge(ok(r("Branding")), err())
+            }})
+        )
+    })
+}
+
 fn build_spec() -> Value {
     let all_schemas = merge(hand_written_schemas(), derived::derived());
     json!({
@@ -161,7 +188,7 @@ fn build_spec() -> Value {
         "info": { "title": "Context Pilot Orchestrator", "version": "1.0.0" },
         "servers": [{ "url": "http://localhost:7878" }],
         "components": { "schemas": all_schemas },
-        "paths": paths::paths()
+        "paths": merge(paths::paths(), branding_paths())
     })
 }
 

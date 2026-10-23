@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react"
 import { AppSkeleton } from "@/switch/AppSkeleton"
 import { UploadToasts } from "@/switch/UploadToasts"
+import { useBranding } from "@/switch/useBranding"
 import { useIsMobile } from "@/switch/useIsMobile"
 
 // The two component trees, code-split. Only the active tree's dynamic chunk is
@@ -21,6 +22,7 @@ const MobileRoot = lazy(() => import("@/mobile-components/Root"))
  * loads.
  */
 export default function App() {
+  useBranding()
   const Root = useIsMobile() ? MobileRoot : DesktopRoot
   return (
     <>
