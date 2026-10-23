@@ -1,0 +1,81 @@
+--- a/packages/xlsx/src/render/canvas2d.ts
++++ b/packages/xlsx/src/render/canvas2d.ts
+@@ -52,16 +52,38 @@
+   ctx: CanvasRenderingContext2D,
+   dl: DisplayList,
+   dpr: number,
+-  origin: { x: number; y: number } = { x: 0, y: 0 }
++  origin: { x: number; y: number } = { x: 0, y: 0 },
++  options: PaintOptions = {}
+ ): void {
++  const { gridlineColor } = options;
+   ctx.save();
+   ctx.setTransform(dpr, 0, 0, dpr, origin.x, origin.y);
+   ctx.beginPath();
+   ctx.rect(0, 0, dl.width, dl.height);
+   ctx.clip();
+   ctx.clearRect(0, 0, dl.width, dl.height);
+-  for (const cmd of dl.commands) paintCommand(ctx, cmd, dpr, origin);
++  for (const cmd of dl.commands) {
++    paintCommand(ctx, gridlineColor && isGridline(cmd) ? { ...cmd, color: gridlineColor } : cmd, dpr, origin);
++  }
+   ctx.restore();
++}
++
++/** Host overrides applied while painting; every field defaults to the engine's own output. */
++export interface PaintOptions {
++  /** Screen gridline colour, `#rrggbb`. Defaults to the engine's `#d4d4d4`. */
++  gridlineColor?: string;
++}
++
++/** The engine's screen gridline colour (xlsx-render `GRIDLINE_COLOR`). */
++const ENGINE_GRIDLINE_COLOR = '#d4d4d4';
++
++/**
++ * A screen gridline: a plain solid line in the engine's gridline colour. A cell
++ * border drawn in exactly that colour, solid and unclipped, matches too.
++ */
++function isGridline(cmd: DrawCmd): cmd is LineCmd {
++  return cmd.op === 'line' && cmd.color.toLowerCase() === ENGINE_GRIDLINE_COLOR && cmd.style === undefined
++    && cmd.rail === undefined;
+ }
+ 
+ function paintCommand(ctx: CanvasRenderingContext2D, cmd: DrawCmd, dpr: number, origin: { x: number; y: number }): void {
+--- a/packages/xlsx/src/index.ts
++++ b/packages/xlsx/src/index.ts
+@@ -141 +141 @@
+-export { paintDisplayList } from './render/canvas2d';
++export { paintDisplayList, type PaintOptions } from './render/canvas2d';
+--- a/packages/xlsx-react/src/XlsxEditor.tsx
++++ b/packages/xlsx-react/src/XlsxEditor.tsx
+@@ -286,6 +286,8 @@
+   showToolbar?: boolean;
+   /** Selection outline colour, `#rrggbb`. Defaults to `#217346`. */
+   selectionColor?: string;
++  /** Screen gridline colour, `#rrggbb`. Defaults to `#d4d4d4`. */
++  gridlineColor?: string;
+ }
+ 
+ /** @deprecated Removed in 0.6.0. Use XlsxAsyncEditorProps. */
+--- a/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
++++ b/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
+@@ -154,6 +154,9 @@
+   const rootRef = useRef<HTMLDivElement>(null);
+   const scrollRef = useRef<HTMLDivElement>(null);
+   const canvasRef = useRef<HTMLCanvasElement>(null);
++  // Read at paint time so a colour change never rebuilds the frame pipeline.
++  const gridlineColorRef = useRef(props.gridlineColor);
++  gridlineColorRef.current = props.gridlineColor;
+   const pluginBindingRef = useRef<XlsxPluginHostBinding | null>(null);
+   useLayoutEffect(() => () => pluginBindingRef.current?.host.close('unmounted'), []);
+   const propsRef = useRef(props);
+@@ -943,7 +946,8 @@
+         canvas.width = Math.round(request.width * request.dpr);
+         canvas.height = Math.round(request.height * request.dpr);
+         canvas.style.width = `${request.width}px`; canvas.style.height = `${request.height}px`;
+-        paintDisplayList(context, frame.displayList, request.dpr * request.zoom);
++        paintDisplayList(context, frame.displayList, request.dpr * request.zoom, undefined,
++          gridlineColorRef.current ? { gridlineColor: gridlineColorRef.current } : {});
+         canvas.dataset.workerSequence = String(frame.sequence);
+         canvas.dataset.commandCoverage = String(frame.coversThroughSeq ?? 0);
+         canvas.dataset.paintSource = frame.source; canvas.dataset.workerZoom = String(request.zoom);

@@ -1,0 +1,60 @@
+--- a/packages/xlsx-react/src/XlsxEditor.tsx
++++ b/packages/xlsx-react/src/XlsxEditor.tsx
+@@ -288,8 +288,27 @@
+   selectionColor?: string;
+   /** Screen gridline colour, `#rrggbb`. Defaults to `#d4d4d4`. */
+   gridlineColor?: string;
++  /**
++   * Called after every painted frame with the grid geometry, so the host can
++   * draw row/column headers or other overlays aligned with the canvas.
++   */
++  onViewport?: (viewport: XlsxViewport) => void;
+ }
+ 
++/** The painted frame's grid, as handed to {@link XlsxInThreadEditorProps.onViewport}. */
++export interface XlsxViewport {
++  sheet: number;
++  /** Scroll offset of the non-frozen body, in sheet pixels at zoom 1. */
++  x: number;
++  y: number;
++  /** Painted size in CSS pixels. */
++  width: number;
++  height: number;
++  zoom: number;
++  /** Row/column offsets of the painted cells; absent on a pre-grid frame. */
++  grid: import('@betteroffice/xlsx').GridMeta | null;
++}
++
+ /** @deprecated Removed in 0.6.0. Use XlsxAsyncEditorProps. */
+ export type XlsxWorkerViewerProps = Omit<XlsxInThreadEditorProps, 'onReady' | 'readOnly' | 'collaboration' | 'experimentalWorkerOpen'> & {
+   /** @deprecated Removed in 0.6.0. Omit for the async editor. */
+--- a/packages/xlsx-react/src/index.ts
++++ b/packages/xlsx-react/src/index.ts
+@@ -13,6 +13,7 @@
+   XlsxEditorCollaborationOptions,
+   XlsxWorkerViewerApi,
+   XlsxWorkerViewerProps,
++  XlsxViewport,
+ } from './XlsxEditor';
+ /** @experimental */
+ export type { XlsxAsyncEditorProps, XlsxWorkerEditorProps } from './XlsxEditor';
+--- a/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
++++ b/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
+@@ -157,6 +157,8 @@
+   // Read at paint time so a colour change never rebuilds the frame pipeline.
+   const gridlineColorRef = useRef(props.gridlineColor);
+   gridlineColorRef.current = props.gridlineColor;
++  const onViewportRef = useRef(props.onViewport);
++  onViewportRef.current = props.onViewport;
+   const pluginBindingRef = useRef<XlsxPluginHostBinding | null>(null);
+   useLayoutEffect(() => () => pluginBindingRef.current?.host.close('unmounted'), []);
+   const propsRef = useRef(props);
+@@ -951,6 +953,8 @@
+         canvas.dataset.workerSequence = String(frame.sequence);
+         canvas.dataset.commandCoverage = String(frame.coversThroughSeq ?? 0);
+         canvas.dataset.paintSource = frame.source; canvas.dataset.workerZoom = String(request.zoom);
++        onViewportRef.current?.({ sheet: request.sheet, x: request.viewport.x, y: request.viewport.y,
++          width: request.width, height: request.height, zoom: request.zoom, grid: frame.displayList.grid ?? null });
+       },
+       onInstalled(frame) {
+         for (const seq of pipeCommands) if (seq <= source.coversThroughSeq) pipeCommands.delete(seq);

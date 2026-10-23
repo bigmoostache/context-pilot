@@ -1,0 +1,57 @@
+--- a/packages/xlsx-react/src/XlsxEditor.tsx
++++ b/packages/xlsx-react/src/XlsxEditor.tsx
+@@ -284,6 +284,8 @@
+   toolbar?: React.ReactNode;
+   /** `false` hides the toolbar region, whatever `toolbar` is. */
+   showToolbar?: boolean;
++  /** Selection outline colour, `#rrggbb`. Defaults to `#217346`. */
++  selectionColor?: string;
+ }
+ 
+ /** @deprecated Removed in 0.6.0. Use XlsxAsyncEditorProps. */
+--- a/packages/xlsx-react/src/worker/PeerlessWorkerSurface.tsx
++++ b/packages/xlsx-react/src/worker/PeerlessWorkerSurface.tsx
+@@ -29,7 +29,7 @@
+ });
+ 
+ export const PeerlessWorkerOverlay = memo(function PeerlessWorkerOverlay({ store, active, zoom, selectedChart,
+-  chartOffset, controller, disabled, run }: {
++  chartOffset, controller, disabled, run, selectionColor = '#217346' }: {
+   store: WorkerPresentationStore;
+   active: number;
+   zoom: number;
+@@ -38,6 +38,8 @@
+   controller: WorkerDraftController;
+   disabled: boolean;
+   run: PeerlessWorkbookSession | null;
++  /** Selection outline colour, `#rrggbb`; the fill is the same colour at 12%. */
++  selectionColor?: string;
+ }) {
+   const unavailable = usePeerlessReadOnly(run, disabled);
+   const painted = useWorkerPresentation(store, selectPainted);
+@@ -61,10 +63,10 @@
+   return <div data-testid="xlsx-overlay-host"
+     style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0, pointerEvents: 'none' }}>
+     {selectionRect && !selectedChart && <div data-testid="xlsx-selection"
+-      style={outline(selectionRect, '1px solid #217346', 'rgba(33, 115, 70, 0.12)')} />}
+-    {focusRect && !selectedChart && <div style={outline(focusRect, '2px solid #217346')} />}
++      style={outline(selectionRect, `1px solid ${selectionColor}`, `${selectionColor}1f`)} />}
++    {focusRect && !selectedChart && <div style={outline(focusRect, `2px solid ${selectionColor}`)} />}
+     {chartRect && <div data-testid="xlsx-chart-selection" data-chart-id={selectedChart?.id} aria-hidden
+-      style={{ ...outline(chartRect, '2px solid #217346'), transform: `translate(${chartOffset?.x ?? 0}px, ${chartOffset?.y ?? 0}px)` }} />}
++      style={{ ...outline(chartRect, `2px solid ${selectionColor}`), transform: `translate(${chartOffset?.x ?? 0}px, ${chartOffset?.y ?? 0}px)` }} />}
+     <PeerlessWorkerCellInput controller={controller} zoom={scale} disabled={unavailable} rect={rect} />
+   </div>;
+ });
+--- a/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
++++ b/packages/xlsx-react/src/worker/XlsxPeerlessWorkerEditor.tsx
+@@ -1481,7 +1481,8 @@
+             <div style={{ position: 'sticky', top: 0, left: 0, width: 0, height: 0 }}>
+               <canvas ref={canvasRef} style={{ display: 'block', position: 'absolute', top: 0, left: 0 }} />
+               <PeerlessWorkerOverlay store={presentation} active={active} zoom={zoom} selectedChart={selectedChart}
+-                chartOffset={chartOffset} controller={draftController} run={run} disabled={Boolean(error) || Boolean(props.readOnly)} />
++                chartOffset={chartOffset} controller={draftController} run={run} disabled={Boolean(error) || Boolean(props.readOnly)}
++                selectionColor={props.selectionColor} />
+               <PeerlessWorkerPresence store={presentation} run={run} provider={props.collaboration?.provider}
+                 active={active} sheets={sheets} />
+               {pluginHost.managed && <PluginOverlays host={pluginHost.host} activations={pluginHost.activations}
