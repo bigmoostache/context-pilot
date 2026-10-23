@@ -69,6 +69,8 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
   const baseRef = useRef("")
   const dirtyRef = useRef(false)
   const [state, setState] = useState<SaveState>("idle")
+  // Version whose xlsx workbook finished opening (the engine signals onReady).
+  const [xlsxReady, setXlsxReady] = useState("")
   const pptxFonts = usePptxFonts(kind === "pptx")
   const { refetch } = doc
 
@@ -123,13 +125,17 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
       <div key={version} className="relative min-h-0 flex-1">
         <Suspense fallback={<PreviewStatus label="Loading editor…" />}>
           {kind === "xlsx" && (
-            <LazyXlsx
-              file={bytes}
-              fileName={node.name}
-              onSave={save}
-              onChange={markDirty}
-              className="size-full"
-            />
+            <>
+              <LazyXlsx
+                file={bytes}
+                fileName={node.name}
+                onSave={save}
+                onChange={markDirty}
+                onReady={() => setXlsxReady(version)}
+                className="size-full"
+              />
+              {xlsxReady !== version && <OpeningOverlay />}
+            </>
           )}
           {kind === "pptx" && (
             <LazyPptx
@@ -150,6 +156,22 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
           )}
         </Suspense>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Covers the xlsx grid while the worker parses every sheet: a large workbook
+ * (tens of MB unpacked) shows nothing for ~20 s otherwise.
+ */
+function OpeningOverlay() {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background">
+      <span className="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-(--signal)" />
+      <span className="text-[12.5px] text-muted-foreground">Opening workbook…</span>
+      <span className="text-[11px] text-muted-foreground/70">
+        Large workbooks can take up to ~20 s.
+      </span>
     </div>
   )
 }
