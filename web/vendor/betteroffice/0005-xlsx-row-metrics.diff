@@ -1,0 +1,477 @@
+--- a/crates/xlsx-render/src/geometry.rs
++++ b/crates/xlsx-render/src/geometry.rs
+@@ -96,13 +96,19 @@
+ #[derive(Debug, Clone, Copy, PartialEq)]
+ enum RowFit {
+     Screen,
+-    Print { dpi: f64 },
++    /// excel for windows and the web: a declared `defaultRowHeight` is kept as
++    /// authored, stored `ht` values are never rescaled, and only content taller
++    /// than the default grows a row.
++    ScreenWindows,
++    Print {
++        dpi: f64,
++    },
+ }
+ 
+ impl RowFit {
+     fn natural(self, size_pt: f64) -> f64 {
+         match self {
+-            Self::Screen => autofit_row_height_pt(size_pt),
++            Self::Screen | Self::ScreenWindows => autofit_row_height_pt(size_pt),
+             Self::Print { dpi } => {
+                 (((1.2 * size_pt * dpi / 72.0).round() + 1.0) * 72.0 / dpi).max(0.0)
+             }
+@@ -111,7 +117,9 @@
+ 
+     fn stored(self, height: f64, scale: Option<f64>) -> f64 {
+         match self {
+-            Self::Screen => scale.map_or(height, |scale| floor_pt(height * scale)),
++            Self::Screen | Self::ScreenWindows => {
++                scale.map_or(height, |scale| floor_pt(height * scale))
++            }
+             Self::Print { dpi } => {
+                 (height * scale.unwrap_or(1.0) * dpi / 72.0 + 1e-9).floor() * 72.0 / dpi
+             }
+@@ -184,7 +192,7 @@
+ /// cached hint it recomputes; `None` keeps stored heights. gated on calibri
+ /// because [`autofit_row_height_pt`] is a calibri measurement.
+ fn stored_height_scale(sheet: &Sheet, normal: NormalFace<'_>, fit: RowFit) -> Option<f64> {
+-    if sheet.format.custom_height {
++    if sheet.format.custom_height || fit == RowFit::ScreenWindows {
+         return None;
+     }
+     let declared = sheet
+@@ -221,6 +229,7 @@
+     let height = fit.natural(size);
+     let grows = match fit {
+         RowFit::Screen => cached_default || height > default_pt,
++        RowFit::ScreenWindows => height > default_pt,
+         RowFit::Print { .. } => size > normal.size_pt && height > default_pt,
+     };
+     grows.then_some(height)
+@@ -686,11 +695,30 @@
+     columns: Sizes,
+     rows: Sizes,
+     spanned: Arc<HashSet<(RowId, ColId)>>,
++    fit: RowFit,
++}
++
++/// which excel's screen row metrics the grid reproduces.
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
++pub enum RowMetrics {
++    /// excel for mac: a declared `defaultRowHeight` is a cached hint, rows
++    /// refit from the normal font (calibri 11 -> 14pt) and stored `ht` values
++    /// rescale with it.
++    #[default]
++    Mac,
++    /// excel for windows and the web: `defaultRowHeight` and stored `ht`
++    /// values are used as authored (calibri 11 sheets keep 15pt = 20px rows).
++    Windows,
+ }
+ 
+ impl GridGeometry {
+     /// build cumulative offset tables from a sheet's custom widths/heights.
+     pub fn new(sheet: &Sheet, styles: &Stylesheet) -> Self {
++        Self::with_row_metrics(sheet, styles, RowMetrics::Mac)
++    }
++
++    /// [`Self::new`] with an explicit screen row-metrics flavour.
++    pub fn with_row_metrics(sheet: &Sheet, styles: &Stylesheet, metrics: RowMetrics) -> Self {
+         Self::with_sizes(
+             sheet,
+             styles,
+@@ -701,7 +729,10 @@
+                 .unwrap_or(DEFAULT_ROW_HEIGHT_PT),
+             NormalFace::from_styles(styles),
+             col_chars_to_px,
+-            RowFit::Screen,
++            match metrics {
++                RowMetrics::Mac => RowFit::Screen,
++                RowMetrics::Windows => RowFit::ScreenWindows,
++            },
+         )
+     }
+ 
+@@ -801,6 +832,7 @@
+             columns,
+             rows,
+             spanned,
++            fit,
+         }
+     }
+ 
+@@ -828,7 +860,7 @@
+             .format
+             .default_row_height_pt
+             .unwrap_or(DEFAULT_ROW_HEIGHT_PT);
+-        let scale = stored_height_scale(sheet, normal, RowFit::Screen);
++        let scale = stored_height_scale(sheet, normal, self.fit);
+         for row in rows {
+             let mut fitted: Option<f64> = None;
+             if !sheet.format.custom_height && !sheet.row_heights.contains_key(&row) {
+@@ -837,9 +869,9 @@
+                         styles,
+                         Some(style),
+                         default_pt,
+-                        sheet.format.default_row_height_pt.is_some(),
++                        self.fit == RowFit::Screen && sheet.format.default_row_height_pt.is_some(),
+                         normal,
+-                        RowFit::Screen,
++                        self.fit,
+                     )
+                 });
+                 for (at, _) in sheet.iter_cells_in_rect(row..row + 1, 0..xlsx_model::MAX_COLS) {
+@@ -853,15 +885,15 @@
+                         styles,
+                         style,
+                         default_pt,
+-                        sheet.format.default_row_height_pt.is_some(),
++                        self.fit == RowFit::Screen && sheet.format.default_row_height_pt.is_some(),
+                         normal,
+-                        RowFit::Screen,
++                        self.fit,
+                     ) {
+                         fitted = Some(fitted.map_or(height, |old| old.max(height)));
+                     }
+                 }
+             }
+-            let size = row_size(sheet, row, fitted, scale, default_pt, RowFit::Screen);
++            let size = row_size(sheet, row, fitted, scale, default_pt, self.fit);
+             if self.rows.value(row) != size {
+                 self.rows.set(row, size);
+             }
+@@ -1155,9 +1187,99 @@
+         sheet.row_heights.insert(1, 9.0);
+         let authored = GridGeometry::new(&sheet, &styles);
+         assert!((authored.row_y(2) - authored.row_y(1) - row_pt_to_px(9.0)).abs() < 0.001);
++    }
++
++    #[test]
++    fn windows_metrics_keep_the_declared_default_and_stored_heights() {
++        let mut styles = Stylesheet::default();
++        styles.fonts.push(Font {
++            name: Some("Calibri".into()),
++            size_pt: Some(11.0),
++            ..Font::default()
++        });
++        styles.cell_xfs.push(Xf {
++            font: Some(0),
++            ..Xf::default()
++        });
++        let mut sheet = sheet_with(&[], &[(1, 24.0), (2, 37.5)]);
++        sheet.format.default_row_height_pt = Some(15.0);
++        sheet.set_cell(
++            CellRef::new(0, 0),
++            xlsx_model::workbook::Cell {
++                style: Some(0),
++                ..Default::default()
++            },
++        );
++        let height = |grid: &GridGeometry, row: RowId| grid.row_y(row + 1) - grid.row_y(row);
++
++        let windows = GridGeometry::with_row_metrics(&sheet, &styles, RowMetrics::Windows);
++        for (row, pt) in [(0, 15.0), (1, 24.0), (2, 37.5), (3, 15.0)] {
++            assert!(
++                (height(&windows, row) - row_pt_to_px(pt)).abs() < 0.001,
++                "row {row}"
++            );
++        }
++        assert_eq!(row_pt_to_px(15.0), 20.0);
++
++        let mac = GridGeometry::new(&sheet, &styles);
++        for (row, pt) in [(0, 14.0), (1, 22.0), (2, 35.0)] {
++            assert!(
++                (height(&mac, row) - row_pt_to_px(pt)).abs() < 0.001,
++                "row {row}"
++            );
++        }
++
++        sheet.format.custom_height = true;
++        let pinned = GridGeometry::with_row_metrics(&sheet, &styles, RowMetrics::Windows);
++        for (row, pt) in [(0, 15.0), (1, 24.0), (3, 15.0)] {
++            assert!(
++                (height(&pinned, row) - row_pt_to_px(pt)).abs() < 0.001,
++                "row {row}"
++            );
++        }
+     }
+ 
+     #[test]
++    fn windows_metrics_still_grow_rows_for_taller_fonts() {
++        let mut styles = Stylesheet::default();
++        styles.fonts.push(Font {
++            name: Some("Calibri".into()),
++            size_pt: Some(11.0),
++            ..Font::default()
++        });
++        styles.fonts.push(Font {
++            name: Some("Calibri".into()),
++            size_pt: Some(30.0),
++            ..Font::default()
++        });
++        styles.cell_xfs.push(Xf {
++            font: Some(0),
++            ..Xf::default()
++        });
++        styles.cell_xfs.push(Xf {
++            font: Some(1),
++            ..Xf::default()
++        });
++        let mut sheet = Sheet::new("S");
++        sheet.format.default_row_height_pt = Some(15.0);
++        sheet.set_cell(
++            CellRef::new(1, 0),
++            xlsx_model::workbook::Cell {
++                style: Some(1),
++                ..Default::default()
++            },
++        );
++        let mut grid = GridGeometry::with_row_metrics(&sheet, &styles, RowMetrics::Windows);
++        let grown = row_pt_to_px(autofit_row_height_pt(30.0));
++        assert!((grid.row_y(2) - grid.row_y(1) - grown).abs() < 0.001);
++        assert!((grid.row_y(1) - 20.0).abs() < 0.001);
++
++        grid.update_rows(&sheet, &styles, [0, 1]);
++        assert!((grid.row_y(2) - grid.row_y(1) - grown).abs() < 0.001);
++        assert!((grid.row_y(1) - 20.0).abs() < 0.001);
++    }
++
++    #[test]
+     fn stored_heights_rescale_with_a_recomputed_cached_default() {
+         let mut styles = Stylesheet::default();
+         styles.fonts.push(Font {
+--- a/crates/xlsx-render/src/lib.rs
++++ b/crates/xlsx-render/src/lib.rs
+@@ -35,7 +35,7 @@
+     Align, ChartA11yAttrs, ChartRegion, DisplayList, DrawCmd, GridMeta, HyperlinkRegion,
+     PathStroke, Rect, TextValign, border_dash, scaled,
+ };
+-pub use geometry::{GridGeometry, PrintMetrics, autofit_relevant};
++pub use geometry::{GridGeometry, PrintMetrics, RowMetrics, autofit_relevant};
+ pub use hit::chart_at_point;
+ pub use number_format::{NumberFormatLayout, paint_number_format};
+ pub use region::{viewport_for_range, viewport_for_used_range, viewport_for_used_range_within};
+--- a/crates/betteroffice-xlsx/src/lib.rs
++++ b/crates/betteroffice-xlsx/src/lib.rs
+@@ -73,8 +73,8 @@
+ pub use xlsx_parse::translate_formula;
+ pub use xlsx_render::{
+     Align, ChartA11yAttrs, ChartRegion, DisplayList, DrawCmd, GridGeometry, GridMeta,
+-    HyperlinkRegion, PathStroke, PrintMetrics, Rect, RenderError, Viewport, viewport_for_range,
+-    viewport_for_used_range, viewport_for_used_range_within,
++    HyperlinkRegion, PathStroke, PrintMetrics, Rect, RenderError, RowMetrics, Viewport,
++    viewport_for_range, viewport_for_used_range, viewport_for_used_range_within,
+ };
+ 
+ pub type Result<T> = std::result::Result<T, Error>;
+--- a/crates/betteroffice-xlsx/src/workbook.rs
++++ b/crates/betteroffice-xlsx/src/workbook.rs
+@@ -56,10 +56,10 @@
+ #[cfg(feature = "raster")]
+ use xlsx_render::scaled;
+ use xlsx_render::{
+-    ChartRegion, DisplayList, GhostEdit, GridGeometry, PrintMetrics, RenderError, Viewport,
+-    build_display_list_with_geometry, build_print_display_list_with_charts, chart_at_point,
+-    display_text, display_viewport_with_geometry, moved_chart_anchor, resolve_chart_anchor,
+-    visible_merged_ranges_with_geometry,
++    ChartRegion, DisplayList, GhostEdit, GridGeometry, PrintMetrics, RenderError, RowMetrics,
++    Viewport, build_display_list_with_geometry, build_print_display_list_with_charts,
++    chart_at_point, display_text, display_viewport_with_geometry, moved_chart_anchor,
++    resolve_chart_anchor, visible_merged_ranges_with_geometry,
+ };
+ 
+ use crate::authority::{
+@@ -395,6 +395,8 @@
+     /// Mutation counter; chart resolutions cache against it.
+     model_epoch: u64,
+     geometry_cache: Mutex<HashMap<SheetId, geometry::GeometryState>>,
++    /// Screen row metrics the cached geometry is built with.
++    row_metrics: RowMetrics,
+     /// Rotated whenever the authority is replaced; half of [`Workbook::version`].
+     version_nonce: String,
+     /// Changes committed since the nonce was minted; the other half.
+@@ -772,6 +774,7 @@
+             sheet_info_cache: Mutex::new(None),
+             model_epoch: 0,
+             geometry_cache: Mutex::new(HashMap::new()),
++            row_metrics: RowMetrics::default(),
+             version_nonce,
+             committed_changes: 0,
+             chart_cache: Mutex::new(ChartCache::default()),
+@@ -5408,6 +5411,7 @@
+             sheet_info_cache: Mutex::new(None),
+             model_epoch: 0,
+             geometry_cache: Mutex::new(HashMap::new()),
++            row_metrics: RowMetrics::default(),
+             version_nonce,
+             committed_changes: 0,
+             chart_cache: Mutex::new(ChartCache::default()),
+--- a/crates/betteroffice-xlsx/src/workbook/geometry.rs
++++ b/crates/betteroffice-xlsx/src/workbook/geometry.rs
+@@ -192,6 +192,19 @@
+         Ok(())
+     }
+ 
++    /// Screen row metrics the grid geometry reproduces ([`RowMetrics::Mac`] by default).
++    pub fn row_metrics(&self) -> RowMetrics {
++        self.row_metrics
++    }
++
++    /// Switches the screen row metrics; cached geometry is rebuilt on next use.
++    pub fn set_row_metrics(&mut self, metrics: RowMetrics) {
++        if self.row_metrics != metrics {
++            self.row_metrics = metrics;
++            self.clear_geometry();
++        }
++    }
++
+     pub(super) fn clear_geometry(&mut self) {
+         self.geometry_cache
+             .get_mut()
+@@ -232,7 +245,11 @@
+             }
+             return Ok((Arc::clone(&state.geometry), state.generation));
+         }
+-        let geometry = Arc::new(GridGeometry::new(sheet_ref, &self.model.styles));
++        let geometry = Arc::new(GridGeometry::with_row_metrics(
++            sheet_ref,
++            &self.model.styles,
++            self.row_metrics,
++        ));
+         cache.insert(
+             sheet,
+             GeometryState {
+--- a/crates/betteroffice-xlsx/src/snapshot/assembly.rs
++++ b/crates/betteroffice-xlsx/src/snapshot/assembly.rs
+@@ -81,6 +81,7 @@
+             sheet_info_cache: _,
+             model_epoch,
+             geometry_cache: _,
++            row_metrics: _,
+             version_nonce,
+             committed_changes,
+             chart_cache: _,
+@@ -1972,6 +1973,7 @@
+             sheet_info_cache: Mutex::new(None),
+             model_epoch,
+             geometry_cache: Mutex::new(HashMap::new()),
++            row_metrics: crate::RowMetrics::default(),
+             version_nonce,
+             committed_changes,
+             chart_cache: Mutex::new(ChartCache::default()),
+--- a/crates/xlsx-wasm/src/core.rs
++++ b/crates/xlsx-wasm/src/core.rs
+@@ -722,6 +722,17 @@
+         .map_err(|error| error.to_string())
+     }
+ 
++    /// `"mac"` (default) or `"windows"`: which excel's screen row heights the grid uses.
++    pub fn set_row_metrics(&mut self, metrics: &str) -> Result<(), String> {
++        let metrics = match metrics {
++            "mac" => betteroffice_xlsx::RowMetrics::Mac,
++            "windows" => betteroffice_xlsx::RowMetrics::Windows,
++            other => return Err(format!("unknown row metrics `{other}`")),
++        };
++        self.workbook.set_row_metrics(metrics);
++        Ok(())
++    }
++
+     pub fn set_active_sheet(&mut self, index: u32) -> Result<(), String> {
+         self.workbook
+             .set_active_sheet(SheetId(index))
+--- a/crates/xlsx-wasm/src/lib.rs
++++ b/crates/xlsx-wasm/src/lib.rs
+@@ -220,6 +220,14 @@
+         context: &str,
+     ) -> Result<XlsxDocument, JsValue> {
+         XlsxDocument::opened(|| Session::open_with_calculation_json(bytes, context))
++            .map_err(|error| js_sys::TypeError::new(&error).into())
++    }
++
++    /// `"mac"` (default) or `"windows"`: which excel's screen row heights the grid uses.
++    #[wasm_bindgen(js_name = setRowMetrics)]
++    pub fn set_row_metrics(&mut self, metrics: &str) -> Result<(), JsValue> {
++        self.session
++            .set_row_metrics(metrics)
+             .map_err(|error| js_sys::TypeError::new(&error).into())
+     }
+ 
+--- a/packages/xlsx/src/wasm/loader.ts
++++ b/packages/xlsx/src/wasm/loader.ts
+@@ -329,6 +329,11 @@
+   /** Peer-unique positive safe integer. Generated securely when omitted. */
+   clientId?: number;
+   calculation?: WorkbookCalculationContext;
++  /**
++   * Whose screen row heights the grid reproduces: `'mac'` (default) refits rows
++   * from the normal font, `'windows'` keeps `defaultRowHeight` and stored heights.
++   */
++  rowMetrics?: 'mac' | 'windows';
+ }
+ 
+ /**
+@@ -523,6 +528,8 @@
+    */
+   moveChart(sheet: number, chart: string, dx: number, dy: number): EditResult;
+   setActiveSheet(index: number): void;
++  /** switch screen row metrics; cached geometry is rebuilt. */
++  setRowMetrics(metrics: 'mac' | 'windows'): void;
+   /**
+    * apply one user input to a cell (parses number/bool/formula/text) and
+    * recalc its transitive dependents. one undo step; moved dependents come back
+@@ -1044,6 +1051,9 @@
+     setActiveSheet(index: number): void {
+       mutatingWasmCall(() => doc.setActiveSheet(index));
+     },
++    setRowMetrics(metrics: 'mac' | 'windows'): void {
++      mutatingWasmCall(() => doc.setRowMetrics(metrics));
++    },
+     editCell(sheet: number, row: number, col: number, input: string): EditResult {
+       return parseJson(() => doc.editCellJson(JSON.stringify({ sheet, row, col, input })), true);
+     },
+--- a/packages/xlsx/src/session/client.ts
++++ b/packages/xlsx/src/session/client.ts
+@@ -156,6 +156,7 @@
+     initialViewport: options.initialViewport ? { ...options.initialViewport } : undefined,
+     includeEditState: options.includeEditState,
+     initialUpdate: options.initialUpdate?.slice(),
++    rowMetrics: options.rowMetrics,
+   };
+   if (options.wasm instanceof ArrayBuffer ||
+     Object.prototype.toString.call(options.wasm) === '[object ArrayBuffer]') {
+--- a/packages/xlsx/src/session/host.ts
++++ b/packages/xlsx/src/session/host.ts
+@@ -421,6 +421,7 @@
+       });
+       collaborative = input.collaborative === true;
+       try {
++        if (input.rowMetrics === 'windows') opened.setRowMetrics('windows');
+         if (input.initialUpdate) {
+           if (!collaborative || retainPeerHydration) throw new Error('Initial updates require a collaborative worker replica');
+           opened.applyUpdate(input.initialUpdate);
+--- a/packages/xlsx-react/src/worker/usePeerlessSessionWorkbook.ts
++++ b/packages/xlsx-react/src/worker/usePeerlessSessionWorkbook.ts
+@@ -332,6 +332,7 @@
+         const session = await editableWorkbookSessionBackend.open(props.file!, {
+           signal: controller.signal,
+           includeEditState: true,
++          ...(latest.current.props.rowMetrics ? { rowMetrics: latest.current.props.rowMetrics } : {}),
+           ...(collaboration ? { collaborative: true,
+             clientId: collaborationClientId, initialUpdate: collaborationInitialUpdate?.slice() } : {}),
+           ...(latest.current.options.initialViewport
+--- a/packages/xlsx-react/src/XlsxEditor.tsx
++++ b/packages/xlsx-react/src/XlsxEditor.tsx
+@@ -288,6 +288,12 @@
+   selectionColor?: string;
+   /** Screen gridline colour, `#rrggbb`. Defaults to `#d4d4d4`. */
+   gridlineColor?: string;
++  /**
++   * Whose screen row heights to reproduce: `'mac'` (default) or `'windows'`
++   * (Excel for Windows and the web: `defaultRowHeight` and stored heights as authored).
++   * Read when the workbook opens.
++   */
++  rowMetrics?: 'mac' | 'windows';
+   /**
+    * Called after every painted frame with the grid geometry, so the host can
+    * draw row/column headers or other overlays aligned with the canvas.
