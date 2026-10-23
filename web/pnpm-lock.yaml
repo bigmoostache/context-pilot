@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.tgz
+  '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.tgz
+
 importers:
 
   .:
@@ -13,13 +17,16 @@ importers:
         version: 1.5.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/docx-react':
         specifier: 0.4.3
-        version: 0.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 0.4.3(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@betteroffice/fonts':
+        specifier: 0.4.0
+        version: 0.4.0
       '@betteroffice/pptx-react':
         specifier: 0.2.0
         version: 0.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/xlsx-react':
-        specifier: 0.3.0
-        version: 0.3.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.tgz
+        version: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -372,6 +379,14 @@ packages:
       '@betteroffice/fonts':
         optional: true
 
+  '@betteroffice/fonts@0.4.0':
+    resolution: {integrity: sha512-x1BVwYDAgY5R6TWI4t9NLguSiAEbH5GItN2ZlpBIFoRXTIJgjBsXd6sUxPGpexXOyY6KdhRjG8XvHjyAYxEGCw==}
+    peerDependencies:
+      '@betteroffice/fonts-cjk': ^0
+    peerDependenciesMeta:
+      '@betteroffice/fonts-cjk':
+        optional: true
+
   '@betteroffice/pptx-i18n@0.2.0':
     resolution: {integrity: sha512-v+mrz02exXGB0hcQL1W0cBKASU3r++F1u1yZxaqXGZ2K7IjFT3bKDT7rhQL1aGQpTNdkt9h6cienS3APD5BFow==}
 
@@ -384,17 +399,20 @@ packages:
   '@betteroffice/pptx@0.2.0':
     resolution: {integrity: sha512-pNPQ58tlA+pVibERbLdQNskvP7a0GIMf4jhkCU/gPp8043Ichf6gB3PSb4ra9sfqoIaWqOaZKCWyptovA2+Q0A==}
 
-  '@betteroffice/xlsx-i18n@0.3.0':
-    resolution: {integrity: sha512-wQx7boZyKr+8MDDtUdos52pDfHeyesY8Hrsj4zEiptAi1c+8Tgy+d3sTPyYX2WZit9EoeSGy4AzombARI03vOQ==}
+  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.tgz':
+    resolution: {integrity: sha512-4uga6Lbtc2mWdPo8p99gy+p9wR9WRtUl48NovAawHa6daHfylELMZFnEndjemORLEu3WEinFMMOQ8C2Hevme+A==, tarball: file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.tgz}
+    version: 0.3.1-cp.20261023
 
-  '@betteroffice/xlsx-react@0.3.0':
-    resolution: {integrity: sha512-ZKHTKGvWKz9Np33MiENcE115QDddREO3LuvtZTnPiNVphB3J5DvxICV9FET/CMgKP5Y5WMgtNDJcJfe6AvLo6A==}
+  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.tgz':
+    resolution: {integrity: sha512-PUdExMncZP7D3aAijRGbrKP+15N27xz+gUiC+Jr/trGZpr6SMBmYpfu6zMCgd/SQGxXoeR4QvNifeG/ft5S9IA==, tarball: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.tgz}
+    version: 0.3.1-cp.20261023
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@betteroffice/xlsx@0.3.0':
-    resolution: {integrity: sha512-K2bHtdk/epAxsmvxJlIWBRndjP3ltQU0Oh3p4gcZd2n5/YgXglo3SmMYX4nQe8WEm/yvz91p+aIasKyXXQP9Wg==}
+  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.tgz':
+    resolution: {integrity: sha512-/W6MYQNoIpFg6bxSBYXYWwmHhaw+vVdPaFd/tB8WWdluPLJcBy59USWJtscG8loXefo7sw9UUCvhi+zL7HOxgQ==, tarball: file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.tgz}
+    version: 0.3.1-cp.20261023
 
   '@boundaries/elements@2.0.1':
     resolution: {integrity: sha512-sAWO3D8PFP6pBXdxxW93SQi/KQqqhE2AAHo3AgWfdtJXwO6bfK6/wUN81XnOZk0qRC6vHzUEKhjwVD9dtDWvxg==}
@@ -5160,9 +5178,9 @@ snapshots:
 
   '@betteroffice/docx-i18n@0.4.3': {}
 
-  '@betteroffice/docx-react@0.4.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@betteroffice/docx-react@0.4.3(@betteroffice/fonts@0.4.0)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@betteroffice/docx': 0.4.3
+      '@betteroffice/docx': 0.4.3(@betteroffice/fonts@0.4.0)
       '@betteroffice/docx-i18n': 0.4.3
       '@radix-ui/react-select': 2.4.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       clsx: 2.1.1
@@ -5175,7 +5193,11 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@betteroffice/docx@0.4.3': {}
+  '@betteroffice/docx@0.4.3(@betteroffice/fonts@0.4.0)':
+    optionalDependencies:
+      '@betteroffice/fonts': 0.4.0
+
+  '@betteroffice/fonts@0.4.0': {}
 
   '@betteroffice/pptx-i18n@0.2.0': {}
 
@@ -5188,16 +5210,16 @@ snapshots:
 
   '@betteroffice/pptx@0.2.0': {}
 
-  '@betteroffice/xlsx-i18n@0.3.0': {}
+  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.tgz': {}
 
-  '@betteroffice/xlsx-react@0.3.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@betteroffice/xlsx': 0.3.0
-      '@betteroffice/xlsx-i18n': 0.3.0
+      '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.tgz
+      '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.tgz
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@betteroffice/xlsx@0.3.0': {}
+  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.tgz': {}
 
   '@boundaries/elements@2.0.1(@typescript-eslint/parser@8.61.0(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint-import-resolver-typescript@4.4.5(eslint-plugin-import-x@4.17.1(@typescript-eslint/utils@8.62.1(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(typescript@6.0.3))(eslint-import-resolver-node@0.3.9)(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2))(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2))(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))':
     dependencies:

@@ -27,9 +27,9 @@ type SaveState = "idle" | "saving" | "saved" | "conflict" | "error"
  * polled version moves while nothing is unsaved.
  */
 export function OfficeEditor({ fleetId, node }: { fleetId: string; node: FinderNode }) {
-  // The BetterOffice engines parse on the main thread: a 2 MB workbook blocks
-  // the page ~20 s. Never open on mount (a restored tab would freeze the app);
-  // fetch and parse only after an explicit click.
+  // docx/pptx engines parse on the main thread (xlsx runs in a Web Worker but
+  // still takes ~20 s on a 2 MB workbook). Never open on mount, so a restored
+  // tab doesn't fetch and parse; open only after an explicit click.
   const [open, setOpen] = useState(false)
   if (!open) return <OpenGate node={node} onOpen={() => setOpen(true)} />
   return <OfficeEditorBody fleetId={fleetId} node={node} />
@@ -51,7 +51,8 @@ function OpenGate({ node, onOpen }: { node: FinderNode; onOpen: () => void }) {
       >
         Open in editor
       </button>
-      {mb != null && mb > 0.5 && (
+      {/* xlsx parses in a Web Worker; docx/pptx still parse on the main thread. */}
+      {mb != null && mb > 0.5 && officeKindOf(node.path) !== "xlsx" && (
         <span className="text-[11px] text-muted-foreground/70">
           Large file: the page may be unresponsive while it opens.
         </span>
