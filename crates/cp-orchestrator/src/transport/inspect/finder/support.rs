@@ -52,6 +52,13 @@ pub(super) fn previewable_path(root: &str, relative: &str) -> Option<PathBuf> {
     widened_path(root, relative, &fixed, &cp_env::env().orch.finder_extra_roots)
 }
 
+/// [`confined_path`] widened with `/tmp` only — for Office saves, so a
+/// document the Finder opened from `/tmp` can be saved back. The behaviours
+/// dir and `CP_FINDER_EXTRA_ROOTS` stay read-only.
+pub(super) fn office_writable_path(root: &str, relative: &str) -> Option<PathBuf> {
+    widened_path(root, relative, &[Path::new(PREVIEW_TMP_ROOT)], &[])
+}
+
 /// [`confined_path`] widened with `CP_FINDER_EXTRA_ROOTS` — for read-only
 /// directory listings (`/tmp` is preview-only, never browsable).
 pub(super) fn listable_path(root: &str, relative: &str) -> Option<PathBuf> {
@@ -63,7 +70,8 @@ pub(super) fn listable_path(root: &str, relative: &str) -> Option<PathBuf> {
 /// canonicalized (`/tmp` → `/private/tmp` on macOS), so symlinks cannot
 /// smuggle a path past the prefix check. Under an `extra` root, any hidden
 /// component (`.ssh`, `.context-pilot`) is refused: `$HOME` is the default
-/// extra root and its dotfiles hold credentials. Never use for writes.
+/// extra root and its dotfiles hold credentials. Writes only through
+/// [`office_writable_path`] (`/tmp`, no extra roots).
 fn widened_path(root: &str, relative: &str, fixed: &[&Path], extra: &[PathBuf]) -> Option<PathBuf> {
     if let Some(inside) = confined_path(root, relative) {
         return Some(inside);
@@ -201,6 +209,18 @@ mod tests {
         assert_eq!(got, Some(extra));
         assert!(denied.is_none());
         assert!(widened_path(&root, "/etc", &[], &allowed).is_none());
+    }
+
+    #[test]
+    fn office_writable_path_accepts_tmp_only() {
+        let agent = std::env::temp_dir().canonicalize().expect("temp dir").join("cp-office-w-agent");
+        std::fs::create_dir_all(&agent).expect("mkdir agent");
+        let doc = PathBuf::from("/tmp/cp-office-w-probe.xlsx");
+        std::fs::write(&doc, b"x").expect("write probe");
+        let root = agent.to_string_lossy();
+        assert!(office_writable_path(&root, "/tmp/cp-office-w-probe.xlsx").is_some());
+        assert!(office_writable_path(&root, "/etc/hosts").is_none());
+        std::fs::remove_file(&doc).expect("rm probe");
     }
 
     #[test]

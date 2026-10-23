@@ -15,7 +15,7 @@ use cp_office::OfficeError;
 use crate::transport::Backend;
 use crate::transport::rest::HttpReply;
 
-use super::support::{confined_path, extract_param, fleet_folder, previewable_path};
+use super::support::{extract_param, fleet_folder, office_writable_path, previewable_path};
 
 /// The `path` query param, required and non-empty.
 fn path_param(query: &str) -> Result<String, HttpReply> {
@@ -37,11 +37,11 @@ pub(super) fn readable(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> R
     previewable_path(&folder, &relative).ok_or_else(|| HttpReply::error(403, "path outside agent realm"))
 }
 
-/// Resolve a writable document path (realm only, never the read-only roots).
+/// Resolve a writable document path (realm or `/tmp`, never the other read-only roots).
 pub(super) fn confined_target(state: &Mutex<Backend>, fleet_id: &str, query: &str) -> Result<PathBuf, HttpReply> {
     let folder = fleet_folder(state, fleet_id)?;
     let relative = path_param(query)?;
-    confined_path(&folder, &relative).ok_or_else(|| HttpReply::error(403, "path outside agent realm"))
+    office_writable_path(&folder, &relative).ok_or_else(|| HttpReply::error(403, "path outside agent realm"))
 }
 
 /// `GET /api/fleet/{id}/fs/office?path=` — the document's bytes and version.
@@ -72,7 +72,7 @@ pub(crate) fn fs_office_version(state: &Mutex<Backend>, fleet_id: &str, query: &
 }
 
 /// `POST /api/fleet/{id}/fs/office?path=&base=` — body = the whole saved
-/// document. Realm only (never the read-only roots). Returns `{ version }`;
+/// document. Realm or `/tmp` (never the other read-only roots). Returns `{ version }`;
 /// `409` when `base` no longer matches the file on disk.
 pub(crate) fn fs_office_write(
     state: &Mutex<Backend>,
@@ -88,7 +88,7 @@ pub(crate) fn fs_office_write(
         Ok(p) => p,
         Err(reply) => return reply,
     };
-    let Some(target) = confined_path(&folder, &relative) else {
+    let Some(target) = office_writable_path(&folder, &relative) else {
         return HttpReply::error(403, "path outside agent realm");
     };
     let mut bytes = Vec::new();
