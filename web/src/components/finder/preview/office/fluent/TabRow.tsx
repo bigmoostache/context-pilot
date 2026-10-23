@@ -230,10 +230,12 @@ const tabRowStyle: CSSProperties = {
   fontFamily: "var(--of-font)",
 }
 
+/** Tab button from the row's top: Word web's is 31 px with the label 3 px above the row centre. */
 const tabStyle: CSSProperties = {
   position: "relative",
-  height: "100%",
-  padding: "0 10px",
+  height: "var(--of-tab-h)",
+  alignSelf: "flex-start",
+  padding: "0 var(--of-tab-pad)",
   border: "none",
   borderRadius: 4,
   font: "inherit",
@@ -243,10 +245,10 @@ const tabStyle: CSSProperties = {
 
 const underlineStyle: CSSProperties = {
   position: "absolute",
-  left: 10,
-  right: 10,
-  bottom: 4,
-  height: 3,
+  left: "var(--of-tab-pad)",
+  right: "var(--of-tab-pad)",
+  bottom: "var(--of-tab-line-bottom)",
+  height: "var(--of-tab-line)",
   borderRadius: 2,
   background: "var(--of-accent)",
 }

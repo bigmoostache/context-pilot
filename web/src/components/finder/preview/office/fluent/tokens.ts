@@ -70,11 +70,25 @@ export const STANDARD_COLORS: readonly string[] = [
   "7030A0",
 ]
 
-/** Per-app bar heights in CSS px: status bar, ribbon card (classic two-row or single-line). */
-export const HEIGHTS: Record<OfficeApp, { statusH: number; ribbonH: number }> = {
-  word: { statusH: 24, ribbonH: 100 },
-  excel: { statusH: 23, ribbonH: 40 },
-  powerpoint: { statusH: 23, ribbonH: 40 },
+/** Per-app geometry in CSS px (see {@link officeVars} for the `--of-*` names). */
+export interface AppGeometry {
+  /** Status bar height. */
+  statusH: number
+  /** Ribbon strip height (classic two-row or single-line card). */
+  ribbonH: number
+  /** Tab button height, from the top of the 36 px tab row. */
+  tabH: number
+  /** Tab side padding; the underline spans the label between them. */
+  tabPad: number
+  /** Underline thickness and its gap above the tab's bottom edge. */
+  tabLine: number
+  tabLineBottom: number
+}
+
+export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
+  word: { statusH: 24, ribbonH: 100, tabH: 31, tabPad: 12, tabLine: 2, tabLineBottom: 1 },
+  excel: { statusH: 23, ribbonH: 40, tabH: 36, tabPad: 10, tabLine: 3, tabLineBottom: 4 },
+  powerpoint: { statusH: 23, ribbonH: 40, tabH: 36, tabPad: 10, tabLine: 3, tabLineBottom: 4 },
 }
 
 /** Measured per-app deviations from {@link FLUENT}; code stays shared. */
@@ -110,6 +124,10 @@ export function officeVars(app: OfficeApp): CSSProperties {
     "--of-radius": `${String(FLUENT.radius)}px`,
     "--of-status-h": `${String(h.statusH)}px`,
     "--of-ribbon-h": `${String(h.ribbonH)}px`,
+    "--of-tab-h": `${String(h.tabH)}px`,
+    "--of-tab-pad": `${String(h.tabPad)}px`,
+    "--of-tab-line": `${String(h.tabLine)}px`,
+    "--of-tab-line-bottom": `${String(h.tabLineBottom)}px`,
     fontFamily: t.font,
   } as CSSProperties
 }
