@@ -32,7 +32,7 @@ export default function ExcelXlsx({
 }) {
   const [viewport, setViewport] = useState<HeaderViewport | null>(null)
   return (
-    <ExcelChrome title={fileName}>
+    <ExcelChrome>
       <ExcelHeaderFrame viewport={viewport}>
         <XlsxEditor
           file={bytes}

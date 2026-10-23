@@ -37,8 +37,9 @@ export function XlsxLiveBody({ fleetId, node }: { fleetId: string; node: FinderN
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Autosave is silent: only a failure or a disk conflict takes space. */}
       <SaveBar
-        state={state}
+        state={state === "saving" || state === "saved" ? "idle" : state}
         onReload={() => {
           setState("idle")
           live.reopen()

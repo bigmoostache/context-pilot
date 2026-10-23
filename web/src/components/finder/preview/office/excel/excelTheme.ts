@@ -16,7 +16,6 @@ export const EXCEL = {
   hover: "#ebebeb",
   pressed: "#e0e0e0",
   line: "#e0e0e0",
-  titleH: 48,
   tabsH: 36,
   ribbonH: 40,
   formulaH: 32,
