@@ -4,6 +4,7 @@ import { saveOffice } from "@/lib/api"
 import { useFsOffice, useFsOfficeVersion } from "@/lib/live"
 import { Generic, PreviewStatus } from "../previewParts"
 import { officeKindOf } from "../kinds"
+import { usePptxFonts } from "./pptxFonts"
 import "@betteroffice/docx-react/styles.css"
 
 /** BetterOffice editors (Rust engines compiled to WASM) — loaded on first open. */
@@ -16,9 +17,6 @@ const LazyDocx = lazy(() =>
 const LazyPptx = lazy(() =>
   import("@betteroffice/pptx-react").then((m) => ({ default: m.PptxEditor })),
 )
-
-/** Stable empty font list: a new array each render would reopen the deck. */
-const NO_FONTS: never[] = []
 
 type SaveState = "idle" | "saving" | "saved" | "conflict" | "error"
 
@@ -70,6 +68,7 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
   const baseRef = useRef("")
   const dirtyRef = useRef(false)
   const [state, setState] = useState<SaveState>("idle")
+  const pptxFonts = usePptxFonts(kind === "pptx")
   const { refetch } = doc
 
   useEffect(() => {
@@ -106,6 +105,8 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
   if (!kind) return <Generic node={node} />
   if (doc.loading) return <PreviewStatus label="Loading document…" />
   if (doc.error || !doc.data) return <Generic node={node} />
+  if (kind === "pptx" && pptxFonts.error) return <Generic node={node} />
+  if (kind === "pptx" && !pptxFonts.fonts) return <PreviewStatus label="Loading fonts…" />
 
   const { bytes, version } = doc.data
   return (
@@ -133,7 +134,7 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
             <LazyPptx
               file={bytes}
               fileName={node.name}
-              fonts={NO_FONTS}
+              fonts={pptxFonts.fonts ?? []}
               onSave={save}
               onChange={markDirty}
               className="size-full"
