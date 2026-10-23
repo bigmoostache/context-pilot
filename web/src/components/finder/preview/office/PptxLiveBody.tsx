@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from "react"
 import type { FinderNode } from "@/lib/types"
 import { Generic, PreviewStatus } from "../previewParts"
+import { PptChrome } from "./powerpoint/PptChrome"
+import { PptRibbon } from "./powerpoint/PptRibbon"
 import { usePptxFonts } from "./pptxFonts"
 import { usePptxLive } from "./pptxLive"
 import { SaveBar, type SaveState } from "./saveBar"
@@ -40,17 +42,20 @@ export function PptxLiveBody({ fleetId, node }: { fleetId: string; node: FinderN
         }}
       />
       <div key={live.session.key} className="relative min-h-0 flex-1">
-        <Suspense fallback={<PreviewStatus label="Loading editor…" />}>
-          <LazyPptx
-            file={live.session.base}
-            fileName={node.name}
-            fonts={fonts.fonts}
-            collaboration={live.collaboration}
-            onSave={save}
-            onChange={live.markDirty}
-            className="size-full"
-          />
-        </Suspense>
+        <PptChrome fileName={node.name}>
+          <Suspense fallback={<PreviewStatus label="Loading editor…" />}>
+            <LazyPptx
+              file={live.session.base}
+              fileName={node.name}
+              fonts={fonts.fonts}
+              collaboration={live.collaboration}
+              onSave={save}
+              onChange={live.markDirty}
+              toolbar={<PptRibbon />}
+              className="size-full"
+            />
+          </Suspense>
+        </PptChrome>
       </div>
     </div>
   )
