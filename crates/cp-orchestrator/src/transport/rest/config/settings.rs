@@ -77,11 +77,11 @@ fn may_set_access_control(want: bool, caller: Option<&User>) -> bool {
 
 /// Is the caller allowed to mutate product/org config (defaults, allowed models,
 /// onboarding flag)? Per design §13.5 product config keeps a management gate:
-/// `can_manage_users` (manager+). When access control is disabled (single-user
-/// appliance) everyone is.
+/// `can_manage_users` (manager+). With auth disabled (no caller, single-user
+/// appliance) or access control off, everyone is.
 pub(super) fn can_manage_config(state: &Mutex<Backend>, auth_user: Option<&User>) -> bool {
-    let access_control = state.lock().is_ok_and(|b| b.access_control);
-    if !access_control {
+    let gated = state.lock().is_ok_and(|b| b.access_control && b.auth.is_some());
+    if !gated {
         return true;
     }
     auth_user.is_some_and(User::can_manage_users)

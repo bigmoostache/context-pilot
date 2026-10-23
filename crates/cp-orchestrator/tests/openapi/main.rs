@@ -163,7 +163,7 @@ fn branding_paths() -> Value {
         "/api/branding/favicon": { "get": {
             "tags": ["settings"], "summary": "Uploaded favicon image (public; 404 = built-in)",
             "responses": { "200": { "description": "Favicon image bytes", "content": {
-                "image/*": { "schema": binary.clone() }
+                "image/*": { "schema": { "type": "string", "format": "binary" } }
             }}}
         }},
         "/api/settings/branding": post("settings", "Set the tab title (admin; empty = default)", Some(json!({
