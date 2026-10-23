@@ -87,9 +87,26 @@ export interface AppGeometry {
   btnW: number
   btnH: number
   comboH: number
+  /** Combo box chevron width. */
+  comboChevW: number
+  /** Split button halves: main action and menu chevron. */
+  splitW: number
+  splitChevW: number
+  /** Menu-only button: side padding and icon-to-chevron gap. */
+  dropPad: number
+  dropGap: number
 }
 
-const SINGLE_LINE = { btnW: 32, btnH: 32, comboH: 28 } as const
+const SINGLE_LINE = {
+  btnW: 32,
+  btnH: 32,
+  comboH: 28,
+  comboChevW: 20,
+  splitW: 28,
+  splitChevW: 16,
+  dropPad: 6,
+  dropGap: 4,
+} as const
 
 export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
   word: {
@@ -102,6 +119,11 @@ export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
     btnW: 28,
     btnH: 24,
     comboH: 24,
+    comboChevW: 24,
+    splitW: 26,
+    splitChevW: 24,
+    dropPad: 3,
+    dropGap: 0,
   },
   excel: {
     statusH: 23,
@@ -163,6 +185,11 @@ export function officeVars(app: OfficeApp): CSSProperties {
     "--of-btn-w": `${String(h.btnW)}px`,
     "--of-btn-h": `${String(h.btnH)}px`,
     "--of-combo-h": `${String(h.comboH)}px`,
+    "--of-combo-chev-w": `${String(h.comboChevW)}px`,
+    "--of-split-w": `${String(h.splitW)}px`,
+    "--of-split-chev-w": `${String(h.splitChevW)}px`,
+    "--of-drop-pad": `${String(h.dropPad)}px`,
+    "--of-drop-gap": `${String(h.dropGap)}px`,
     fontFamily: t.font,
   } as CSSProperties
 }

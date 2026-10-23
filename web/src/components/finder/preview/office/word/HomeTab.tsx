@@ -84,14 +84,14 @@ function FontGroup() {
         <Fragment key="r81">
           <Combo
             label="Font"
-            width={128}
+            width={126}
             options={FONTS}
             cmd={family}
             toArgs={(t) => ({ family: t })}
           />
           <Combo
             label="Font Size"
-            width={56}
+            width={68}
             options={FONT_SIZES}
             cmd={size}
             toArgs={(t) => ({ points: Math.min(1638, Math.max(1, Number(t) || 11)) })}

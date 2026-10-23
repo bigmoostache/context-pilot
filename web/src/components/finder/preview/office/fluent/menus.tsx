@@ -289,7 +289,7 @@ export function SplitBtn<A>({
         aria-label={cmd.label}
         disabled={!enabled}
         onClick={() => void cmd.execute(args)}
-        style={{ ...btnStyle, padding: 0, width: 28, opacity }}
+        style={{ ...btnStyle, padding: 0, width: "var(--of-split-w)", opacity }}
       >
         {icon}
       </button>
@@ -304,7 +304,7 @@ export function SplitBtn<A>({
         style={{
           ...btnStyle,
           padding: 0,
-          width: 16,
+          width: "var(--of-split-chev-w)",
           opacity,
           background: open ? "var(--of-pressed)" : "transparent",
         }}
@@ -461,8 +461,8 @@ const btnStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 4,
-  padding: "0 6px",
+  gap: "var(--of-drop-gap)",
+  padding: "0 var(--of-drop-pad)",
   border: "none",
   borderRadius: 4,
   background: "transparent",

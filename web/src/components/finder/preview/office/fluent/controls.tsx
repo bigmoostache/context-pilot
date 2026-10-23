@@ -306,7 +306,7 @@ const inputStyle: CSSProperties = {
 }
 
 const chevronStyle: CSSProperties = {
-  width: 20,
+  width: "var(--of-combo-chev-w)",
   height: "100%",
   display: "inline-flex",
   alignItems: "center",
