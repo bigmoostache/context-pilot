@@ -1,6 +1,5 @@
 import type { ReactNode } from "react"
-import { Search } from "lucide-react"
-import { EXCEL, EXCEL_TABS } from "./excelTheme"
+import { EXCEL, EXCEL_TAB } from "./excelTheme"
 
 /**
  * Excel for the web frame around the xlsx editor: title bar, ribbon tab row,
@@ -84,32 +83,11 @@ function TitleBar({ title }: { title: string }) {
     >
       <ExcelLogo />
       <span style={{ fontSize: 14 }}>{title.replace(/\.xlsx$/i, "")}</span>
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 468,
-          height: 32,
-          borderRadius: 6,
-          background: EXCEL.search,
-          border: `1px solid ${EXCEL.line}`,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 10px",
-          color: EXCEL.inkMuted,
-          fontSize: 14,
-          boxSizing: "border-box",
-        }}
-      >
-        <Search size={16} />
-        Search for tools, help, and more (Option + Q)
-      </div>
     </div>
   )
 }
 
+/** Tab row: only Home exists here, so it is a label, not a tab that switches. */
 function TabRow() {
   return (
     <div
@@ -122,57 +100,41 @@ function TabRow() {
         fontSize: 14,
       }}
     >
-      <span style={{ width: 43, textAlign: "center", color: EXCEL.inkTab }}>File</span>
-      {EXCEL_TABS.map((tab) => {
-        const active = tab === "Home"
-        return (
-          <span
-            key={tab}
-            style={{
-              marginLeft: 23,
-              position: "relative",
-              lineHeight: "34px",
-              color: active ? EXCEL.ink : EXCEL.inkTab,
-              fontWeight: active ? 600 : 400,
-            }}
-          >
-            {tab}
-            {active && (
-              <span
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 2,
-                  height: 3,
-                  borderRadius: 2,
-                  background: EXCEL.brand,
-                }}
-              />
-            )}
-          </span>
-        )
-      })}
+      <span
+        style={{
+          marginLeft: 8,
+          position: "relative",
+          lineHeight: "34px",
+          color: EXCEL.ink,
+          fontWeight: 600,
+        }}
+      >
+        {EXCEL_TAB}
+        <span
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 2,
+            height: 3,
+            borderRadius: 2,
+            background: EXCEL.brand,
+          }}
+        />
+      </span>
     </div>
   )
 }
 
+/** Excel's status bar strip; empty until it carries live selection aggregates. */
 function StatusBar() {
   return (
     <div
       style={{
         height: EXCEL.statusH,
         flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 36,
-        padding: "0 32px",
         background: EXCEL.surface,
-        color: EXCEL.inkStatus,
-        fontSize: 12,
       }}
-    >
-      <span>Workbook Statistics</span>
-    </div>
+    />
   )
 }

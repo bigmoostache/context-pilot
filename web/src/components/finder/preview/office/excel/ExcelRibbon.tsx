@@ -16,6 +16,8 @@ import {
   WrapText,
 } from "lucide-react"
 import { EXCEL } from "./excelTheme"
+import { Combo } from "../fluent/controls"
+import type { Cmd } from "../fluent/tokens"
 
 type NoArgCommand = "bold" | "italic" | "strikethrough" | "undo" | "redo"
 
@@ -100,34 +102,52 @@ export function ExcelToolbar() {
   )
 }
 
-/** Font family and size boxes, read-only mirrors of the selection. */
+/** Common Excel fonts offered in the family list; any typed name is accepted. */
+const FONTS = [
+  "Aptos Narrow",
+  "Aptos",
+  "Calibri",
+  "Arial",
+  "Cambria",
+  "Consolas",
+  "Segoe UI",
+  "Times New Roman",
+] as const
+/** Excel's font size list (points). */
+const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72] as const
+
+/** Editable font family and size boxes bound to the selection's font commands. */
 function FontBox() {
   const family = useXlsxCommand("fontFamily")
   const size = useXlsxCommand("fontSize")
+  const familyCmd: Cmd<string, { family: string }> = {
+    label: family.label,
+    state: { enabled: family.state.enabled, value: family.state.value ?? undefined },
+    execute: (a) => family.execute(a),
+  }
+  const sizeCmd: Cmd<number, { points: number }> = {
+    label: size.label,
+    state: { enabled: size.state.enabled, value: size.state.value ?? undefined },
+    execute: (a) => size.execute(a),
+  }
   return (
     <>
-      <span style={box(128, "#f0f0f0")}>{family.state.value ?? "Aptos Narrow"}</span>
-      <span style={box(58, EXCEL.surface)}>{size.state.value ?? 11}</span>
+      <Combo
+        label={family.label}
+        width={128}
+        options={FONTS}
+        cmd={familyCmd}
+        toArgs={(family) => ({ family })}
+      />
+      <Combo
+        label={size.label}
+        width={58}
+        options={SIZES}
+        cmd={sizeCmd}
+        toArgs={(t) => ({ points: Math.min(400, Math.max(1, Number(t) || 11)) })}
+      />
     </>
   )
-}
-
-function box(width: number, background: string) {
-  return {
-    width,
-    height: 28,
-    background,
-    border: `1px solid ${EXCEL.line}`,
-    borderRadius: 4,
-    padding: "0 8px",
-    display: "inline-flex",
-    alignItems: "center",
-    fontSize: 14,
-    color: EXCEL.ink,
-    overflow: "hidden",
-    whiteSpace: "nowrap" as const,
-    boxSizing: "border-box" as const,
-  }
 }
 
 function Toggle({ id, icon }: { id: NoArgCommand; icon: ReactNode }) {

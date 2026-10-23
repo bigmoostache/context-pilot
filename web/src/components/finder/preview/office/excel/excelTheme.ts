@@ -23,16 +23,5 @@ export const EXCEL = {
   statusH: 23,
 } as const
 
-/** Ribbon tab labels, in Excel's order. Only Home carries commands here. */
-export const EXCEL_TABS = [
-  "Home",
-  "Insert",
-  "Share",
-  "Page Layout",
-  "Formulas",
-  "Data",
-  "Review",
-  "View",
-  "Help",
-  "Draw",
-] as const
+/** The only ribbon tab with commands here; others are omitted, not faked. */
+export const EXCEL_TAB = "Home"
