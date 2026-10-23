@@ -20,6 +20,8 @@ export function StatusBar({ left, right }: { left?: ReactNode; right?: ReactNode
         gap: 2,
         padding: "0 8px",
         background: "var(--of-chrome)",
+        borderTop: "1px solid var(--of-status-line)",
+        boxSizing: "border-box",
         color: "var(--of-ink-muted)",
         fontFamily: "var(--of-font)",
         fontSize: 12,

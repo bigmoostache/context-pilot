@@ -1,9 +1,9 @@
 import { OfficeRibbon } from "../fluent/Frame"
-import { StatusBar, Zoom } from "../fluent/StatusBar"
+import { StatusBar, StatusItem, Zoom } from "../fluent/StatusBar"
 import type { OfficeTab, SearchItem } from "../fluent/TabRow"
 import { HomeTab } from "./HomeTab"
 import { FileBackstage, InsertTab, LayoutTab, ModeCombo, ReviewTab } from "./MoreTabs"
-import { plain, useWordCmd } from "./wordCmd"
+import { plain, usePageInfo, useWordCmd } from "./wordCmd"
 
 const TABS: readonly OfficeTab[] = [
   { id: "home", label: "Home", ribbon: <HomeTab /> },
@@ -34,8 +34,12 @@ export function WordRibbon() {
 
 function WordStatus() {
   const zoom = useWordCmd("zoom")
+  const pages = usePageInfo()
   return (
     <StatusBar
+      left={
+        pages ? <StatusItem text={`Page ${String(pages.page)} of ${String(pages.total)}`} /> : null
+      }
       right={<Zoom cmd={zoom} toArgs={(s) => ({ scale: s === "fit" ? 1 : s })} fit={false} />}
     />
   )

@@ -1,6 +1,37 @@
+import { createContext, use, useEffect, useState } from "react"
+import type { RefObject } from "react"
 import { useDocxCommand } from "@betteroffice/docx-react"
-import type { DocxCommandArgs, DocxCommandId, DocxCommandValues } from "@betteroffice/docx-react"
+import type {
+  DocxCommandArgs,
+  DocxCommandId,
+  DocxCommandValues,
+  DocxEditorRef,
+} from "@betteroffice/docx-react"
 import type { Cmd } from "../fluent/tokens"
+
+/** The mounted DocxEditor, for read-only queries the command API lacks (page count). */
+export const WordEditorContext = createContext<RefObject<DocxEditorRef | null> | null>(null)
+
+/** "Page X of Y" from the editor, polled twice a second; null until laid out. */
+export function usePageInfo(): { page: number; total: number } | null {
+  const ref = use(WordEditorContext)
+  const [info, setInfo] = useState<{ page: number; total: number } | null>(null)
+  useEffect(() => {
+    const tick = () => {
+      const ed = ref?.current
+      const total = ed?.getTotalPages() ?? 0
+      const page = ed?.getCurrentPage() ?? 0
+      setInfo((prev) => {
+        if (total < 1) return null
+        if (prev?.page === page && prev.total === total) return prev
+        return { page: Math.max(1, page), total }
+      })
+    }
+    const id = setInterval(tick, 500)
+    return () => clearInterval(id)
+  }, [ref])
+  return info
+}
 
 /** A docx command in the kit's `Cmd` shape. */
 export type WordCmd<K extends DocxCommandId> = Cmd<

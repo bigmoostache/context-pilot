@@ -1,9 +1,11 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import { DocxEditor } from "@betteroffice/docx-react"
+import type { DocxEditorRef } from "@betteroffice/docx-react"
 import { OfficeShell, OfficeTitleBar } from "../fluent/Frame"
 import { ACCENT } from "../fluent/tokens"
 import { WordRibbon } from "./WordRibbon"
+import { WordEditorContext } from "./wordCmd"
 import { WORD_EDITOR_STYLE } from "./wordTheme"
 
 /**
@@ -58,23 +60,27 @@ function EditorArea({
   onSave: (bytes: Uint8Array) => void
   onError: (message: string) => void
 }) {
+  const editorRef = useRef<DocxEditorRef>(null)
   return (
     <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-      <DocxEditor
-        documentBuffer={bytes}
-        downloadOnSave={false}
-        onSave={(buf: ArrayBuffer) => {
-          onSave(new Uint8Array(buf))
-        }}
-        onError={(e: Error) => {
-          onError(e.message || "The document could not be read.")
-        }}
-        toolbar={<WordRibbon />}
-        showRuler={false}
-        showZoomControl={false}
-        style={WORD_EDITOR_STYLE as CSSProperties}
-        className="size-full"
-      />
+      <WordEditorContext value={editorRef}>
+        <DocxEditor
+          ref={editorRef}
+          documentBuffer={bytes}
+          downloadOnSave={false}
+          onSave={(buf: ArrayBuffer) => {
+            onSave(new Uint8Array(buf))
+          }}
+          onError={(e: Error) => {
+            onError(e.message || "The document could not be read.")
+          }}
+          toolbar={<WordRibbon />}
+          showRuler={false}
+          showZoomControl={false}
+          style={WORD_EDITOR_STYLE as CSSProperties}
+          className="size-full"
+        />
+      </WordEditorContext>
     </div>
   )
 }
