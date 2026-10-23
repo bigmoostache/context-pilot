@@ -1,114 +1,148 @@
 import {
-  AArrowDown,
-  AArrowUp,
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  Bold,
-  ImagePlus,
-  Italic,
-  MousePointer2,
-  Plus,
-  Redo2,
-  Shapes,
-  Type,
-  Underline,
-  Undo2,
-} from "lucide-react"
-import { FontBox, Sep, Toggle, Valued } from "./pptButtons"
-import { PPT, PPT_TABS } from "./pptTheme"
+  ArrowRedo20Regular,
+  ArrowUndo20Regular,
+  Cursor20Regular,
+  FontDecrease20Regular,
+  FontIncrease20Regular,
+  ImageAdd20Regular,
+  Play16Regular,
+  Shapes20Regular,
+  SlideAdd20Regular,
+  TextAlignCenter20Regular,
+  TextAlignJustify20Regular,
+  TextAlignLeft20Regular,
+  TextAlignRight20Regular,
+  TextBold20Regular,
+  TextField20Regular,
+  TextItalic20Regular,
+  TextUnderline20Regular,
+} from "@fluentui/react-icons"
+import type { PptxCommandArgs, PptxEditorTool } from "@betteroffice/pptx-react"
+import { Btn, Combo, Sep } from "../fluent/controls"
+import { OfficeRibbon } from "../fluent/Frame"
+import { StatusBar, StatusItem, Zoom } from "../fluent/StatusBar"
+import type { Cmd } from "../fluent/tokens"
+import { usePptCmd } from "./pptCmd"
 
-const ICON = 16
+const FAMILIES = ["Calibri", "Calibri Light", "Arial", "Helvetica", "Times New Roman", "Aptos"]
+const SIZES = [
+  8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 66, 72, 80, 88, 96,
+]
 
 /**
- * PowerPoint's tab row plus single-line Home ribbon, passed to PptxEditor as
- * `toolbar` so every button sits inside the editor's command context.
+ * PowerPoint for the web's single-line ribbon on the shared Office kit. Passed
+ * to PptxEditor as `toolbar` so every control resolves editor commands; the
+ * status bar is portalled into the shell from here for the same reason.
  */
 export function PptRibbon() {
   return (
-    <div style={{ background: PPT.chrome, fontFamily: PPT.font }}>
-      <PptTabs />
-      <div style={{ height: PPT.ribbonH, padding: "0 8px", display: "flex" }}>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 0,
-            padding: "0 8px",
-            background: PPT.surface,
-            borderRadius: 8,
-            boxShadow: PPT.shadow,
-          }}
-        >
-          <Toggle id="undo" icon={<Undo2 size={ICON} />} />
-          <Toggle id="redo" icon={<Redo2 size={ICON} />} />
-          <Sep />
-          <Valued id="insertSlide" args={{}} icon={<Plus size={ICON} />} />
-          <Sep />
-          <FontBox />
-          <Valued
-            id="fontSizeStep"
-            args={{ direction: "increase" }}
-            icon={<AArrowUp size={ICON} />}
-          />
-          <Valued
-            id="fontSizeStep"
-            args={{ direction: "decrease" }}
-            icon={<AArrowDown size={ICON} />}
-          />
-          <Toggle id="bold" icon={<Bold size={ICON} />} />
-          <Toggle id="italic" icon={<Italic size={ICON} />} />
-          <Toggle id="underline" icon={<Underline size={ICON} />} />
-          <Sep />
-          <Valued id="alignment" args={{ value: "l" }} icon={<AlignLeft size={ICON} />} />
-          <Valued id="alignment" args={{ value: "ctr" }} icon={<AlignCenter size={ICON} />} />
-          <Valued id="alignment" args={{ value: "r" }} icon={<AlignRight size={ICON} />} />
-          <Valued id="alignment" args={{ value: "just" }} icon={<AlignJustify size={ICON} />} />
-          <Sep />
-          <Valued id="tool" args={{ value: "select" }} icon={<MousePointer2 size={ICON} />} />
-          <Valued id="tool" args={{ value: "textBox" }} icon={<Type size={ICON} />} />
-          <Valued id="tool" args={{ value: "shape:rect" }} icon={<Shapes size={ICON} />} />
-          <Toggle id="insertImage" icon={<ImagePlus size={ICON} />} />
-        </div>
-      </div>
-    </div>
+    <OfficeRibbon
+      layout="single"
+      tabs={[{ id: "home", label: "Home", ribbon: <HomeRibbon /> }]}
+      status={<PptStatus />}
+    />
   )
 }
 
-/** Tab row. Only tabs with live commands are listed (no dead controls). */
-function PptTabs() {
+function HomeRibbon() {
+  const undo = usePptCmd("undo")
+  const redo = usePptCmd("redo")
+  const newSlide = usePptCmd("insertSlide", {})
+  const grow = usePptCmd("fontSizeStep", { direction: "increase" })
+  const shrink = usePptCmd("fontSizeStep", { direction: "decrease" })
+  const bold = usePptCmd("bold")
+  const italic = usePptCmd("italic")
+  const underline = usePptCmd("underline")
+  const image = usePptCmd("insertImage")
   return (
-    <div
-      role="tablist"
-      style={{
-        height: PPT.tabsH,
-        padding: "0 8px",
-        display: "flex",
-        alignItems: "flex-start",
-      }}
-    >
-      {PPT_TABS.map((label) => (
-        <span key={label} role="tab" aria-selected style={tab(true)}>
-          {label}
-        </span>
-      ))}
-    </div>
+    <>
+      <Btn cmd={undo} args={null} icon={<ArrowUndo20Regular />} />
+      <Btn cmd={redo} args={null} icon={<ArrowRedo20Regular />} />
+      <Sep />
+      <Btn cmd={newSlide} args={{}} icon={<SlideAdd20Regular />} />
+      <Sep />
+      <FontCombos />
+      <Btn cmd={grow} args={{ direction: "increase" }} icon={<FontIncrease20Regular />} />
+      <Btn cmd={shrink} args={{ direction: "decrease" }} icon={<FontDecrease20Regular />} />
+      <Btn cmd={bold} args={null} icon={<TextBold20Regular />} />
+      <Btn cmd={italic} args={null} icon={<TextItalic20Regular />} />
+      <Btn cmd={underline} args={null} icon={<TextUnderline20Regular />} />
+      <Sep />
+      <Align value="l" icon={<TextAlignLeft20Regular />} />
+      <Align value="ctr" icon={<TextAlignCenter20Regular />} />
+      <Align value="r" icon={<TextAlignRight20Regular />} />
+      <Align value="just" icon={<TextAlignJustify20Regular />} />
+      <Sep />
+      <Tool value="select" icon={<Cursor20Regular />} />
+      <Tool value="textBox" icon={<TextField20Regular />} />
+      <Tool value="shape:rect" icon={<Shapes20Regular />} />
+      <Btn cmd={image} args={null} icon={<ImageAdd20Regular />} />
+    </>
   )
 }
 
-function tab(active: boolean) {
-  return {
-    height: 31,
-    padding: "0 10px",
-    display: "inline-flex",
-    alignItems: "center",
-    fontSize: 14,
-    fontWeight: active ? 600 : 400,
-    color: active ? PPT.ink : PPT.inkTab,
-    boxShadow: active ? `inset 0 -3px 0 ${PPT.brand}` : "none",
-    cursor: "default",
-    whiteSpace: "nowrap" as const,
+/** Editable font name and size boxes, bound to fontFamily / fontSize. */
+function FontCombos() {
+  const family = usePptCmd("fontFamily")
+  const size = usePptCmd("fontSize")
+  return (
+    <>
+      <Combo
+        label={family.label}
+        width={128}
+        options={FAMILIES}
+        cmd={family}
+        toArgs={(t) => ({ family: t })}
+      />
+      <Combo
+        label={size.label}
+        width={58}
+        options={SIZES}
+        cmd={size}
+        toArgs={(t) => ({ points: clampPoints(Number(t), size.state.value ?? 18) })}
+      />
+    </>
+  )
+}
+
+type ParagraphAlignment = PptxCommandArgs["alignment"]["value"]
+
+function Align({ value, icon }: { value: ParagraphAlignment; icon: React.ReactNode }) {
+  const cmd = usePptCmd("alignment", { value })
+  return <Btn cmd={cmd} args={{ value }} icon={icon} />
+}
+
+function Tool({ value, icon }: { value: PptxEditorTool; icon: React.ReactNode }) {
+  const cmd = usePptCmd("tool", { value })
+  return <Btn cmd={cmd} args={{ value }} icon={icon} />
+}
+
+/** Status bar: slideshow + zoom, both live commands; the language is static text. */
+function PptStatus() {
+  const show = usePptCmd("slideshow")
+  const zoom = usePptCmd("zoom")
+  const showCmd: Cmd = { ...show, execute: () => show.execute(null) }
+  const zoomCmd: Cmd<number, { scale: number | "fit" }> = {
+    ...zoom,
+    state: {
+      ...zoom.state,
+      value: typeof zoom.state.value === "number" ? zoom.state.value : undefined,
+    },
   }
+  return (
+    <StatusBar
+      left={<StatusItem text="English (U.S.)" />}
+      right={
+        <>
+          <StatusItem cmd={showCmd} icon={<Play16Regular />} />
+          <Zoom cmd={zoomCmd} toArgs={(scale) => ({ scale })} />
+        </>
+      }
+    />
+  )
+}
+
+/** Font size in points, 1 to 400; an unparsable entry keeps the current size. */
+function clampPoints(n: number, fallback: number) {
+  return Number.isFinite(n) ? Math.min(400, Math.max(1, n)) : fallback
 }
