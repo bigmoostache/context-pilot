@@ -24,6 +24,8 @@ export const FLUENT = {
   search: "#fafafa",
   ink: "#242424",
   inkTab: "#424242",
+  /** Ribbon icon glyphs; Word web draws them lighter than text. */
+  inkIcon: "#242424",
   inkMuted: "#616161",
   hover: "#ebebeb",
   pressed: "#e0e0e0",
@@ -147,7 +149,7 @@ export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
 
 /** Measured per-app deviations from {@link FLUENT}; code stays shared. */
 const OVERRIDES: Record<OfficeApp, Partial<Record<keyof typeof FLUENT, string>>> = {
-  word: {},
+  word: { inkIcon: "#424242" },
   excel: { inkMuted: "#707070" },
   powerpoint: {},
 }
@@ -166,6 +168,7 @@ export function officeVars(app: OfficeApp): CSSProperties {
     "--of-search": t.search,
     "--of-ink": t.ink,
     "--of-ink-tab": t.inkTab,
+    "--of-ink-icon": t.inkIcon,
     "--of-ink-muted": t.inkMuted,
     "--of-hover": t.hover,
     "--of-pressed": t.pressed,

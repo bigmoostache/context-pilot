@@ -466,7 +466,7 @@ const btnStyle: CSSProperties = {
   border: "none",
   borderRadius: 4,
   background: "transparent",
-  color: "var(--of-ink)",
+  color: "var(--of-ink-icon)",
   font: "inherit",
   cursor: "pointer",
 }

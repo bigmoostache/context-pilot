@@ -269,7 +269,7 @@ function HoverButton({
         flex: "none",
         border: "none",
         borderRadius: 4,
-        color: "var(--of-ink)",
+        color: "var(--of-ink-icon)",
         font: "inherit",
         background,
         opacity: enabled ? 1 : 0.4,
