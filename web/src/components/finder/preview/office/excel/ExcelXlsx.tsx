@@ -1,5 +1,9 @@
 import { useState } from "react"
-import { XlsxEditor } from "@betteroffice/xlsx-react"
+import {
+  XlsxEditor,
+  type XlsxCommandStore,
+  type XlsxEditorCollaborationOptions,
+} from "@betteroffice/xlsx-react"
 import { ExcelChrome } from "./ExcelChrome"
 import { ExcelHeaderFrame, type HeaderViewport } from "./ExcelHeaders"
 import { ExcelToolbar } from "./ExcelRibbon"
@@ -13,15 +17,18 @@ import { ExcelToolbar } from "./ExcelRibbon"
 export default function ExcelXlsx({
   bytes,
   fileName,
+  collaboration,
   onSave,
   onChange,
   onReady,
 }: {
   bytes: Uint8Array
   fileName: string
+  /** Live session replica (office log); edits then merge instead of reloading. */
+  collaboration: XlsxEditorCollaborationOptions
   onSave: (bytes: Uint8Array) => void
   onChange: () => void
-  onReady: () => void
+  onReady: (api: { readonly commands: XlsxCommandStore }) => void
 }) {
   const [viewport, setViewport] = useState<HeaderViewport | null>(null)
   return (
@@ -30,6 +37,7 @@ export default function ExcelXlsx({
         <XlsxEditor
           file={bytes}
           fileName={fileName}
+          collaboration={collaboration}
           onSave={onSave}
           onChange={onChange}
           onReady={onReady}
