@@ -9,9 +9,7 @@ import { SaveBar, type SaveState } from "./saveBar"
 import "@betteroffice/docx-react/styles.css"
 
 /** BetterOffice editors (Rust engines compiled to WASM) — loaded on first open. */
-const LazyXlsx = lazy(() =>
-  import("@betteroffice/xlsx-react").then((m) => ({ default: m.XlsxEditor })),
-)
+const LazyXlsx = lazy(() => import("./excel/ExcelXlsx"))
 const LazyDocx = lazy(() => import("./word/WordDocx"))
 
 /**
@@ -119,12 +117,13 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
           {kind === "xlsx" && (
             <>
               <LazyXlsx
-                file={bytes}
+                bytes={bytes}
                 fileName={node.name}
                 onSave={save}
                 onChange={markDirty}
-                onReady={() => setXlsxReady(version)}
-                className="size-full"
+                onReady={() => {
+                  setXlsxReady(version)
+                }}
               />
               {xlsxReady !== version && <OpeningOverlay size={bytes.length} />}
             </>
