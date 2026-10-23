@@ -9824,3 +9824,59 @@ index 1688d741..f1034486 100644
  
        # mobile-components EXACT structural mirror of components: path parity +
 # --- End entry #118 ---
+119:b53ddfe4e7432ca326cd1bb2cd746e6eec76dcb9bcc109968cfbca220c9180ad:fd8ecc0b0fbb75132a224147644f3afc0203a9a9dc5e272af0efdf0c37a20d10:550a7ef709aa5dc35e441db5112315943e46b4ce3dd14ac7fb47a22175d6f5a1
+# --- Diff for entry #119 ---
+diff --git a/Cargo.toml b/Cargo.toml
+index 394cfd53..a81b85d1 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,8 +1,8 @@
+ [workspace]
+-members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-groups", "crates/cp-management", "crates/cp-coordination", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros"]
++members = [".", "crates/cp-base", "crates/cp-console-server", "crates/cp-render", "crates/cp-wire", "crates/cp-oplog", "crates/cp-fleet", "crates/cp-mod-bridge", "crates/cp-orchestrator", "crates/cp-mod-callback", "crates/cp-mod-console", "crates/cp-mod-entities", "crates/cp-mod-files", "crates/cp-mod-git", "crates/cp-mod-github", "crates/cp-mod-logs", "crates/cp-mod-memory", "crates/cp-mod-ocr", "crates/cp-mod-queue", "crates/cp-mod-scratchpad", "crates/cp-mod-spine", "crates/cp-mod-agents", "crates/cp-groups", "crates/cp-management", "crates/cp-coordination", "crates/cp-mod-todo", "crates/cp-mod-tree", "crates/cp-mod-prompt", "crates/cp-mod-brave", "crates/cp-mod-firecrawl", "crates/cp-mod-search", "crates/cp-mod-utilities", "crates/cp-vault", "crates/cp-env", "crates/cp-macros", "crates/cp-office"]
+ 
+ [workspace.package]
+-version = "0.2.13"
++version = "0.2.14"
+ edition = "2024"
+ license = "MIT"
+ description = "Context Pilot — AI coding assistant TUI"
+@@ -14,6 +14,7 @@ readme = "README.md"
+ [workspace.dependencies]
+ cp-env = { path = "crates/cp-env" }
+ cp-macros = { path = "crates/cp-macros" }
++cp-office = { path = "crates/cp-office" }
+ cp-base = { path = "crates/cp-base" }
+ cp-render = { path = "crates/cp-render" }
+ cp-groups = { path = "crates/cp-groups" }
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index 8b887787..eb5667fc 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -15,7 +15,8 @@
+ #   3. Hash-chain integrity        — delegates to check-lint-config.sh (verify)
+ #
+ # Exemptions mirror the originals: Rust skips target/ and the historically-
+-# exempt product/vendor dirs; web skips the vendored shadcn ui/ + the generated
++# exempt product/vendor dirs, plus vendor/ (third-party git submodules such as
++# BetterOffice, built as-is with our patches applied out of tree); web skips the vendored shadcn ui/ + the generated
+ # OpenAPI client. Repo root resolved via git so it is cwd-independent.
+ set -uo pipefail
+ 
+@@ -62,6 +63,7 @@ while IFS= read -r f; do
+ done < <(find . \
+   \( -type d \( -name target \
+       -o -path './.worktrees' \
++      -o -path './vendor' \
+       -o -path './deploy/ansible/.venv' \
+       -o -path './deploy/ansible/.artifacts' \) -prune \) \
+   -o \( -name '*.rs' -print \))
+@@ -80,6 +82,7 @@ done < <(find . -mindepth 1 \
+   \( -type d \( \
+       -path './.git' \
+       -o -path './.worktrees' \
++      -o -path './vendor' \
+       -o -path './.playwright-cli' \
+       -o -path './.context-pilot' \
+       -o -path './docs' \
+# --- End entry #119 ---

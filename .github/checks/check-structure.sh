@@ -15,7 +15,8 @@
 #   3. Hash-chain integrity        — delegates to check-lint-config.sh (verify)
 #
 # Exemptions mirror the originals: Rust skips target/ and the historically-
-# exempt product/vendor dirs; web skips the vendored shadcn ui/ + the generated
+# exempt product/vendor dirs, plus vendor/ (third-party git submodules such as
+# BetterOffice, built as-is with our patches applied out of tree); web skips the vendored shadcn ui/ + the generated
 # OpenAPI client. Repo root resolved via git so it is cwd-independent.
 set -uo pipefail
 
@@ -62,6 +63,7 @@ while IFS= read -r f; do
 done < <(find . \
   \( -type d \( -name target \
       -o -path './.worktrees' \
+      -o -path './vendor' \
       -o -path './deploy/ansible/.venv' \
       -o -path './deploy/ansible/.artifacts' \) -prune \) \
   -o \( -name '*.rs' -print \))
@@ -80,6 +82,7 @@ done < <(find . -mindepth 1 \
   \( -type d \( \
       -path './.git' \
       -o -path './.worktrees' \
+      -o -path './vendor' \
       -o -path './.playwright-cli' \
       -o -path './.context-pilot' \
       -o -path './docs' \

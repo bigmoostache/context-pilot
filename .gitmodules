@@ -1,0 +1,3 @@
+[submodule "vendor/betteroffice"]
+	path = vendor/betteroffice
+	url = https://github.com/openooxml/betteroffice.git
