@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useCallback, useRef, useState } from "react"
 import {
   XlsxEditor,
   type XlsxCommandStore,
   type XlsxEditorCollaborationOptions,
 } from "@betteroffice/xlsx-react"
 import { ExcelChrome } from "./ExcelChrome"
-import { ExcelHeaderFrame, type HeaderViewport } from "./ExcelHeaders"
+import { ExcelHeaderFrame, type HeaderViewport, type OutlineDispatch } from "./ExcelHeaders"
 import { ExcelToolbar } from "./ExcelRibbon"
 
 /**
@@ -31,16 +31,25 @@ export default function ExcelXlsx({
   onReady: (api: { readonly commands: XlsxCommandStore }) => void
 }) {
   const [viewport, setViewport] = useState<HeaderViewport | null>(null)
+  const commandsRef = useRef<XlsxCommandStore | null>(null)
+  const onOutline = useCallback<OutlineDispatch>((axis, sheet, { indices, hidden }) => {
+    commandsRef.current
+      ?.execute("outlineVisibility", { axis, sheet, indices, hidden })
+      .catch(() => null)
+  }, [])
   return (
     <ExcelChrome>
-      <ExcelHeaderFrame viewport={viewport}>
+      <ExcelHeaderFrame viewport={viewport} onOutline={onOutline}>
         <XlsxEditor
           file={bytes}
           fileName={fileName}
           collaboration={collaboration}
           onSave={onSave}
           onChange={onChange}
-          onReady={onReady}
+          onReady={(api) => {
+            commandsRef.current = api.commands
+            onReady(api)
+          }}
           onViewport={setViewport}
           toolbar={<ExcelToolbar />}
           gridlineColor="#e1e1e1"

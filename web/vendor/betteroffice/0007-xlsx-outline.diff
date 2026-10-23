@@ -1,0 +1,1233 @@
+0007-xlsx-outline: row/column outlines (grouping) for the xlsx engine.
+
+- xlsx-model: SheetOutline (outlineLevel per row/col, summaryBelow/Right) as
+  read-only base data, parsed in xlsx-parse/read.rs. Not part of the CRDT.
+- Collapse/expand = batches of the existing SetRow/ColVisibility ops (synced,
+  undoable). `collapsed` on the summary row/col is derived from the hidden
+  state on save, on both the source-patch and the full writer paths.
+- xlsx-render GridMeta: rowOutline/colOutline runs [first,last,level] and
+  outlineSummaryAbove/Left, so hosts can draw an outline gutter.
+- xlsx-react: `outlineVisibility {axis,sheet,indices,hidden}` command, one
+  applyOps batch (one undo step, one sync update).
+- Upstream defaults unchanged; a malformed outlineLevel reads as ungrouped;
+  SheetOutline is excluded from Sheet equality.
+
+KNOWN LIMITS
+1. Nested restore is lossy: collapse an outer group while an inner one is open,
+   then expand the outer: the inner comes back collapsed (Excel restores it
+   open). Pinned by tests/outline.rs.
+2. Outline levels do not follow row/col inserts or deletes (gutter and
+   full-writer saves); the patch path copies source row/col tags verbatim.
+
+diff -ruN a/crates/betteroffice-xlsx/src/authority/snapshot.rs b/crates/betteroffice-xlsx/src/authority/snapshot.rs
+--- a/crates/betteroffice-xlsx/src/authority/snapshot.rs	2026-10-23 23:04:21
++++ b/crates/betteroffice-xlsx/src/authority/snapshot.rs	2026-10-23 23:04:40
+@@ -1409,6 +1409,7 @@
+         formats,
+         col_styles,
+         row_styles,
++        outlines: _,
+         hyperlinks,
+         conditional_formats: _,
+         auto_filters: _,
+@@ -1458,6 +1459,7 @@
+         formats: _,
+         col_styles: _,
+         row_styles: _,
++        outlines: _,
+         hyperlinks: _,
+         conditional_formats: _,
+         auto_filters: _,
+@@ -1511,6 +1513,7 @@
+             formats,
+             col_styles,
+             row_styles,
++            outlines: _,
+             hyperlinks,
+             conditional_formats,
+             auto_filters,
+@@ -2064,6 +2067,7 @@
+                     formats: Vec::new(),
+                     col_styles: Vec::new(),
+                     row_styles: Vec::new(),
++                    outlines: Vec::new(),
+                     hyperlinks: Vec::new(),
+                     conditional_formats: Vec::new(),
+                     auto_filters: Vec::new(),
+@@ -2154,6 +2158,7 @@
+                 formats: Vec::new(),
+                 col_styles: Vec::new(),
+                 row_styles: Vec::new(),
++                outlines: Vec::new(),
+                 hyperlinks: Vec::new(),
+                 conditional_formats: Vec::new(),
+                 auto_filters: Vec::new(),
+diff -ruN a/crates/betteroffice-xlsx/src/authority.rs b/crates/betteroffice-xlsx/src/authority.rs
+--- a/crates/betteroffice-xlsx/src/authority.rs	2026-10-23 23:04:21
++++ b/crates/betteroffice-xlsx/src/authority.rs	2026-10-23 23:04:40
+@@ -169,6 +169,9 @@
+     formats: Vec<SheetFormat>,
+     col_styles: Vec<Vec<ColStyle>>,
+     row_styles: Vec<BTreeMap<u32, u32>>,
++    /// Row/column outline levels per base sheet (vendor patch 0007). Read-only
++    /// source data, not in the recovery encoding: a restored base has none.
++    outlines: Vec<xlsx_model::SheetOutline>,
+     hyperlinks: Vec<Vec<Hyperlink>>,
+     conditional_formats: Vec<Vec<ConditionalFormatting>>,
+     auto_filters: Vec<Option<xlsx_model::AutoFilter>>,
+@@ -242,6 +245,7 @@
+                 .map(|sheet| sheet.col_styles.clone())
+                 .collect(),
+             row_styles: base_row_styles(model),
++            outlines: model.sheets.iter().map(|sheet| sheet.outline.clone()).collect(),
+             conditional_formats: model
+                 .sheets
+                 .iter()
+@@ -469,6 +473,7 @@
+                 .map(|sheet| sheet.col_styles.clone())
+                 .collect(),
+             row_styles: base_row_styles(model),
++            outlines: model.sheets.iter().map(|sheet| sheet.outline.clone()).collect(),
+             conditional_formats: model
+                 .sheets
+                 .iter()
+@@ -881,6 +886,7 @@
+             formats: Codec::read(&mut reader)?,
+             col_styles: Codec::read(&mut reader)?,
+             row_styles: Vec::new(),
++            outlines: Vec::new(),
+             conditional_formats: Vec::new(),
+             auto_filters: Vec::new(),
+             hyperlinks: Codec::read(&mut reader)?,
+@@ -2204,6 +2210,9 @@
+             let row_styles = base_sheet
+                 .and_then(|base| self.base.row_styles.get(base))
+                 .unwrap_or(&EMPTY_ROW_STYLES);
++            let outline = base_sheet
++                .and_then(|base| self.base.outlines.get(base))
++                .unwrap_or(&EMPTY_OUTLINE);
+             let hyperlinks = base_sheet
+                 .and_then(|base| self.base.hyperlinks.get(base))
+                 .map(Vec::as_slice)
+@@ -2233,6 +2242,7 @@
+                     format,
+                     col_styles,
+                     row_styles,
++                    outline,
+                     hyperlinks,
+                     charts,
+                     hidden_dimensions,
+@@ -4597,6 +4607,7 @@
+     format: SheetFormat,
+     col_styles: &'a [ColStyle],
+     row_styles: &'a BTreeMap<u32, u32>,
++    outline: &'a xlsx_model::SheetOutline,
+     hyperlinks: &'a [Hyperlink],
+     charts: &'a [SheetChart],
+     hidden_dimensions: &'a HiddenDimensions,
+@@ -4611,6 +4622,7 @@
+             format: SheetFormat::default(),
+             col_styles: &[],
+             row_styles: &EMPTY_ROW_STYLES,
++            outline: &EMPTY_OUTLINE,
+             hyperlinks: &[],
+             charts: &[],
+             hidden_dimensions: &EMPTY_HIDDEN_DIMENSIONS,
+@@ -4683,6 +4695,7 @@
+     sheet.format = fallbacks.format;
+     sheet.col_styles = fallbacks.col_styles.to_vec();
+     sheet.row_styles = fallbacks.row_styles.clone();
++    sheet.outline = fallbacks.outline.clone();
+     materialize_style_defaults(&mut sheet, sheet_map, txn)?;
+     sheet.freeze_pane = match (version, sheet_map.get(txn, FREEZE_PANE)) {
+         (FREEZE_PANE_SCHEMA_VERSION.., Some(Out::Any(value))) => freeze_pane_from_any(&value)?,
+@@ -5257,6 +5270,8 @@
+ }
+ 
+ static EMPTY_ROW_STYLES: BTreeMap<u32, u32> = BTreeMap::new();
++/// Outline of a sheet with no base source (vendor patch 0007).
++static EMPTY_OUTLINE: xlsx_model::SheetOutline = xlsx_model::SheetOutline::EMPTY;
+ 
+ /// Each sheet's row defaults, or none at all when no sheet has any, as a base
+ /// releases before them recorded.
+@@ -6555,6 +6570,9 @@
+             let row_styles = base_sheet
+                 .and_then(|base| self.base.row_styles.get(base))
+                 .unwrap_or(&EMPTY_ROW_STYLES);
++            let outline = base_sheet
++                .and_then(|base| self.base.outlines.get(base))
++                .unwrap_or(&EMPTY_OUTLINE);
+             let hyperlinks = base_sheet
+                 .and_then(|base| self.base.hyperlinks.get(base))
+                 .map(Vec::as_slice)
+@@ -6584,6 +6602,7 @@
+                     format,
+                     col_styles,
+                     row_styles,
++                    outline,
+                     hyperlinks,
+                     charts,
+                     hidden_dimensions,
+@@ -6745,6 +6764,7 @@
+     sheet.format = fallbacks.format;
+     sheet.col_styles = fallbacks.col_styles.to_vec();
+     sheet.row_styles = fallbacks.row_styles.clone();
++    sheet.outline = fallbacks.outline.clone();
+     materialize_style_defaults(&mut sheet, sheet_map, txn)?;
+     sheet.freeze_pane = match (version, sheet_map.get(txn, FREEZE_PANE)) {
+         (FREEZE_PANE_SCHEMA_VERSION.., Some(Out::Any(value))) => freeze_pane_from_any(&value)?,
+diff -ruN a/crates/betteroffice-xlsx/tests/outline.rs b/crates/betteroffice-xlsx/tests/outline.rs
+--- a/crates/betteroffice-xlsx/tests/outline.rs	1970-01-01 01:00:00
++++ b/crates/betteroffice-xlsx/tests/outline.rs	2026-10-23 23:04:40
+@@ -0,0 +1,205 @@
++//! Vendor patch 0007: row/column outlines. Levels are read-only source data;
++//! collapse/expand is a batch of row/col visibility ops, and `collapsed` on
++//! the summary row/col is derived from the hidden state when saving.
++
++use std::collections::BTreeMap;
++
++use betteroffice_xlsx::{CalculationOptions, Op, SheetId, Workbook};
++
++const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++
++/// Rows 2..=6 at level 1 (summary row 7), rows 3..=4 at level 2 (summary
++/// row 5); columns B:C at level 1 with summary column D.
++const SHEET: &str = concat!(
++    r#"<cols><col min="2" max="3" width="9" customWidth="1" outlineLevel="1"/>"#,
++    r#"<col min="4" max="4" width="9" customWidth="1"/></cols>"#,
++    r#"<sheetData>"#,
++    r#"<row r="1"><c r="A1"><v>1</v></c></row>"#,
++    r#"<row r="2" outlineLevel="1"><c r="A2"><v>2</v></c></row>"#,
++    r#"<row r="3" outlineLevel="2"><c r="A3"><v>3</v></c></row>"#,
++    r#"<row r="4" outlineLevel="2"><c r="A4"><v>4</v></c></row>"#,
++    r#"<row r="5" outlineLevel="1"><c r="A5"><v>5</v></c></row>"#,
++    r#"<row r="6" outlineLevel="1"><c r="A6"><v>6</v></c></row>"#,
++    r#"<row r="7"><c r="A7"><v>7</v></c></row>"#,
++    r#"</sheetData>"#,
++);
++
++fn package(sheet_pr: &str, sheet_data: &str) -> Vec<u8> {
++    let parts = [
++        (
++            "[Content_Types].xml",
++            concat!(
++                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
++                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#,
++                r#"<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>"#,
++                r#"<Default Extension="xml" ContentType="application/xml"/>"#,
++                r#"<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>"#,
++                r#"<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>"#,
++                r#"</Types>"#,
++            )
++            .to_owned(),
++        ),
++        (
++            "_rels/.rels",
++            concat!(
++                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
++                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
++                r#"<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>"#,
++                r#"</Relationships>"#,
++            )
++            .to_owned(),
++        ),
++        (
++            "xl/workbook.xml",
++            format!(
++                concat!(
++                    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
++                    r#"<workbook xmlns="{main}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
++                    r#"<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
++                ),
++                main = MAIN,
++            ),
++        ),
++        (
++            "xl/_rels/workbook.xml.rels",
++            concat!(
++                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
++                r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
++                r#"<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>"#,
++                r#"</Relationships>"#,
++            )
++            .to_owned(),
++        ),
++        (
++            "xl/worksheets/sheet1.xml",
++            format!(
++                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="{MAIN}">{sheet_pr}{sheet_data}</worksheet>"#
++            ),
++        ),
++    ]
++    .map(|(path, xml)| (path.to_owned(), xml.into_bytes()));
++    ooxml_opc::rezip_parts(&parts).unwrap()
++}
++
++fn sheet_xml(bytes: &[u8]) -> String {
++    let parts: BTreeMap<String, Vec<u8>> = ooxml_opc::unzip_parts(bytes).unwrap().into_iter().collect();
++    String::from_utf8(parts["xl/worksheets/sheet1.xml"].clone()).unwrap()
++}
++
++/// The `<row>` start tag for 1-based row `r`.
++fn row_tag(xml: &str, r: u32) -> &str {
++    let start = xml.find(&format!(r#"<row r="{r}""#)).unwrap();
++    &xml[start..start + xml[start..].find('>').unwrap()]
++}
++
++fn set_rows(workbook: &mut Workbook, rows: &[u32], hidden: bool) {
++    let ops = rows
++        .iter()
++        .map(|&row| Op::SetRowVisibility { sheet: SheetId(0), row, hidden })
++        .collect();
++    workbook.apply_ops(ops, CalculationOptions::default()).unwrap();
++}
++
++#[test]
++fn parse_reads_levels_and_summary_placement() {
++    let workbook = Workbook::open(&package("", SHEET)).unwrap();
++    let outline = &workbook.model().sheets[0].outline;
++    assert_eq!(
++        outline.rows.iter().map(|(&r, &l)| (r, l)).collect::<Vec<_>>(),
++        vec![(1, 1), (2, 2), (3, 2), (4, 1), (5, 1)]
++    );
++    assert_eq!(outline.cols.iter().map(|(&c, &l)| (c, l)).collect::<Vec<_>>(), vec![(1, 1), (2, 1)]);
++    assert!(!outline.summary_above && !outline.summary_left);
++
++    let above = package(
++        r#"<sheetPr><outlinePr summaryBelow="0" summaryRight="0"/></sheetPr>"#,
++        SHEET,
++    );
++    let workbook = Workbook::open(&above).unwrap();
++    let outline = &workbook.model().sheets[0].outline;
++    assert!(outline.summary_above && outline.summary_left);
++}
++
++#[test]
++fn collapsing_a_group_marks_its_summary_row_collapsed_on_save() {
++    let mut workbook = Workbook::open(&package("", SHEET)).unwrap();
++    set_rows(&mut workbook, &[2, 3], true);
++    let saved = workbook.save().unwrap();
++    let xml = sheet_xml(&saved);
++    assert!(row_tag(&xml, 5).contains(r#"collapsed="1""#), "{xml}");
++    assert!(!row_tag(&xml, 7).contains("collapsed"), "{xml}");
++
++    let mut reopened = Workbook::open(&saved).unwrap();
++    assert!(reopened.model().sheets[0].row_hidden(2));
++    assert!(reopened.model().sheets[0].row_hidden(3));
++
++    set_rows(&mut reopened, &[2, 3], false);
++    let xml = sheet_xml(&reopened.save().unwrap());
++    assert!(!row_tag(&xml, 5).contains("collapsed"), "{xml}");
++}
++
++/// Documented limit of 0007: the inner group's own collapsed state is not
++/// stored, so expanding the outer group (unhiding its direct rows) brings a
++/// previously open inner group back collapsed. Excel would restore it open.
++#[test]
++fn expanding_outer_group_brings_inner_back_collapsed() {
++    let mut workbook = Workbook::open(&package("", SHEET)).unwrap();
++    // collapse outer: every row at level >= 1 hidden
++    set_rows(&mut workbook, &[1, 2, 3, 4, 5], true);
++    // expand outer: unhide its direct rows only
++    set_rows(&mut workbook, &[1, 4, 5], false);
++    let sheet = &workbook.model().sheets[0];
++    assert!(sheet.row_hidden(2) && sheet.row_hidden(3));
++    let xml = sheet_xml(&workbook.save().unwrap());
++    assert!(row_tag(&xml, 5).contains(r#"collapsed="1""#), "{xml}");
++    assert!(!row_tag(&xml, 7).contains("collapsed"), "{xml}");
++}
++
++#[test]
++fn collapsing_a_column_group_marks_its_summary_column() {
++    let mut workbook = Workbook::open(&package("", SHEET)).unwrap();
++    let ops = [1, 2]
++        .into_iter()
++        .map(|col| Op::SetColVisibility { sheet: SheetId(0), col, hidden: true })
++        .collect();
++    workbook.apply_ops(ops, CalculationOptions::default()).unwrap();
++    let xml = sheet_xml(&workbook.save().unwrap());
++    let d = xml.find(r#"<col min="4""#).unwrap();
++    let tag = &xml[d..d + xml[d..].find('>').unwrap()];
++    assert!(tag.contains(r#"collapsed="1""#), "{xml}");
++}
++
++/// Collapse is a batch of synced visibility ops: a second replica receiving the
++/// update sees the rows hidden and saves the summary row collapsed too.
++#[test]
++fn collapse_merges_into_a_second_replica() {
++    let source = package("", SHEET);
++    let mut a = Workbook::open_collaborative(&source, 1).unwrap();
++    let mut b = Workbook::open_collaborative(&source, 2).unwrap();
++    let updates = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
++    let observed = std::sync::Arc::clone(&updates);
++    let subscription = a
++        .observe_update_v1(move |event| observed.lock().unwrap().push(event.update))
++        .unwrap();
++    set_rows(&mut a, &[2, 3], true);
++    drop(subscription);
++    let updates = updates.lock().unwrap().clone();
++    assert!(!updates.is_empty());
++    for update in &updates {
++        b.apply_update_v1(update, CalculationOptions::default()).unwrap();
++    }
++    let sheet = &b.model().sheets[0];
++    assert!(sheet.row_hidden(2) && sheet.row_hidden(3) && !sheet.row_hidden(4));
++    assert_eq!(sheet.outline.rows.len(), 5);
++    let xml = sheet_xml(&b.save().unwrap());
++    assert!(row_tag(&xml, 5).contains(r#"collapsed="1""#), "{xml}");
++}
++
++#[test]
++fn untouched_outlined_sheet_saves_byte_identical() {
++    let source = package("", SHEET);
++    let mut workbook = Workbook::open(&source).unwrap();
++    set_rows(&mut workbook, &[2], true);
++    set_rows(&mut workbook, &[2], false);
++    assert_eq!(sheet_xml(&workbook.save().unwrap()), sheet_xml(&source));
++}
+diff -ruN a/crates/xlsx-model/src/lib.rs b/crates/xlsx-model/src/lib.rs
+--- a/crates/xlsx-model/src/lib.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-model/src/lib.rs	2026-10-23 23:04:40
+@@ -5,6 +5,7 @@
+ pub mod chart;
+ pub mod date;
+ pub mod numfmt;
++pub mod outline;
+ pub mod progress;
+ pub mod rich_text;
+ pub mod styles;
+@@ -17,6 +18,7 @@
+     SheetChart,
+ };
+ pub use date::DateSystem;
++pub use outline::{OutlineGroup, OutlineLevels, SheetOutline};
+ pub use rich_text::{RichRun, RunBaseline, RunStyle, RunUnderline};
+ pub use styles::{
+     Alignment, Border, BorderEdge, BorderStyle, CellFormat, Color, DifferentialFormat, Fill, Font,
+diff -ruN a/crates/xlsx-model/src/outline.rs b/crates/xlsx-model/src/outline.rs
+--- a/crates/xlsx-model/src/outline.rs	1970-01-01 01:00:00
++++ b/crates/xlsx-model/src/outline.rs	2026-10-23 23:04:40
+@@ -0,0 +1,214 @@
++//! Row and column outlines (grouping): levels authored in the file plus the
++//! summary placement. Levels are read-only reference data; which groups are
++//! collapsed is not stored but derived from the hidden state, the way Excel
++//! recomputes it.
++
++use std::collections::BTreeMap;
++
++/// One axis of a sheet's outline: the `outlineLevel` of each grouped index.
++pub type OutlineLevels = BTreeMap<u32, u8>;
++
++/// Excel's deepest outline level.
++pub const MAX_OUTLINE_LEVEL: u8 = 7;
++
++/// A sheet's outline. Default = no groups, summaries below and right (Excel's
++/// default `summaryBelow="1" summaryRight="1"`).
++///
++/// Excluded from `Sheet` equality (every two outlines compare equal): it is
++/// read-only source data that does not follow row/column inserts or deletes,
++/// so it is not part of the edited model's identity. Compare fields directly.
++#[derive(Debug, Clone, Default)]
++pub struct SheetOutline {
++    pub rows: OutlineLevels,
++    pub cols: OutlineLevels,
++    /// `summaryBelow="0"`: a row group's summary row sits above it.
++    pub summary_above: bool,
++    /// `summaryRight="0"`: a column group's summary column sits left of it.
++    pub summary_left: bool,
++}
++
++/// A maximal run of indices at `level` or deeper, with its summary index.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct OutlineGroup {
++    pub level: u8,
++    pub first: u32,
++    pub last: u32,
++    /// The index carrying the group's +/- control (and `collapsed` in the file).
++    pub summary: u32,
++}
++
++impl PartialEq for SheetOutline {
++    fn eq(&self, _: &Self) -> bool {
++        true
++    }
++}
++
++impl Eq for SheetOutline {}
++
++impl SheetOutline {
++    /// No groups, Excel's default summary placement.
++    pub const EMPTY: Self = Self {
++        rows: BTreeMap::new(),
++        cols: BTreeMap::new(),
++        summary_above: false,
++        summary_left: false,
++    };
++
++    pub fn is_empty(&self) -> bool {
++        self.rows.is_empty() && self.cols.is_empty()
++    }
++}
++
++/// Every group of one axis, outer levels first, then by position.
++pub fn outline_groups(levels: &OutlineLevels, summary_before: bool) -> Vec<OutlineGroup> {
++    let deepest = levels.values().copied().max().unwrap_or(0);
++    let mut groups = Vec::new();
++    for level in 1..=deepest {
++        let mut run: Option<(u32, u32)> = None;
++        let close = |run: (u32, u32), groups: &mut Vec<OutlineGroup>| {
++            let summary = if summary_before {
++                run.0.saturating_sub(1)
++            } else {
++                run.1.saturating_add(1)
++            };
++            groups.push(OutlineGroup {
++                level,
++                first: run.0,
++                last: run.1,
++                summary,
++            });
++        };
++        for (&index, &at) in levels {
++            if at < level {
++                continue;
++            }
++            run = match run {
++                Some((first, last)) if last.checked_add(1) == Some(index) => Some((first, index)),
++                Some(done) => {
++                    close(done, &mut groups);
++                    Some((index, index))
++                }
++                None => Some((index, index)),
++            };
++        }
++        if let Some(done) = run {
++            close(done, &mut groups);
++        }
++    }
++    groups
++}
++
++/// Summary indices whose group is collapsed: every index directly inside the
++/// group (at the group's level, not in a deeper group) is hidden. This is the
++/// `collapsed` attribute Excel writes on the summary row/column.
++pub fn collapsed_summaries(
++    levels: &OutlineLevels,
++    summary_before: bool,
++    hidden: impl Fn(u32) -> bool,
++) -> Vec<u32> {
++    let mut out: Vec<u32> = outline_groups(levels, summary_before)
++        .into_iter()
++        .filter(|group| {
++            let mut direct = (group.first..=group.last)
++                .filter(|index| levels.get(index) == Some(&group.level))
++                .peekable();
++            direct.peek().is_some() && direct.all(|index| hidden(index))
++        })
++        .map(|group| group.summary)
++        .collect();
++    out.sort_unstable();
++    out.dedup();
++    out
++}
++
++/// Whether `summary` is the summary index of a collapsed group: some group
++/// sits right next to it (above/left when `summary_before` is false, else
++/// below/right) and every index directly in that group is hidden. Only walks
++/// the adjacent runs, so it is cheap for indices away from a group edge.
++pub fn summary_collapsed(
++    levels: &OutlineLevels,
++    summary_before: bool,
++    summary: u32,
++    hidden: impl Fn(u32) -> bool,
++) -> bool {
++    let step = |index: u32| {
++        if summary_before {
++            index.checked_add(1)
++        } else {
++            index.checked_sub(1)
++        }
++    };
++    let Some(edge) = step(summary) else {
++        return false;
++    };
++    let Some(&deepest) = levels.get(&edge) else {
++        return false;
++    };
++    let own = levels.get(&summary).copied().unwrap_or(0);
++    (own + 1..=deepest).any(|level| {
++        let mut at = Some(edge);
++        let mut any = false;
++        while let Some(index) = at {
++            match levels.get(&index) {
++                Some(&l) if l >= level => {
++                    if l == level {
++                        if !hidden(index) {
++                            return false;
++                        }
++                        any = true;
++                    }
++                }
++                _ => break,
++            }
++            at = step(index);
++        }
++        any
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn levels(pairs: &[(u32, u8)]) -> OutlineLevels {
++        pairs.iter().copied().collect()
++    }
++
++    #[test]
++    fn groups_nest_by_level_with_summary_below() {
++        // rows 1..=6 at level 1, rows 2..=3 at level 2
++        let l = levels(&[(1, 1), (2, 2), (3, 2), (4, 1), (5, 1), (6, 1)]);
++        let g = outline_groups(&l, false);
++        assert_eq!(
++            g,
++            vec![
++                OutlineGroup { level: 1, first: 1, last: 6, summary: 7 },
++                OutlineGroup { level: 2, first: 2, last: 3, summary: 4 },
++            ]
++        );
++        assert_eq!(outline_groups(&l, true)[0].summary, 0);
++    }
++
++    #[test]
++    fn collapsed_is_derived_from_direct_children() {
++        let l = levels(&[(1, 1), (2, 2), (3, 2), (4, 1)]);
++        let hidden = [2u32, 3];
++        assert_eq!(collapsed_summaries(&l, false, |i| hidden.contains(&i)), vec![4]);
++        let all = [1u32, 2, 3, 4];
++        // outer collapsed hides everything: both summaries read as collapsed,
++        // so expanding the outer later brings the inner back collapsed.
++        assert_eq!(collapsed_summaries(&l, false, |i| all.contains(&i)), vec![4, 5]);
++    }
++
++    #[test]
++    fn summary_collapsed_matches_full_derivation() {
++        let l = levels(&[(1, 1), (2, 2), (3, 2), (4, 1), (6, 1)]);
++        for hidden in [vec![], vec![2u32, 3], vec![1, 2, 3, 4], vec![6], vec![1, 4]] {
++            let h = |i: u32| hidden.contains(&i);
++            let full = collapsed_summaries(&l, false, h);
++            for index in 0..10 {
++                assert_eq!(summary_collapsed(&l, false, index, h), full.contains(&index), "{index} {hidden:?}");
++            }
++        }
++    }
++}
+diff -ruN a/crates/xlsx-model/src/workbook.rs b/crates/xlsx-model/src/workbook.rs
+--- a/crates/xlsx-model/src/workbook.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-model/src/workbook.rs	2026-10-23 23:04:40
+@@ -223,6 +223,8 @@
+     /// Column defaults in source order.
+     pub col_styles: Vec<ColStyle>,
+     pub row_styles: BTreeMap<RowId, u32>,
++    /// row/column grouping levels from the file; read-only base data.
++    pub outline: crate::outline::SheetOutline,
+     pub charts: Vec<SheetChart>,
+     /// anchors of `t="array"` formulas mapped to the rectangle their result
+     /// occupies. authored from the file, then kept current by recalc.
+diff -ruN a/crates/xlsx-parse/src/patch/oracle.rs b/crates/xlsx-parse/src/patch/oracle.rs
+--- a/crates/xlsx-parse/src/patch/oracle.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-parse/src/patch/oracle.rs	2026-10-23 23:04:40
+@@ -105,6 +105,7 @@
+             self.retained,
+             self.plan,
+             None,
++            false,
+         )
+         .map_err(xml_err)?;
+         *out = writer.into_inner();
+diff -ruN a/crates/xlsx-parse/src/patch.rs b/crates/xlsx-parse/src/patch.rs
+--- a/crates/xlsx-parse/src/patch.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-parse/src/patch.rs	2026-10-23 23:04:40
+@@ -7,6 +7,7 @@
+ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+ use quick_xml::{Reader, Writer};
+ use xlsx_model::addr::{MAX_COLS, MAX_ROWS};
++use xlsx_model::outline::summary_collapsed;
+ use xlsx_model::{Cell, CellRange, CellRef, ColId, ColStyle, Sheet, Workbook};
+ 
+ use crate::axis::SheetAxes;
+@@ -254,10 +255,20 @@
+                 .into_iter()
+                 .flat_map(|range| self.width_pieces(range, &model_runs, &source_runs))
+                 .collect::<Vec<_>>();
++            let outline = &self.original.outline;
++            let collapsed_flip = |start: ColId| {
++                !outline.cols.is_empty()
++                    && summary_collapsed(&outline.cols, outline.summary_left, start, |c| {
++                        self.sheet.col_hidden(c)
++                    }) != summary_collapsed(&outline.cols, outline.summary_left, start, |c| {
++                        self.original.col_hidden(c)
++                    })
++            };
+             let verbatim = pieces.len() == 1
+                 && pieces[0].range == col.range
+                 && pieces[0].changed.is_none()
+-                && pieces[0].style.is_none();
++                && pieces[0].style.is_none()
++                && !collapsed_flip(pieces[0].range.start);
+             for (index, piece) in pieces.iter().enumerate() {
+                 let mut bytes = Vec::new();
+                 if index == 0 {
+@@ -277,6 +288,9 @@
+                     if let Some((width, hidden_width)) = piece.changed {
+                         set_col_width(&mut attributes, width, hidden_width);
+                     }
++                    if collapsed_flip(piece.range.start) {
++                        toggle_collapsed(&mut attributes);
++                    }
+                     match piece.style {
+                         Some(Some(style)) => {
+                             set_attribute(&mut attributes, "style", "style", style.to_string())
+@@ -293,7 +307,7 @@
+                 entries.push((piece.range.start, bytes));
+             }
+         }
+-        let mut generated = col_runs(self.sheet, &covered).into_iter().peekable();
++        let mut generated = col_runs(self.sheet, &covered, false).into_iter().peekable();
+         if entries.is_empty() && generated.peek().is_none() {
+             return Ok(None);
+         }
+@@ -377,6 +391,7 @@
+             self.retained,
+             self.plan,
+             None,
++            false,
+         )
+         .map_err(xml_err)?;
+         *out = writer.into_inner();
+@@ -482,7 +497,20 @@
+         let style = self.sheet.row_styles.get(&row).copied();
+         let style_changed = style != self.original.row_styles.get(&source.index).copied();
+         let (name, mut attributes) = start_tag(&data[source.tag.clone()])?;
+-        let mut rewrite = moved || height_changed || style_changed;
++        // `collapsed` follows the hidden state of the group the row summarises
++        // (outline levels are read-only source data; see xlsx_model::outline).
++        let outline = &self.original.outline;
++        let collapsed_changed = !moved
++            && !outline.rows.is_empty()
++            && summary_collapsed(&outline.rows, outline.summary_above, row, |r| {
++                self.sheet.row_hidden(r)
++            }) != summary_collapsed(&outline.rows, outline.summary_above, row, |r| {
++                self.original.row_hidden(r)
++            });
++        if collapsed_changed {
++            toggle_collapsed(&mut attributes);
++        }
++        let mut rewrite = moved || height_changed || style_changed || collapsed_changed;
+         if moved {
+             set_attribute(&mut attributes, "r", "r", (u64::from(row) + 1).to_string());
+         }
+@@ -1020,6 +1048,17 @@
+         None => Some(end..end),
+         _ => None,
+     }))
++}
++
++/// Flips `collapsed` on a summary row/col tag (set when absent, else dropped).
++fn toggle_collapsed(attributes: &mut Vec<XmlAttribute>) {
++    let was = attributes
++        .iter()
++        .any(|a| a.local_name() == "collapsed" && is_truthy(&a.value));
++    remove_attribute(attributes, "collapsed");
++    if !was {
++        set_attribute(attributes, "collapsed", "collapsed", "1".to_owned());
++    }
+ }
+ 
+ fn set_row_height(
+diff -ruN a/crates/xlsx-parse/src/read.rs b/crates/xlsx-parse/src/read.rs
+--- a/crates/xlsx-parse/src/read.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-parse/src/read.rs	2026-10-23 23:04:40
+@@ -645,6 +645,9 @@
+                     };
+                     cur_row = Some(row);
+                     col_cursor = 0;
++                    if let Some(level) = outline_level(&e)? {
++                        sheet.outline.rows.insert(row, level);
++                    }
+                     if attr(&e, b"customFormat")?.is_some_and(|value| is_truthy(&value)) {
+                         let style = attr(&e, b"s")?
+                             .and_then(|value| value.parse::<u32>().ok())
+@@ -739,7 +742,16 @@
+                         sheet.hyperlinks.push(link);
+                     }
+                 }
+-                b"col" => parse_col(&e, &mut sheet, &mut columns, legacy)?,
++                b"col" => {
++                    parse_col_outline(&e, &mut sheet)?;
++                    parse_col(&e, &mut sheet, &mut columns, legacy)?;
++                }
++                b"outlinePr" => {
++                    sheet.outline.summary_above = attr(&e, b"summaryBelow")?
++                        .is_some_and(|value| !is_truthy(&value));
++                    sheet.outline.summary_left = attr(&e, b"summaryRight")?
++                        .is_some_and(|value| !is_truthy(&value));
++                }
+                 b"sheetFormatPr" => {
+                     sheet.format = SheetFormat {
+                         default_row_height_pt: attr(&e, b"defaultRowHeight")?
+@@ -1055,6 +1067,39 @@
+ /// render, so it narrows to zero the way a hidden column does, and one past
+ /// excel's ceiling opens at the ceiling; the authored value stays in `legacy`
+ /// and the source span is reused verbatim on save.
++/// `outlineLevel` of a `<row>`/`<col>`, when grouped (1..=7).
++/// A malformed value (bad entity, out of range) reads as ungrouped rather than
++/// failing the parse: the tag is still copied verbatim on save.
++fn outline_level(e: &quick_xml::events::BytesStart) -> Result<Option<u8>, ParseError> {
++    Ok(attr(e, b"outlineLevel")
++        .ok()
++        .flatten()
++        .and_then(|v| v.parse::<u8>().ok())
++        .filter(|level| (1..=xlsx_model::outline::MAX_OUTLINE_LEVEL).contains(level)))
++}
++
++/// Records a `<col>` run's outline level on every column it spans.
++fn parse_col_outline(
++    e: &quick_xml::events::BytesStart,
++    sheet: &mut Sheet,
++) -> Result<(), ParseError> {
++    let Some(level) = outline_level(e)? else {
++        return Ok(());
++    };
++    let min = attr(e, b"min")?
++        .and_then(|v| v.parse::<u32>().ok())
++        .unwrap_or(1)
++        .clamp(1, MAX_COLS);
++    let max = attr(e, b"max")?
++        .and_then(|v| v.parse::<u32>().ok())
++        .unwrap_or(min)
++        .clamp(min, MAX_COLS);
++    for col in min..=max {
++        sheet.outline.cols.insert(col - 1, level);
++    }
++    Ok(())
++}
++
+ fn parse_col(
+     e: &quick_xml::events::BytesStart,
+     sheet: &mut Sheet,
+diff -ruN a/crates/xlsx-parse/src/write.rs b/crates/xlsx-parse/src/write.rs
+--- a/crates/xlsx-parse/src/write.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-parse/src/write.rs	2026-10-23 23:04:40
+@@ -3401,6 +3401,7 @@
+     let mut cells = sheet.iter_cells().peekable();
+     let mut heights = sheet.row_heights.keys().copied().peekable();
+     let mut row_styles = sheet.row_styles.keys().copied().peekable();
++    let mut outlined = sheet.outline.rows.keys().copied().peekable();
+ 
+     writer
+         .create_element("sheetData")
+@@ -3409,7 +3410,8 @@
+                 let cell_row = cells.peek().map(|(addr, _)| addr.row);
+                 let height_row = heights.peek().copied();
+                 let style_row = row_styles.peek().copied();
+-                let Some(row) = [cell_row, height_row, style_row]
++                let outline_row = outlined.peek().copied();
++                let Some(row) = [cell_row, height_row, style_row, outline_row]
+                     .into_iter()
+                     .flatten()
+                     .min()
+@@ -3426,6 +3428,7 @@
+                     retained,
+                     shared_string_plan,
+                     source_styles,
++                    true,
+                 )?;
+                 if height_row == Some(row) {
+                     heights.next();
+@@ -3433,6 +3436,9 @@
+                 if style_row == Some(row) {
+                     row_styles.next();
+                 }
++                if outline_row == Some(row) {
++                    outlined.next();
++                }
+             }
+             Ok(())
+         })?;
+@@ -3517,7 +3523,7 @@
+ }
+ 
+ pub(crate) fn write_cols(w: &mut Writer<Vec<u8>>, sheet: &Sheet) -> io::Result<()> {
+-    let runs = col_runs(sheet, &[]);
++    let runs = col_runs(sheet, &[], true);
+     if runs.is_empty() {
+         return Ok(());
+     }
+@@ -3537,11 +3543,16 @@
+     width: Option<f64>,
+     hidden_width: Option<f64>,
+     style: Option<u32>,
++    /// `outlineLevel` shared by the run (vendor patch 0007).
++    level: Option<u8>,
++    /// The run's first column is a collapsed group's summary column.
++    collapsed: bool,
+ }
+ 
+ /// The model's widths and column styles as ascending, disjoint runs outside
+ /// `covered`. Widths stay one column per run.
+-pub(crate) fn col_runs(sheet: &Sheet, covered: &[Range<ColId>]) -> Vec<ColRun> {
++/// `with_outline` emits the model's outline levels (full writer only).
++pub(crate) fn col_runs(sheet: &Sheet, covered: &[Range<ColId>], with_outline: bool) -> Vec<ColRun> {
+     let mut sorted = covered.to_vec();
+     sorted.sort_unstable_by_key(|range| range.start);
+     let mut covered: Vec<Range<ColId>> = Vec::with_capacity(sorted.len());
+@@ -3560,6 +3571,22 @@
+     for &col in sheet.col_widths.keys() {
+         bounds.extend([col, col.saturating_add(1)]);
+     }
++    let empty = xlsx_model::SheetOutline::default();
++    let outline = if with_outline { &sheet.outline } else { &empty };
++    let collapsed = |col: ColId| {
++        !outline.cols.is_empty()
++            && xlsx_model::outline::summary_collapsed(&outline.cols, outline.summary_left, col, |c| {
++                sheet.col_hidden(c)
++            })
++    };
++    for &col in outline.cols.keys() {
++        bounds.extend([col, col.saturating_add(1)]);
++        // the summary columns on both sides, so `collapsed` lands on its own run
++        bounds.extend([col.saturating_add(1), col.saturating_add(2)]);
++        if let Some(before) = col.checked_sub(1) {
++            bounds.extend([before, col]);
++        }
++    }
+     for range in &covered {
+         bounds.extend([range.start, range.end]);
+     }
+@@ -3578,7 +3605,9 @@
+             .filter(|run| run.first <= first)
+             .map(|run| run.xf);
+         let width = sheet.col_widths.get(&first).copied();
+-        if width.is_none() && style.is_none() {
++        let level = outline.cols.get(&first).copied();
++        let collapsed = collapsed(first);
++        if width.is_none() && style.is_none() && level.is_none() && !collapsed {
+             continue;
+         }
+         match runs.last_mut() {
+@@ -3586,6 +3615,9 @@
+                 if width.is_none()
+                     && run.width.is_none()
+                     && run.style == style
++                    && run.level == level
++                    && !collapsed
++                    && !run.collapsed
+                     && run.last.saturating_add(1) == first =>
+             {
+                 run.last = last;
+@@ -3596,6 +3628,8 @@
+                 width,
+                 hidden_width: sheet.hidden_col_widths.get(&first).copied(),
+                 style,
++                level,
++                collapsed,
+             }),
+         }
+     }
+@@ -3627,6 +3661,13 @@
+     if hidden {
+         element.push_attribute(("hidden", "1"));
+     }
++    let level = run.level.map(|level| level.to_string());
++    if let Some(level) = &level {
++        element.push_attribute(("outlineLevel", level.as_str()));
++    }
++    if run.collapsed {
++        element.push_attribute(("collapsed", "1"));
++    }
+     w.write_event(Event::Empty(element))?;
+     Ok(())
+ }
+@@ -3642,6 +3683,9 @@
+     retained: &SharedStringCells,
+     shared_string_plan: Option<&SharedStringPlan>,
+     source_styles: Option<SourceStyles<'_>>,
++    // Emit the model's outline (full writer only: the patch path keeps source
++    // row tags verbatim, and a generated row must not inherit a stale level).
++    with_outline: bool,
+ ) -> io::Result<()>
+ where
+     I: Iterator<Item = (CellRef, &'a Cell)>,
+@@ -3668,6 +3712,19 @@
+         if hidden {
+             start.push_attribute(("hidden", "1"));
+         }
++    }
++    let empty = xlsx_model::SheetOutline::default();
++    let outline = if with_outline { &sheet.outline } else { &empty };
++    let level = outline.rows.get(&row).map(u8::to_string);
++    if let Some(level) = &level {
++        start.push_attribute(("outlineLevel", level.as_str()));
++    }
++    if !outline.rows.is_empty()
++        && xlsx_model::outline::summary_collapsed(&outline.rows, outline.summary_above, row, |r| {
++            sheet.row_hidden(r)
++        })
++    {
++        start.push_attribute(("collapsed", "1"));
+     }
+     w.write_event(Event::Start(start))?;
+     while let Some((addr, cell)) = cells.next_if(|(addr, _)| addr.row == row) {
+diff -ruN a/crates/xlsx-render/src/display_list.rs b/crates/xlsx-render/src/display_list.rs
+--- a/crates/xlsx-render/src/display_list.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-render/src/display_list.rs	2026-10-23 23:04:40
+@@ -153,6 +153,19 @@
+     pub hidden_row_spans: Vec<(u32, u32)>,
+     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+     pub hidden_col_spans: Vec<(u32, u32)>,
++    /// Row outline (vendor patch 0007): whole-sheet runs `(first, last, level)`
++    /// of equal `outlineLevel`, like `hidden_row_spans`.
++    #[serde(default, skip_serializing_if = "Vec::is_empty")]
++    pub row_outline: Vec<(u32, u32, u8)>,
++    /// Column outline runs, as `row_outline`.
++    #[serde(default, skip_serializing_if = "Vec::is_empty")]
++    pub col_outline: Vec<(u32, u32, u8)>,
++    /// `summaryBelow="0"`: row group summaries sit above their group.
++    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
++    pub outline_summary_above: bool,
++    /// `summaryRight="0"`: column group summaries sit left of their group.
++    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
++    pub outline_summary_left: bool,
+     pub row_offsets: Vec<f32>,
+     pub col_offsets: Vec<f32>,
+ }
+@@ -358,6 +371,10 @@
+             start_col: dl.grid.start_col,
+             hidden_row_spans: dl.grid.hidden_row_spans,
+             hidden_col_spans: dl.grid.hidden_col_spans,
++            row_outline: dl.grid.row_outline,
++            col_outline: dl.grid.col_outline,
++            outline_summary_above: dl.grid.outline_summary_above,
++            outline_summary_left: dl.grid.outline_summary_left,
+             row_indices: dl.grid.row_indices,
+             col_indices: dl.grid.col_indices,
+             row_offsets: dl
+@@ -532,6 +549,10 @@
+                 start_col: 2,
+                 hidden_row_spans: vec![(10, 20)],
+                 hidden_col_spans: vec![(4, 5)],
++                row_outline: Vec::new(),
++                col_outline: Vec::new(),
++                outline_summary_above: false,
++                outline_summary_left: false,
+                 row_indices: None,
+                 col_indices: None,
+                 row_offsets: vec![0.0, 20.0],
+diff -ruN a/crates/xlsx-render/src/lib.rs b/crates/xlsx-render/src/lib.rs
+--- a/crates/xlsx-render/src/lib.rs	2026-10-23 23:04:21
++++ b/crates/xlsx-render/src/lib.rs	2026-10-23 23:04:40
+@@ -776,6 +776,10 @@
+         start_col: cols.start(),
+         hidden_row_spans: sheet_ref.hidden_row_spans(0..=MAX_ROWS - 1).collect(),
+         hidden_col_spans: sheet_ref.hidden_col_spans(0..=MAX_COLS - 1).collect(),
++        row_outline: outline_runs(&sheet_ref.outline.rows),
++        col_outline: outline_runs(&sheet_ref.outline.cols),
++        outline_summary_above: sheet_ref.outline.summary_above,
++        outline_summary_left: sheet_ref.outline.summary_left,
+         row_indices: rows.indices(),
+         col_indices: cols.indices(),
+         row_offsets: rows.offsets(),
+@@ -4192,4 +4196,16 @@
+         let scale = 96.0 / metrics.dpi;
+         assert_eq!(xs, vec![3.0 * scale, (3.0 + 2.0 * INDENT_WIDTH_PX) * scale]);
+     }
++}
++
++/// Runs `(first, last, level)` of consecutive indices sharing one outline level.
++fn outline_runs(levels: &xlsx_model::OutlineLevels) -> Vec<(u32, u32, u8)> {
++    let mut runs: Vec<(u32, u32, u8)> = Vec::new();
++    for (&index, &level) in levels {
++        match runs.last_mut() {
++            Some(run) if run.2 == level && run.1.checked_add(1) == Some(index) => run.1 = index,
++            _ => runs.push((index, index, level)),
++        }
++    }
++    runs
+ }
+diff -ruN a/packages/xlsx/src/display-list/types.ts b/packages/xlsx/src/display-list/types.ts
+--- a/packages/xlsx/src/display-list/types.ts	2026-10-23 23:04:21
++++ b/packages/xlsx/src/display-list/types.ts	2026-10-23 23:08:46
+@@ -182,6 +182,14 @@
+   startCol: number;
+   hiddenRowSpans?: [number, number][];
+   hiddenColSpans?: [number, number][];
++  /** Row outline runs `[first, last, level]` over the whole sheet (vendor patch 0007). */
++  rowOutline?: [number, number, number][];
++  /** Column outline runs, as `rowOutline`. */
++  colOutline?: [number, number, number][];
++  /** `summaryBelow="0"`: row group summaries sit above their group. */
++  outlineSummaryAbove?: boolean;
++  /** `summaryRight="0"`: column group summaries sit left of their group. */
++  outlineSummaryLeft?: boolean;
+   rowIndices?: number[];
+   colIndices?: number[];
+   rowOffsets: number[];
+diff -ruN a/packages/xlsx-i18n/en.json b/packages/xlsx-i18n/en.json
+--- a/packages/xlsx-i18n/en.json	2026-10-23 23:04:21
++++ b/packages/xlsx-i18n/en.json	2026-10-23 23:08:36
+@@ -30,6 +30,7 @@
+     "horizontalAlignment": "Horizontal alignment",
+     "verticalAlignment": "Vertical alignment",
+     "textWrapping": "Text wrapping",
++    "outlineVisibility": "Show or hide grouped rows and columns",
+     "more": "More toolbar items",
+     "groups": {
+       "search": "Search",
+diff -ruN a/packages/xlsx-react/src/commands/descriptors.ts b/packages/xlsx-react/src/commands/descriptors.ts
+--- a/packages/xlsx-react/src/commands/descriptors.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/commands/descriptors.ts	2026-10-23 23:08:36
+@@ -48,6 +48,7 @@
+   undo: descriptor('undo', 'toolbar.undo', true, [plain('Mod+Z')]),
+   redo: descriptor('redo', 'toolbar.redo', true, [plain('Mod+Y'), plain('Mod+Shift+Z')]),
+   zoom: descriptor('zoom', 'toolbar.zoom', false),
++  outlineVisibility: descriptor('outlineVisibility', 'toolbar.outlineVisibility', true),
+   proposalsPanel: descriptor('proposalsPanel', 'proposals.panelLabel', false),
+   proposalAccept: descriptor('proposalAccept', 'proposals.accept', true),
+   proposalReject: descriptor('proposalReject', 'proposals.reject', false),
+diff -ruN a/packages/xlsx-react/src/commands/evaluate.ts b/packages/xlsx-react/src/commands/evaluate.ts
+--- a/packages/xlsx-react/src/commands/evaluate.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/commands/evaluate.ts	2026-10-23 23:08:36
+@@ -210,6 +210,19 @@
+   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+ }
+ 
++/** Rows 0..1048575 / cols 0..16383, at most one entry per index. */
++function validOutlineVisibility(args: Record<string, unknown>): boolean {
++  const max = args.axis === 'rows' ? 1_048_576 : args.axis === 'cols' ? 16_384 : 0;
++  const index = (value: unknown) => Number.isInteger(value) && (value as number) >= 0 && (value as number) < max;
++  return (
++    max > 0 &&
++    Number.isInteger(args.sheet) && (args.sheet as number) >= 0 &&
++    typeof args.hidden === 'boolean' &&
++    Array.isArray(args.indices) && args.indices.length > 0 && args.indices.length <= max &&
++    args.indices.every(index)
++  );
++}
++
+ /** Whether `args` are well-formed for `id`; `undefined` evaluates the whole control. */
+ export function validArguments(id: XlsxCommandId, args: unknown): boolean {
+   if (args === undefined) return true;
+@@ -241,6 +254,8 @@
+       return isRecord(args) && member(TEXT_WRAPPINGS, args.value);
+     case 'zoom':
+       return isRecord(args) && finiteIn(args.scale, MIN_ZOOM, MAX_ZOOM);
++    case 'outlineVisibility':
++      return isRecord(args) && validOutlineVisibility(args);
+     case 'proposalsPanel':
+       return args === null || (isRecord(args) && typeof args.open === 'boolean');
+     case 'proposalAccept':
+diff -ruN a/packages/xlsx-react/src/commands/outlineOps.ts b/packages/xlsx-react/src/commands/outlineOps.ts
+--- a/packages/xlsx-react/src/commands/outlineOps.ts	1970-01-01 01:00:00
++++ b/packages/xlsx-react/src/commands/outlineOps.ts	2026-10-23 23:08:36
+@@ -0,0 +1,10 @@
++import type { XlsxCommandArgs } from './types';
++
++/** The `outlineVisibility` command as engine ops (one undo step, one sync update). */
++export function outlineVisibilityOps({ axis, sheet, indices, hidden }: XlsxCommandArgs['outlineVisibility']) {
++  return indices.map((index) =>
++    axis === 'rows'
++      ? { type: 'setRowVisibility' as const, sheet, row: index, hidden }
++      : { type: 'setColVisibility' as const, sheet, col: index, hidden }
++  );
++}
+diff -ruN a/packages/xlsx-react/src/commands/types.ts b/packages/xlsx-react/src/commands/types.ts
+--- a/packages/xlsx-react/src/commands/types.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/commands/types.ts	2026-10-23 23:08:36
+@@ -25,6 +25,14 @@
+  * Arguments of every XLSX editor command, keyed by command id.
+  * @experimental
+  */
++/** Arguments of the `outlineVisibility` command. */
++export interface OutlineVisibilityArgs {
++  axis: 'rows' | 'cols';
++  sheet: number;
++  indices: number[];
++  hidden: boolean;
++}
++
+ export interface XlsxCommandArgs {
+   bold: null;
+   italic: null;
+@@ -59,6 +67,11 @@
+   redo: null;
+   /** 1 is 100%; 0.25 to 4. */
+   zoom: { scale: number };
++  /**
++   * Hides or shows whole rows/columns of one sheet in a single undo step: the
++   * building block of outline (group) expand/collapse. Zero-based indices.
++   */
++  outlineVisibility: OutlineVisibilityArgs;
+   /** `null` toggles the panel. */
+   proposalsPanel: { open: boolean } | null;
+   /** `force` applies a proposal whose cells changed since it was staged. */
+@@ -129,6 +142,7 @@
+   undo: null;
+   redo: null;
+   zoom: number;
++  outlineVisibility: null;
+   /** Number of pending proposals. */
+   proposalsPanel: number;
+   proposalAccept: null;
+diff -ruN a/packages/xlsx-react/src/commands/usePeerlessWorkerXlsxCommands.ts b/packages/xlsx-react/src/commands/usePeerlessWorkerXlsxCommands.ts
+--- a/packages/xlsx-react/src/commands/usePeerlessWorkerXlsxCommands.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/commands/usePeerlessWorkerXlsxCommands.ts	2026-10-23 23:08:36
+@@ -18,6 +18,7 @@
+   type XlsxSelectionEnvironment,
+ } from './evaluate';
+ import { XLSX_COMMAND_DESCRIPTORS } from './descriptors';
++import { outlineVisibilityOps } from './outlineOps';
+ 
+ import {
+   PeerlessWorkerCommandRefusal, type PeerlessWorkerCommandInput, type PeerlessWorkerCommandSession,
+@@ -300,6 +301,9 @@
+           }
+           break;
+         case 'undo': case 'redo': input = { kind: id, payload: { args: [] } }; break;
++        case 'outlineVisibility': input = { kind: 'applyOps', payload: {
++          args: [outlineVisibilityOps(args as XlsxCommandArgs['outlineVisibility'])],
++        } } as PeerlessWorkerCommandInput; break;
+         case 'proposalAccept': input = { kind: 'acceptProposal', payload: {
+           args: [argsRecord.proposalId, { force: argsRecord.force }],
+         } }; break;
+diff -ruN a/packages/xlsx-react/src/commands/useWorkerXlsxCommands.ts b/packages/xlsx-react/src/commands/useWorkerXlsxCommands.ts
+--- a/packages/xlsx-react/src/commands/useWorkerXlsxCommands.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/commands/useWorkerXlsxCommands.ts	2026-10-23 23:11:06
+@@ -14,6 +14,7 @@
+   type XlsxCommandEnvironment,
+   type XlsxSelectionEnvironment,
+ } from './evaluate';
++import { outlineVisibilityOps } from './outlineOps';
+ import { XLSX_COMMAND_DESCRIPTORS } from './descriptors';
+ import { inputRefusal, WorkerInputRefusal, type WorkerInputCoordinator } from './workerInputCoordinator';
+ 
+@@ -307,6 +308,8 @@
+         if (ops.length === 0) return done(false);
+         return edit(() => edits.applyOps(ops));
+       }
++      case 'outlineVisibility':
++        return edit(() => edits.applyOps(outlineVisibilityOps(args as XlsxCommandArgs['outlineVisibility'])));
+       case 'undo':
+         return edit(() => edits.undo());
+       case 'redo':
+diff -ruN a/packages/xlsx-react/src/components/toolbar/legacyToolbarStore.ts b/packages/xlsx-react/src/components/toolbar/legacyToolbarStore.ts
+--- a/packages/xlsx-react/src/components/toolbar/legacyToolbarStore.ts	2026-10-23 23:04:21
++++ b/packages/xlsx-react/src/components/toolbar/legacyToolbarStore.ts	2026-10-23 23:10:45
+@@ -49,6 +49,7 @@
+   undo: 'onUndo',
+   redo: 'onRedo',
+   zoom: 'onZoomChange',
++  outlineVisibility: null,
+   proposalsPanel: null,
+   proposalAccept: null,
+   proposalReject: null,

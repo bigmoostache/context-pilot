@@ -1,19 +1,23 @@
 import type { CSSProperties, ReactNode } from "react"
 import { EXCEL } from "./excelTheme"
+import { LevelButtons, OutlineStrip, type Axis, type AxisMeta } from "./ExcelOutline"
+import { gutterSize, type OutlineRuns, type Spans, type VisibilityBatch } from "./outline"
 
 /** Excel's header strip sizes at 100% zoom: column band height, row gutter width. */
 const COL_H = 30
 const ROW_W = 43
 const HEADER_INK = "#5e5e5e"
 const HEADER_LINE = "#e1e1e1"
-/** Top of the engine's scroll host: ExcelToolbar (ribbon + formula row) plus the column band. */
-const GRID_TOP = EXCEL.ribbonH + EXCEL.formulaH + COL_H
+/** Top of the header bands: ExcelToolbar (ribbon + formula row) above them. */
+const BAND_TOP = EXCEL.ribbonH + EXCEL.formulaH
 
 /**
- * The part of xlsx-react's `XlsxViewport` (vendor patch 0003) the headers read.
- * Structural, so the file type-checks against builds that predate the export.
+ * The part of xlsx-react's `XlsxViewport` (vendor patches 0003 + 0007) the
+ * headers and outline gutters read. Structural, so the file type-checks
+ * against builds that predate the export.
  */
 export interface HeaderViewport {
+  sheet: number
   width: number
   height: number
   zoom: number
@@ -24,62 +28,170 @@ export interface HeaderViewport {
     colIndices?: number[]
     rowOffsets: number[]
     colOffsets: number[]
+    hiddenRowSpans?: Spans
+    hiddenColSpans?: Spans
+    rowOutline?: OutlineRuns
+    colOutline?: OutlineRuns
+    outlineSummaryAbove?: boolean
+    outlineSummaryLeft?: boolean
   } | null
 }
 
+/** Applies one outline visibility batch on `sheet` (the `outlineVisibility` command). */
+export type OutlineDispatch = (axis: Axis, sheet: number, batch: VisibilityBatch) => void
+
 /**
  * Wraps an XlsxEditor mounted with `toolbar={<ExcelToolbar />}` and paints
- * Excel's row and column headers, which the engine does not draw. Its scroll
- * host is inset by the header sizes; the strips are laid out from the last
- * painted frame (`onViewport`). Offsets are in viewport space: the canvas is
- * sticky, scrolling only changes which tracks are listed.
+ * Excel's row and column headers plus the outline (grouping) gutters, which the
+ * engine does not draw. Its scroll host is inset by their sizes; the strips are
+ * laid out from the last painted frame (`onViewport`). Offsets are in viewport
+ * space: the canvas is sticky, scrolling only changes which tracks are listed.
  */
 export function ExcelHeaderFrame({
   viewport,
+  onOutline,
   children,
 }: {
   viewport: HeaderViewport | null
+  onOutline: OutlineDispatch
   children: ReactNode
 }) {
+  const grid = viewport?.grid
+  const rowGutter = gutterSize(grid?.rowOutline)
+  const colGutter = gutterSize(grid?.colOutline)
   return (
     <div className="excel-grid-frame" style={{ position: "relative", height: "100%" }}>
-      <style>{`.excel-grid-frame [data-testid="xlsx-scroll"]{margin:${String(COL_H)}px 0 0 ${String(ROW_W)}px}`}</style>
+      <style>{`.excel-grid-frame [data-testid="xlsx-scroll"]{margin:${String(COL_H + colGutter)}px 0 0 ${String(ROW_W + rowGutter)}px}`}</style>
       {children}
-      {viewport?.grid && <Headers viewport={viewport} grid={viewport.grid} />}
+      {viewport && grid && (
+        <Headers
+          viewport={viewport}
+          grid={grid}
+          rowGutter={rowGutter}
+          colGutter={colGutter}
+          onOutline={onOutline}
+        />
+      )}
     </div>
   )
 }
+
+type Grid = NonNullable<HeaderViewport["grid"]>
 
 function Headers({
   viewport,
   grid,
+  rowGutter,
+  colGutter,
+  onOutline,
 }: {
   viewport: HeaderViewport
-  grid: NonNullable<HeaderViewport["grid"]>
+  grid: Grid
+  rowGutter: number
+  colGutter: number
+  onOutline: OutlineDispatch
 }) {
   const z = viewport.zoom
   const cols = spans(grid.colOffsets, viewport.width / z)
   const rows = spans(grid.rowOffsets, viewport.height / z)
-  const top = GRID_TOP - COL_H
+  const colTop = BAND_TOP + colGutter
+  const gridTop = colTop + COL_H
+  const gridLeft = rowGutter + ROW_W
+  const rowMeta = axisMeta(grid, "rows")
+  const colMeta = axisMeta(grid, "cols")
+  const dispatch = (axis: Axis) => (batch: VisibilityBatch) => {
+    onOutline(axis, viewport.sheet, batch)
+  }
   return (
-    <div aria-hidden style={{ pointerEvents: "none", fontFamily: EXCEL.font }}>
-      <div style={{ ...strip, top, left: 0, width: ROW_W, height: COL_H }} />
-      <div style={{ ...strip, top, left: ROW_W, width: viewport.width, height: COL_H }}>
-        {cols.map(([start, end], i) => (
-          <span key={i} style={cell({ x: start * z, y: 0, w: (end - start) * z, h: COL_H }, "col")}>
-            {columnName(grid.colIndices?.[i] ?? grid.startCol + i)}
-          </span>
-        ))}
+    <div style={{ fontFamily: EXCEL.font }}>
+      <div aria-hidden style={{ pointerEvents: "none" }}>
+        <div
+          style={{ ...strip, top: BAND_TOP, left: 0, width: gridLeft, height: colGutter + COL_H }}
+        />
+        <div
+          style={{ ...strip, top: colTop, left: gridLeft, width: viewport.width, height: COL_H }}
+        >
+          {cols.map(([start, end], i) => (
+            <span
+              key={i}
+              style={cell({ x: start * z, y: 0, w: (end - start) * z, h: COL_H }, "col")}
+            >
+              {columnName(grid.colIndices?.[i] ?? grid.startCol + i)}
+            </span>
+          ))}
+        </div>
+        <div
+          style={{ ...strip, top: gridTop, left: rowGutter, width: ROW_W, height: viewport.height }}
+        >
+          {rows.map(([start, end], i) => (
+            <span
+              key={i}
+              style={cell({ x: 0, y: start * z, w: ROW_W, h: (end - start) * z }, "row")}
+            >
+              {(grid.rowIndices?.[i] ?? grid.startRow + i) + 1}
+            </span>
+          ))}
+        </div>
       </div>
-      <div style={{ ...strip, top: GRID_TOP, left: 0, width: ROW_W, height: viewport.height }}>
-        {rows.map(([start, end], i) => (
-          <span key={i} style={cell({ x: 0, y: start * z, w: ROW_W, h: (end - start) * z }, "row")}>
-            {(grid.rowIndices?.[i] ?? grid.startRow + i) + 1}
-          </span>
-        ))}
-      </div>
+      {rowGutter > 0 && (
+        <>
+          <OutlineStrip
+            axis="rows"
+            meta={rowMeta}
+            zoom={z}
+            extent={viewport.height}
+            style={{ top: gridTop, left: 0, width: rowGutter, height: viewport.height }}
+            onBatch={dispatch("rows")}
+          />
+          <LevelButtons
+            axis="rows"
+            meta={rowMeta}
+            style={{ top: colTop + (COL_H - 13) / 2, left: 0 }}
+            onBatch={dispatch("rows")}
+          />
+        </>
+      )}
+      {colGutter > 0 && (
+        <>
+          <OutlineStrip
+            axis="cols"
+            meta={colMeta}
+            zoom={z}
+            extent={viewport.width}
+            style={{ top: BAND_TOP, left: gridLeft, width: viewport.width, height: colGutter }}
+            onBatch={dispatch("cols")}
+          />
+          <LevelButtons
+            axis="cols"
+            meta={colMeta}
+            style={{ top: BAND_TOP, left: rowGutter + (ROW_W - 13) / 2 }}
+            onBatch={dispatch("cols")}
+          />
+        </>
+      )}
     </div>
   )
+}
+
+/** One axis of the grid meta in the gutter's terms. */
+function axisMeta(grid: Grid, axis: Axis): AxisMeta {
+  return axis === "rows"
+    ? {
+        runs: grid.rowOutline,
+        hidden: grid.hiddenRowSpans,
+        summaryBefore: grid.outlineSummaryAbove ?? false,
+        start: grid.startRow,
+        indices: grid.rowIndices,
+        offsets: grid.rowOffsets,
+      }
+    : {
+        runs: grid.colOutline,
+        hidden: grid.hiddenColSpans,
+        summaryBefore: grid.outlineSummaryLeft ?? false,
+        start: grid.startCol,
+        indices: grid.colIndices,
+        offsets: grid.colOffsets,
+      }
 }
 
 /** Column letters as Excel writes them: 0 → A, 25 → Z, 26 → AA. */

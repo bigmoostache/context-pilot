@@ -5,8 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz
-  '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz
+  '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz
+  '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz
   '@betteroffice/pptx': file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz
   '@betteroffice/pptx-i18n': file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz
   '@betteroffice/docx': file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz
@@ -29,8 +29,8 @@ importers:
         specifier: file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz
         version: file:vendor/betteroffice/betteroffice-pptx-react-0.2.1-cp.20261023.1.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@betteroffice/xlsx-react':
-        specifier: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz
-        version: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.4.tgz
+        version: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.4.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -415,20 +415,20 @@ packages:
     resolution: {integrity: sha512-AJh9Uo4Tu8xqgXZGj7waMU7uHcXsbzvodkY7KZq0H56Z+QqT5MLe7GGg6HT7OSEFl2zOPJ7lhDzQAM0UTTbNIg==, tarball: file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz}
     version: 0.2.1-cp.20261023.1
 
-  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz':
-    resolution: {integrity: sha512-c3UnF3dezxDK8hQxH2zuscqFWyP9djx+tbfyLFOwq43NXAlma4RgfT6wMS9zx2vJgIqiEtX6hAvluO/8DqhwEg==, tarball: file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz}
-    version: 0.3.1-cp.20261023.3
+  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz':
+    resolution: {integrity: sha512-gLx77IiVWanXKGfK3ckcE7f5LPMFC+kGAhMzAvnq8wmQxxX0IjPzMfyK5DDJxjG/ibP49X++Hx498gkmn2PB6w==, tarball: file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz}
+    version: 0.3.1-cp.20261023.4
 
-  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz':
-    resolution: {integrity: sha512-sQYGwmIrFgXfR7zmDel5yR975UTviPBueZu3hfGdM+i+CP2G9HIbYOS8YYCgNC4R1bOCoQE+kyWWe0SfUUhCWg==, tarball: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz}
-    version: 0.3.1-cp.20261023.3
+  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.4.tgz':
+    resolution: {integrity: sha512-/0zWPsU5r4a2u/MRj3nNK4siSHQTX2OOV/UoIBLhKmjHGAQ39P2pUBqMEn1j12/UZPY930b3jEJzyQ3D+q6ngA==, tarball: file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.4.tgz}
+    version: 0.3.1-cp.20261023.4
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz':
-    resolution: {integrity: sha512-+N6EehERF9ZOTcfm/mx33DgwkR22OqPGerNKNvhlHUJsyd5EiuMryyGwhNsQ3yCAe8bYnG54qFK2L3fsOevYIA==, tarball: file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz}
-    version: 0.3.1-cp.20261023.3
+  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz':
+    resolution: {integrity: sha512-ze2QyMzIu0y14smvL9qY36gNLYRj1MEpQKsCULAegszf5jZzR3g4hGt+0TCEl6cL8790g9mUhqEVxU9l8DcggA==, tarball: file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz}
+    version: 0.3.1-cp.20261023.4
 
   '@boundaries/elements@2.0.1':
     resolution: {integrity: sha512-sAWO3D8PFP6pBXdxxW93SQi/KQqqhE2AAHo3AgWfdtJXwO6bfK6/wUN81XnOZk0qRC6vHzUEKhjwVD9dtDWvxg==}
@@ -5311,16 +5311,16 @@ snapshots:
 
   '@betteroffice/pptx@file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz': {}
 
-  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz': {}
+  '@betteroffice/xlsx-i18n@file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz': {}
 
-  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.3.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@betteroffice/xlsx-react@file:vendor/betteroffice/betteroffice-xlsx-react-0.3.1-cp.20261023.4.tgz(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz
-      '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz
+      '@betteroffice/xlsx': file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz
+      '@betteroffice/xlsx-i18n': file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
 
-  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz': {}
+  '@betteroffice/xlsx@file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz': {}
 
   '@boundaries/elements@2.0.1(@typescript-eslint/parser@8.61.0(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint-import-resolver-typescript@4.4.5(eslint-plugin-import-x@4.17.1(@typescript-eslint/utils@8.62.1(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(typescript@6.0.3))(eslint-import-resolver-node@0.3.9)(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2))(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2))(eslint@10.5.0(jiti@2.7.0)(supports-color@10.2.2))':
     dependencies:

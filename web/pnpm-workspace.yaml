@@ -28,8 +28,8 @@ allowBuilds:
 # CRDT schema. Tarballs live in vendor/betteroffice/; each react package's deps
 # on its engine and i18n packages must resolve there too, not from the registry.
 overrides:
-  "@betteroffice/xlsx": "file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.3.tgz"
-  "@betteroffice/xlsx-i18n": "file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.3.tgz"
+  "@betteroffice/xlsx": "file:vendor/betteroffice/betteroffice-xlsx-0.3.1-cp.20261023.4.tgz"
+  "@betteroffice/xlsx-i18n": "file:vendor/betteroffice/betteroffice-xlsx-i18n-0.3.1-cp.20261023.4.tgz"
   "@betteroffice/pptx": "file:vendor/betteroffice/betteroffice-pptx-0.2.1-cp.20261023.1.tgz"
   "@betteroffice/pptx-i18n": "file:vendor/betteroffice/betteroffice-pptx-i18n-0.2.1-cp.20261023.1.tgz"
   "@betteroffice/docx": "file:vendor/betteroffice/betteroffice-docx-0.4.4-cp.20261023.1.tgz"
