@@ -111,7 +111,7 @@ function OfficeEditorBody({ fleetId, node }: { fleetId: string; node: FinderNode
       />
       <div key={version} className="relative min-h-0 flex-1">
         <Suspense fallback={<PreviewStatus label="Loading editor…" />}>
-          <LazyDocx bytes={bytes} fileName={node.name} onSave={save} />
+          <LazyDocx bytes={bytes} fileName={node.name} onSave={save} onRetry={refetch} />
         </Suspense>
       </div>
     </div>
