@@ -568,3 +568,52 @@ exceptions:
 
 
 
+
+  # ── exhaustive_*: SqlTable server-paginated view contracts ───────────
+  # Wire FilterOp (cp-wire) and its 1:1 entity-side mirrors (cp-mod-entities
+  # sql/{page,view}.rs) are built by struct/variant literal in the agent binary
+  # and matched exhaustively; #[non_exhaustive] would forbid that construction
+  # (E0639) or force forbidden wildcard arms.
+
+  - path: "crates/cp-wire/src/types/payload/query.rs"
+    match: "wire-protocol contract: closed operator set with an Unknown catch-all for N-1 tolerance"
+    reason: >
+      FilterOp is the SqlTable filter operator set; Unknown catch-all covers N-1,
+      constructed by the frontend payload and matched exhaustively by the agent.
+    strategy: >
+      Irreducible — the Unknown variant already provides forward-compat.
+
+  - path: "crates/cp-mod-entities/src/sql/page.rs"
+    match: "plain result tuple consumed by the agent binary"
+    reason: >
+      Page is a plain result record mapped field-by-field onto the wire SqlPage.
+    strategy: >
+      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
+
+  - path: "crates/cp-mod-entities/src/sql/view.rs"
+    match: "closed operator set mirrored 1:1 from the wire FilterOp"
+    reason: >
+      Op mirrors the wire FilterOp and is matched exhaustively by the SQL builder.
+    strategy: >
+      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
+
+  - path: "crates/cp-mod-entities/src/sql/view.rs"
+    match: "plain request tuple built field-by-field by the agent binary from the wire SqlFilter"
+    reason: >
+      Filter is built by struct literal in the agent binary from the wire SqlFilter.
+    strategy: >
+      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
+
+  - path: "crates/cp-mod-entities/src/sql/view.rs"
+    match: "plain borrowed request bundle built by struct literal in the agent binary"
+    reason: >
+      Request bundles fetch inputs to stay under the too_many_arguments budget.
+    strategy: >
+      Irreducible — a constructor would itself exceed the argument budget.
+
+  - path: "crates/cp-mod-entities/src/sql/view.rs"
+    match: "plain request tuple built field-by-field by the agent binary from the wire SqlView"
+    reason: >
+      View is built by struct literal in the agent binary from the wire SqlView.
+    strategy: >
+      Fold into the wire type if cp-mod-entities ever depends on cp-wire.

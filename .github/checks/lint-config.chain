@@ -9880,3 +9880,75 @@ index 8b887787..eb5667fc 100755
        -o -path './.context-pilot' \
        -o -path './docs' \
 # --- End entry #119 ---
+120:550a7ef709aa5dc35e441db5112315943e46b4ce3dd14ac7fb47a22175d6f5a1:c94b735f721e487c36bcbad4025e2233d9253228af6d2de9e6c3f8b311de2500:2c42dbc36bfef2becbf4dfcd37da70f663ea8d4743ea9669a27c0a7cd04efe12
+# --- Diff for entry #120 ---
+diff --git a/.github/checks/check-structure.sh b/.github/checks/check-structure.sh
+index eb5667fc..53a8ae41 100755
+--- a/.github/checks/check-structure.sh
++++ b/.github/checks/check-structure.sh
+@@ -64,6 +64,7 @@ done < <(find . \
+   \( -type d \( -name target \
+       -o -path './.worktrees' \
+       -o -path './vendor' \
++      -o -path './tmp' \
+       -o -path './deploy/ansible/.venv' \
+       -o -path './deploy/ansible/.artifacts' \) -prune \) \
+   -o \( -name '*.rs' -print \))
+diff --git a/.github/checks/allowed-lint-exceptions.yaml b/.github/checks/allowed-lint-exceptions.yaml
+index 2e7cb591..57acdcc0 100644
+--- a/.github/checks/allowed-lint-exceptions.yaml
++++ b/.github/checks/allowed-lint-exceptions.yaml
+@@ -568,3 +568,52 @@ exceptions:
+ 
+ 
+ 
++
++  # ── exhaustive_*: SqlTable server-paginated view contracts ───────────
++  # Wire FilterOp (cp-wire) and its 1:1 entity-side mirrors (cp-mod-entities
++  # sql/{page,view}.rs) are built by struct/variant literal in the agent binary
++  # and matched exhaustively; #[non_exhaustive] would forbid that construction
++  # (E0639) or force forbidden wildcard arms.
++
++  - path: "crates/cp-wire/src/types/payload/query.rs"
++    match: "wire-protocol contract: closed operator set with an Unknown catch-all for N-1 tolerance"
++    reason: >
++      FilterOp is the SqlTable filter operator set; Unknown catch-all covers N-1,
++      constructed by the frontend payload and matched exhaustively by the agent.
++    strategy: >
++      Irreducible — the Unknown variant already provides forward-compat.
++
++  - path: "crates/cp-mod-entities/src/sql/page.rs"
++    match: "plain result tuple consumed by the agent binary"
++    reason: >
++      Page is a plain result record mapped field-by-field onto the wire SqlPage.
++    strategy: >
++      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
++
++  - path: "crates/cp-mod-entities/src/sql/view.rs"
++    match: "closed operator set mirrored 1:1 from the wire FilterOp"
++    reason: >
++      Op mirrors the wire FilterOp and is matched exhaustively by the SQL builder.
++    strategy: >
++      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
++
++  - path: "crates/cp-mod-entities/src/sql/view.rs"
++    match: "plain request tuple built field-by-field by the agent binary from the wire SqlFilter"
++    reason: >
++      Filter is built by struct literal in the agent binary from the wire SqlFilter.
++    strategy: >
++      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
++
++  - path: "crates/cp-mod-entities/src/sql/view.rs"
++    match: "plain borrowed request bundle built by struct literal in the agent binary"
++    reason: >
++      Request bundles fetch inputs to stay under the too_many_arguments budget.
++    strategy: >
++      Irreducible — a constructor would itself exceed the argument budget.
++
++  - path: "crates/cp-mod-entities/src/sql/view.rs"
++    match: "plain request tuple built field-by-field by the agent binary from the wire SqlView"
++    reason: >
++      View is built by struct literal in the agent binary from the wire SqlView.
++    strategy: >
++      Fold into the wire type if cp-mod-entities ever depends on cp-wire.
+# --- End entry #120 ---

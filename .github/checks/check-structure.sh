@@ -64,6 +64,7 @@ done < <(find . \
   \( -type d \( -name target \
       -o -path './.worktrees' \
       -o -path './vendor' \
+      -o -path './tmp' \
       -o -path './deploy/ansible/.venv' \
       -o -path './deploy/ansible/.artifacts' \) -prune \) \
   -o \( -name '*.rs' -print \))
