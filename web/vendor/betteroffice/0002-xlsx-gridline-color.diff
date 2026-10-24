@@ -1,6 +1,9 @@
+xlsx gridline colour option (gridlineColor). Overridden gridlines are also snapped to the device pixel before
+the track boundary (an unsnapped 1px line blends over two pixels: #e1e1e1 rendered as 2px #f0f0f0). Defaults unchanged.
+
 --- a/packages/xlsx/src/render/canvas2d.ts
 +++ b/packages/xlsx/src/render/canvas2d.ts
-@@ -52,16 +52,38 @@
+@@ -52,16 +52,58 @@
    ctx: CanvasRenderingContext2D,
    dl: DisplayList,
    dpr: number,
@@ -17,15 +20,35 @@
    ctx.clearRect(0, 0, dl.width, dl.height);
 -  for (const cmd of dl.commands) paintCommand(ctx, cmd, dpr, origin);
 +  for (const cmd of dl.commands) {
-+    paintCommand(ctx, gridlineColor && isGridline(cmd) ? { ...cmd, color: gridlineColor } : cmd, dpr, origin);
++    paintCommand(ctx, gridlineColor && isGridline(cmd) ? snapGridline({ ...cmd, color: gridlineColor }, dpr, origin) : cmd, dpr, origin);
 +  }
    ctx.restore();
 +}
 +
 +/** Host overrides applied while painting; every field defaults to the engine's own output. */
 +export interface PaintOptions {
-+  /** Screen gridline colour, `#rrggbb`. Defaults to the engine's `#d4d4d4`. */
++  /**
++   * Screen gridline colour, `#rrggbb`. Defaults to the engine's `#d4d4d4`.
++   * Overridden gridlines are also snapped to whole device pixels, on the last
++   * pixel before the track boundary (Excel's placement): a 1px line centred on
++   * an integer coordinate otherwise blends over two pixels at half strength.
++   */
 +  gridlineColor?: string;
++}
++
++/** `cmd` moved onto the device pixel row/column just before its boundary. */
++function snapGridline(cmd: LineCmd, dpr: number, origin: { x: number; y: number }): LineCmd {
++  const width = Math.max(1, Math.round(cmd.width * dpr));
++  const snap = (v: number, o: number) => (Math.round(v * dpr + o) - width / 2 - o) / dpr;
++  if (cmd.y1 === cmd.y2) {
++    const y = snap(cmd.y1, origin.y);
++    return { ...cmd, y1: y, y2: y, width: width / dpr };
++  }
++  if (cmd.x1 === cmd.x2) {
++    const x = snap(cmd.x1, origin.x);
++    return { ...cmd, x1: x, x2: x, width: width / dpr };
++  }
++  return cmd;
 +}
 +
 +/** The engine's screen gridline colour (xlsx-render `GRIDLINE_COLOR`). */
@@ -41,6 +64,60 @@
  }
  
  function paintCommand(ctx: CanvasRenderingContext2D, cmd: DrawCmd, dpr: number, origin: { x: number; y: number }): void {
+--- a/packages/xlsx/src/render/canvas2d.test.ts
++++ b/packages/xlsx/src/render/canvas2d.test.ts
+@@ -49,7 +49,51 @@
+         [rail, 20 + offset, 0, 20 + offset, 40],
+       ]);
+     }
++  });
++});
++
++describe('Canvas2D gridline colour override', () => {
++  const paint = (dpr: number, gridlineColor?: string) => {
++    const strokes: (number | string)[][] = [];
++    let points: number[] = [];
++    const context = {
++      lineWidth: 0, strokeStyle: '', lineCap: '',
++      save() {}, restore() {}, setTransform() {}, clearRect() {}, rect() {}, clip() {}, setLineDash() {},
++      beginPath() { points = []; },
++      moveTo(x: number, y: number) { points.push(x, y); },
++      lineTo(x: number, y: number) { points.push(x, y); },
++      stroke() { strokes.push([this.strokeStyle, this.lineWidth, ...points]); },
++    };
++    const dl = { width: 100, height: 40, commands: [
++      { op: 'line', x1: 0, y1: 20, x2: 100, y2: 20, width: 1, color: '#d4d4d4' },
++      { op: 'line', x1: 30, y1: 0, x2: 30, y2: 40, width: 1, color: '#d4d4d4' },
++      { op: 'line', x1: 0, y1: 10, x2: 100, y2: 10, width: 1, color: '#000000' },
++    ] } as DisplayList;
++    paintDisplayList(context as unknown as CanvasRenderingContext2D, dl, dpr, { x: 0, y: 0 },
++      gridlineColor ? { gridlineColor } : {});
++    return strokes;
++  };
++
++  it('leaves the engine output untouched by default', () => {
++    expect(paint(2)).toEqual([
++      ['#d4d4d4', 1, 0, 20, 100, 20],
++      ['#d4d4d4', 1, 30, 0, 30, 40],
++      ['#000000', 1, 0, 10, 100, 10],
++    ]);
+   });
++
++  it('recolours gridlines onto the device pixel before the boundary, other lines unchanged', () => {
++    expect(paint(1, '#e1e1e1')).toEqual([
++      ['#e1e1e1', 1, 0, 19.5, 100, 19.5],
++      ['#e1e1e1', 1, 29.5, 0, 29.5, 40],
++      ['#000000', 1, 0, 10, 100, 10],
++    ]);
++    expect(paint(2, '#e1e1e1')).toEqual([
++      ['#e1e1e1', 1, 0, 19.5, 100, 19.5],
++      ['#e1e1e1', 1, 29.5, 0, 29.5, 40],
++      ['#000000', 1, 0, 10, 100, 10],
++    ]);
++  });
+ });
+ 
+ describe('Canvas2D pattern borders', () => {
 --- a/packages/xlsx/src/index.ts
 +++ b/packages/xlsx/src/index.ts
 @@ -141 +141 @@
