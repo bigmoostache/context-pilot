@@ -108,6 +108,25 @@ export interface VisibilityBatch {
   hidden: boolean
 }
 
+/** `spans` with `batch` applied: what the engine will report once it repaints. */
+export function applyBatch(spans: Spans | undefined, batch: VisibilityBatch): Spans {
+  const hidden = new Set<number>()
+  const list = spans ?? []
+  for (const [a, b] of list) for (let i = a; i <= b; i++) hidden.add(i)
+  for (const i of batch.indices) {
+    if (batch.hidden) hidden.add(i)
+    else hidden.delete(i)
+  }
+  const out: Spans = []
+  const sorted = [...hidden].toSorted((x, y) => x - y)
+  for (const i of sorted) {
+    const prev = out.at(-1)
+    if (prev && prev[1] + 1 === i) prev[1] = i
+    else out.push([i, i])
+  }
+  return out
+}
+
 /**
  * Collapse hides the whole group; expand shows its own level (direct rows plus
  * inner groups' summaries), leaving inner groups collapsed.

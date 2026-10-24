@@ -1,7 +1,13 @@
-import type { CSSProperties, ReactNode } from "react"
+import { useState, type CSSProperties, type ReactNode } from "react"
 import { EXCEL } from "./excelTheme"
 import { LevelButtons, OutlineStrip, type Axis, type AxisMeta } from "./ExcelOutline"
-import { gutterSize, type OutlineRuns, type Spans, type VisibilityBatch } from "./outline"
+import {
+  applyBatch,
+  gutterSize,
+  type OutlineRuns,
+  type Spans,
+  type VisibilityBatch,
+} from "./outline"
 
 /** Excel's header strip sizes at 100% zoom: column band height, row gutter width. */
 const COL_H = 30
@@ -56,11 +62,25 @@ export function ExcelHeaderFrame({
   onOutline: OutlineDispatch
   children: ReactNode
 }) {
-  const grid = viewport?.grid
+  const [pending, setPending] = useState<Pending | null>(null)
+  // A pending flip only holds until the engine paints its next frame.
+  const live = pending?.viewport === viewport ? pending : null
+  const grid = viewport?.grid && live ? { ...viewport.grid, ...live.spans } : viewport?.grid
   const rowGutter = gutterSize(grid?.rowOutline)
   const colGutter = gutterSize(grid?.colOutline)
+  const dispatch: OutlineDispatch = (axis, sheet, batch) => {
+    if (viewport && grid) {
+      const key = axis === "rows" ? "hiddenRowSpans" : "hiddenColSpans"
+      setPending({ viewport, spans: { ...live?.spans, [key]: applyBatch(grid[key], batch) } })
+    }
+    onOutline(axis, sheet, batch)
+  }
   return (
-    <div className="excel-grid-frame" style={{ position: "relative", height: "100%" }}>
+    <div
+      className="excel-grid-frame"
+      aria-busy={live !== null}
+      style={{ position: "relative", height: "100%", cursor: live ? "progress" : undefined }}
+    >
       <style>{`.excel-grid-frame [data-testid="xlsx-scroll"]{margin:${String(COL_H + colGutter)}px 0 0 ${String(ROW_W + rowGutter)}px}`}</style>
       {children}
       {viewport && grid && (
@@ -69,11 +89,20 @@ export function ExcelHeaderFrame({
           grid={grid}
           rowGutter={rowGutter}
           colGutter={colGutter}
-          onOutline={onOutline}
+          onOutline={dispatch}
         />
       )}
     </div>
   )
+}
+
+/**
+ * Hidden spans the gutter shows before the engine repaints (a visibility op can
+ * recalc for seconds), tied to the frame they were derived from.
+ */
+interface Pending {
+  viewport: HeaderViewport
+  spans: { hiddenRowSpans?: Spans; hiddenColSpans?: Spans }
 }
 
 type Grid = NonNullable<HeaderViewport["grid"]>

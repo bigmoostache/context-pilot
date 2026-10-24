@@ -1,0 +1,98 @@
+0008-xlsx-visibility-keeps-calc: row/column visibility and size ops keep
+formula results instead of forcing a full recalculation.
+
+- betteroffice-xlsx CalculationScope: SetRow/ColVisibility, SetRowHeight,
+  SetColWidth and RestoreRow/ColDimension (the undo path of visibility and
+  size ops) map to Kept. xlsx-calc reads neither visibility nor sizes:
+  SUBTOTAL 101-111 behaves like 1-11 and AGGREGATE ignores its
+  ignore-hidden options (xlsx-calc functions/stats.rs `subtotal`,
+  `aggregate`). A full recalc on these ops never changed a value; on the
+  Dalia databook it cost ~4.3 s per outline toggle.
+- Test: visibility_keeps_formula_results (SUBTOTAL(109) + SUM, row and col
+  hide/show, undo): values, calculation counters and evaluated formulas
+  unchanged.
+
+KNOWN GAP
+SUBTOTAL 101-111 and AGGREGATE do not skip hidden rows (upstream, not this
+patch). If hidden rows ever get modelled, restore a scoped recalculation of
+hidden-aware formulas and their dependents on these ops.
+
+diff -ruN a/crates/betteroffice-xlsx/src/workbook/format_calculation_tests.rs b/crates/betteroffice-xlsx/src/workbook/format_calculation_tests.rs
+--- a/crates/betteroffice-xlsx/src/workbook/format_calculation_tests.rs	2026-10-24 00:33:30
++++ b/crates/betteroffice-xlsx/src/workbook/format_calculation_tests.rs	2026-10-24 00:33:30
+@@ -826,3 +826,47 @@
+         assert_eq!(value(&reopened, at), number(expected));
+     }
+ }
++
++/// Hiding and showing rows or columns keeps every formula result and runs no
++/// calculation: xlsx-calc reads hidden rows as visible, SUBTOTAL(109) included.
++#[test]
++fn visibility_keeps_formula_results() {
++    let rows = [
++        r#"<row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>SUBTOTAL(109,A1:A3)</f></c><c r="C1"><f>SUM(A1:A3)</f></c></row>"#,
++        r#"<row r="2"><c r="A2"><v>2</v></c></row>"#,
++        r#"<row r="3"><c r="A3"><v>4</v></c></row>"#,
++    ]
++    .concat();
++    let bytes = sheets_package([rows, String::new(), String::new()], "");
++    let mut workbook = Workbook::open(&bytes).unwrap();
++    // uncached formulas wait for a first calculation
++    workbook.recalculate_all(options());
++    assert_eq!(value(&workbook, "B1"), number(7.0));
++    assert_eq!(value(&workbook, "C1"), number(7.0));
++    let before = values(&workbook);
++    let counters = calculation_counters(&workbook);
++    let hide = |hidden| {
++        vec![
++            Op::SetRowVisibility {
++                sheet: SheetId(0),
++                row: 1,
++                hidden,
++            },
++            Op::SetColVisibility {
++                sheet: SheetId(0),
++                col: 0,
++                hidden,
++            },
++        ]
++    };
++    for hidden in [true, false] {
++        track_formula_evaluations();
++        let result = workbook.apply_ops(hide(hidden), options()).unwrap();
++        assert_kept(&workbook, &result, &before, counters);
++        assert_eq!(workbook.model.sheets[0].row_hidden(1), hidden);
++    }
++    track_formula_evaluations();
++    let result = workbook.undo(options()).unwrap();
++    assert_kept(&workbook, &result, &before, counters);
++    assert!(workbook.model.sheets[0].row_hidden(1));
++}
+diff -ruN a/crates/betteroffice-xlsx/src/workbook.rs b/crates/betteroffice-xlsx/src/workbook.rs
+--- a/crates/betteroffice-xlsx/src/workbook.rs	2026-10-24 00:33:30
++++ b/crates/betteroffice-xlsx/src/workbook.rs	2026-10-24 00:33:30
+@@ -5054,13 +5054,19 @@
+             // undo and redo of a rename restore formulas that an edit outside
+             // history may have changed in more than their sheet names
+             Op::RestoreSheet { .. } => Self::Full,
+-            // a zero size hides a row or column, which hidden-aware functions read
+-            Op::SetColWidth { .. }
+-            | Op::SetColVisibility { .. }
++            // Sizing, hiding or showing a row or column changes no value:
++            // xlsx-calc reads neither sizes nor visibility (SUBTOTAL 101-111
++            // and AGGREGATE's ignore-hidden options read hidden rows as
++            // visible, see xlsx-calc functions/stats.rs `subtotal` and
++            // `aggregate`). Undo restores visibility through the dimension
++            // restores, so they share the arm. Restore a scoped recalculation
++            // of hidden-aware formulas if hidden rows ever get modelled.
++            Op::SetColVisibility { .. }
++            | Op::SetRowVisibility { .. }
++            | Op::SetColWidth { .. }
+             | Op::RestoreColDimension { .. }
+             | Op::SetRowHeight { .. }
+-            | Op::SetRowVisibility { .. }
+-            | Op::RestoreRowDimension { .. } => Self::Full,
++            | Op::RestoreRowDimension { .. } => Self::Kept,
+             Op::SetDefinedNames { .. }
+             | Op::SetDefinedName { .. }
+             | Op::DeleteDefinedName { .. }
