@@ -21,6 +21,3 @@ export const EXCEL = {
   formulaH: 32,
   statusH: 23,
 } as const
-
-/** The only ribbon tab with commands here; others are omitted, not faked. */
-export const EXCEL_TAB = "Home"

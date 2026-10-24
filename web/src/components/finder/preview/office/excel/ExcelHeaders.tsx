@@ -14,8 +14,8 @@ const COL_H = 30
 const ROW_W = 43
 const HEADER_INK = "#5e5e5e"
 const HEADER_LINE = "#e1e1e1"
-/** Top of the header bands: ExcelToolbar (ribbon + formula row) above them. */
-const BAND_TOP = EXCEL.ribbonH + EXCEL.formulaH
+/** Top of the header bands: ExcelToolbar (tab row, ribbon, formula row) above them. */
+const BAND_TOP = EXCEL.tabsH + EXCEL.ribbonH + EXCEL.formulaH
 
 /**
  * The part of xlsx-react's `XlsxViewport` (vendor patches 0003 + 0007) the
