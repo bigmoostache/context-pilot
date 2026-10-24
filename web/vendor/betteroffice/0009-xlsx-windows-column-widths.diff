@@ -1,0 +1,119 @@
+0009-xlsx-windows-column-widths: rowMetrics="windows" (0005) now covers
+columns too: screen <col width> -> pixels by ECMA-376 18.3.1.13
+(trunc((256w + trunc(128/mdw))/256 * mdw), shared with PrintMetrics::column_pixels),
+like Excel for Windows / the web. The mac default keeps col_chars_to_px.
+Applies on top of 0001-0008.
+
+--- a/crates/xlsx-render/src/geometry.rs
++++ b/crates/xlsx-render/src/geometry.rs
+@@ -379,9 +379,30 @@
+     }
+ 
+     pub fn column_pixels(&self, width: f64) -> f32 {
+-        let digit = self.max_digit_width as f64;
+-        (((256.0 * width + (128.0 / digit).floor()) / 256.0 * digit).floor() * 96.0
+-            / self.dpi as f64) as f32
++        ecma_column_pixels(width, self.max_digit_width as f64, self.dpi as f64)
++    }
++}
++
++/// ecma-376 §18.3.1.13's width-to-pixels: the stored `width` already counts
++/// the padding, so it is truncated onto whole `digit` pixels at `dpi`.
++fn ecma_column_pixels(width: f64, digit: f64, dpi: f64) -> f32 {
++    (((256.0 * width + (128.0 / digit).floor()) / 256.0 * digit).floor() * 96.0 / dpi) as f32
++}
++
++/// screen column width in characters -> pixels the way excel for windows and
++/// the web draw it: [`ecma_column_pixels`] with the default font's digit at
++/// 96dpi (16.29 -> 114px, where [`col_chars_to_px`] adds the padding again).
++pub fn windows_col_px(chars: f64) -> f32 {
++    ecma_column_pixels(chars, MAX_DIGIT_WIDTH_PX, 96.0)
++}
++
++impl RowFit {
++    /// screen column pixels for this flavour.
++    fn column_px(self, chars: f64) -> f32 {
++        match self {
++            Self::ScreenWindows => windows_col_px(chars),
++            _ => col_chars_to_px(chars),
++        }
+     }
+ }
+ 
+@@ -707,7 +728,8 @@
+     #[default]
+     Mac,
+     /// excel for windows and the web: `defaultRowHeight` and stored `ht`
+-    /// values are used as authored (calibri 11 sheets keep 15pt = 20px rows).
++    /// values are used as authored (calibri 11 sheets keep 15pt = 20px rows),
++    /// and `<col width>` maps to pixels by ecma-376's formula ([`windows_col_px`]).
+     Windows,
+ }
+ 
+@@ -719,6 +741,10 @@
+ 
+     /// [`Self::new`] with an explicit screen row-metrics flavour.
+     pub fn with_row_metrics(sheet: &Sheet, styles: &Stylesheet, metrics: RowMetrics) -> Self {
++        let fit = match metrics {
++            RowMetrics::Mac => RowFit::Screen,
++            RowMetrics::Windows => RowFit::ScreenWindows,
++        };
+         Self::with_sizes(
+             sheet,
+             styles,
+@@ -728,11 +754,8 @@
+                 .default_row_height_pt
+                 .unwrap_or(DEFAULT_ROW_HEIGHT_PT),
+             NormalFace::from_styles(styles),
+-            col_chars_to_px,
+-            match metrics {
+-                RowMetrics::Mac => RowFit::Screen,
+-                RowMetrics::Windows => RowFit::ScreenWindows,
+-            },
++            |chars| fit.column_px(chars),
++            fit,
+         )
+     }
+ 
+@@ -907,7 +930,7 @@
+                 if sheet.col_hidden(col) {
+                     0.0
+                 } else {
+-                    col_chars_to_px(width)
++                    self.fit.column_px(width)
+                 }
+             });
+             if self.columns.value(col) != size {
+@@ -1236,6 +1259,32 @@
+                 (height(&pinned, row) - row_pt_to_px(pt)).abs() < 0.001,
+                 "row {row}"
+             );
++        }
++    }
++
++    #[test]
++    fn windows_metrics_size_columns_like_excel_web() {
++        let styles = Stylesheet::default();
++        // financial sample widths -> excel web's drawn pixels
++        let authored = [(0, 16.29), (1, 26.57), (2, 14.14), (3, 17.43), (4, 14.29)];
++        let mut sheet = sheet_with(&authored, &[]);
++        sheet.col_widths.insert(5, 0.0);
++        let width = |grid: &GridGeometry, col: ColId| grid.col_x(col + 1) - grid.col_x(col);
++
++        let mut windows = GridGeometry::with_row_metrics(&sheet, &styles, RowMetrics::Windows);
++        let drawn: Vec<_> = (0..5).map(|col| width(&windows, col)).collect();
++        assert_eq!(drawn, [114.0, 186.0, 99.0, 122.0, 100.0]);
++        assert_eq!(width(&windows, 5), 0.0);
++        assert_eq!(width(&windows, 6), col_chars_to_px(DEFAULT_COL_WIDTH_CHARS));
++
++        sheet.col_widths.insert(1, 10.0);
++        windows.update_columns(&sheet, [1]);
++        assert_eq!(width(&windows, 1), windows_col_px(10.0));
++        assert_eq!(windows_col_px(10.0), 70.0);
++
++        let mac = GridGeometry::new(&sheet_with(&authored, &[]), &styles);
++        for (col, chars) in authored {
++            assert_eq!(width(&mac, col), col_chars_to_px(chars), "col {col}");
+         }
+     }
+ 

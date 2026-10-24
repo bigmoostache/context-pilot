@@ -1,3 +1,7 @@
+0005-xlsx-row-metrics: rowMetrics 'mac' (default, unchanged) | 'windows' screen geometry.
+windows = rows as authored (defaultRowHeight/ht, no Mac refit); since 0009 it also
+sizes columns by the ECMA-376 width formula. Both together = Excel for Windows / the web.
+
 --- a/crates/xlsx-render/src/geometry.rs
 +++ b/crates/xlsx-render/src/geometry.rs
 @@ -96,13 +96,19 @@
