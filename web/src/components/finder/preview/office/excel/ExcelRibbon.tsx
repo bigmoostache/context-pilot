@@ -103,6 +103,7 @@ function PercentGlyph() {
 function FormulaRow() {
   return (
     <div
+      className="excel-formula"
       style={{
         height: EXCEL.formulaH,
         background: "var(--of-chrome)",
@@ -111,10 +112,26 @@ function FormulaRow() {
         alignItems: "center",
       }}
     >
+      <style href="excel-formula" precedence="default">
+        {FORMULA_BOXES}
+      </style>
       <EditorToolbar.FormulaBar style={{ flex: 1, fontSize: 14.67, color: "var(--of-ink)" }} />
     </div>
   )
 }
+
+/**
+ * Excel web's formula row, measured on the reference: three 24px outlined boxes
+ * on the chrome (no white fill), name box x8–131, fx box x141–226, formula
+ * input from x236. The engine styles them inline, hence `!important`.
+ */
+const FORMULA_BOXES = `
+.excel-formula [aria-label="Formula bar"] { gap: 10px !important; }
+.excel-formula [aria-label="Formula bar"] > * { height: 24px !important; box-sizing: border-box; background: transparent !important; border: 1px solid #d1d1d1 !important; border-radius: 4px !important; }
+.excel-formula [aria-label="Name box"] { width: 123px !important; flex: none !important; }
+.excel-formula [aria-label="Formula bar"] > span { width: 85px !important; flex: none !important; display: flex; align-items: center; justify-content: center; }
+.excel-formula [aria-label="Formula bar"] > input:last-child { flex: 1 !important; }
+`
 
 /** Status bar: zoom, a live engine command (no fit-to-window in the engine). */
 function ExcelStatus() {
