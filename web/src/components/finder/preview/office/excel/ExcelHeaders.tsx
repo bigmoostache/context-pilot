@@ -14,6 +14,10 @@ const COL_H = 30
 const ROW_W = 43
 const HEADER_INK = "#5e5e5e"
 const HEADER_LINE = "#e1e1e1"
+/** Excel web's darker rule between the headers and the grid (bottom of letters, right of numbers). */
+const HEADER_EDGE = "#bdbdbd"
+/** Select-all triangle in the corner. */
+const CORNER_INK = "#b7b7b7"
 /** Top of the header bands: ExcelToolbar (tab row, ribbon, formula row) above them. */
 const BAND_TOP = EXCEL.tabsH + EXCEL.ribbonH + EXCEL.formulaH
 
@@ -137,6 +141,9 @@ function Headers({
         <div
           style={{ ...strip, top: BAND_TOP, left: 0, width: gridLeft, height: colGutter + COL_H }}
         />
+        <div style={{ ...corner, top: colTop, left: rowGutter }}>
+          <span style={cornerTriangle} />
+        </div>
         <div
           style={{ ...strip, top: colTop, left: gridLeft, width: viewport.width, height: COL_H }}
         >
@@ -251,6 +258,27 @@ const strip: CSSProperties = {
   boxSizing: "border-box",
 }
 
+/** Select-all corner: Excel web's 2px rules on its grid sides. */
+const corner: CSSProperties = {
+  position: "absolute",
+  width: ROW_W,
+  height: COL_H,
+  boxSizing: "border-box",
+  borderRight: `2px solid ${HEADER_EDGE}`,
+  borderBottom: `2px solid ${HEADER_EDGE}`,
+}
+
+/** The corner's right triangle, 11px legs, right angle 2px inside the rules. */
+const cornerTriangle: CSSProperties = {
+  position: "absolute",
+  right: 2,
+  bottom: 2,
+  width: 11,
+  height: 11,
+  background: CORNER_INK,
+  clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
+}
+
 interface Box {
   x: number
   y: number
@@ -258,6 +286,11 @@ interface Box {
   h: number
 }
 
+/**
+ * One header cell. Column letters: no side rules, bottom edge rule, text set
+ * low like Excel web (ink 16–24px of the 30px band). Row numbers: row rules,
+ * edge rule on the grid side.
+ */
 function cell({ x, y, w, h }: Box, axis: "col" | "row"): CSSProperties {
   return {
     position: "absolute",
@@ -271,8 +304,13 @@ function cell({ x, y, w, h }: Box, axis: "col" | "row"): CSSProperties {
     justifyContent: "center",
     fontSize: 13.33,
     color: HEADER_INK,
-    borderRight: `1px solid ${HEADER_LINE}`,
-    borderBottom: `1px solid ${HEADER_LINE}`,
-    ...(axis === "row" && { justifyContent: "flex-end", paddingRight: 6 }),
+    ...(axis === "col"
+      ? { paddingTop: 11, borderBottom: `1px solid ${HEADER_EDGE}` }
+      : {
+          justifyContent: "flex-end",
+          paddingRight: 6,
+          borderRight: `1px solid ${HEADER_EDGE}`,
+          borderBottom: `1px solid ${HEADER_LINE}`,
+        }),
   }
 }
