@@ -8,6 +8,7 @@ import { OpenError } from "./OpenError"
 import { openErrorOf } from "./openReason"
 import { OpeningOverlay } from "./OpeningOverlay"
 import { useXlsxLive } from "./useXlsxLive"
+import { useXlsxFontsReady } from "./xlsxFonts"
 
 const LazyExcel = lazy(() => import("../ExcelXlsx"))
 
@@ -46,6 +47,7 @@ function LiveSession({
   onRetry: () => void
 }) {
   const live = useXlsxLive(fleetId, node.path)
+  const fontsReady = useXlsxFontsReady()
   const [state, setState] = useState<SaveState>("idle")
   const [ready, setReady] = useState(0)
   const [engineError, setEngineError] = useState<string | null>(null)
@@ -65,7 +67,10 @@ function LiveSession({
       </ExcelChrome>
     )
   }
-  if (!live.session || !live.collaboration) return <PreviewStatus label="Loading document…" />
+  // The grid paints with the fonts it finds at mount: register Carlito & co first.
+  if (!live.session || !live.collaboration || !fontsReady) {
+    return <PreviewStatus label="Loading document…" />
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
