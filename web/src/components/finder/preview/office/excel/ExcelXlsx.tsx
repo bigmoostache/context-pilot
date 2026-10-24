@@ -21,6 +21,7 @@ export default function ExcelXlsx({
   onSave,
   onChange,
   onReady,
+  onError,
 }: {
   bytes: Uint8Array
   fileName: string
@@ -29,6 +30,8 @@ export default function ExcelXlsx({
   onSave: (bytes: Uint8Array) => void
   onChange: () => void
   onReady: (api: { readonly commands: XlsxCommandStore }) => void
+  /** The engine failed to open or run the workbook. */
+  onError: (error: Error) => void
 }) {
   const [viewport, setViewport] = useState<HeaderViewport | null>(null)
   const commandsRef = useRef<XlsxCommandStore | null>(null)
@@ -50,6 +53,7 @@ export default function ExcelXlsx({
             commandsRef.current = api.commands
             onReady(api)
           }}
+          onError={onError}
           onViewport={setViewport}
           toolbar={<ExcelToolbar />}
           gridlineColor="#e1e1e1"

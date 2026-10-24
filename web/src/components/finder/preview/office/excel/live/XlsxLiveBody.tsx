@@ -1,8 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import type { XlsxCommandStore } from "@betteroffice/xlsx-react"
 import type { FinderNode } from "@/lib/types"
-import { Generic, PreviewStatus } from "../../../previewParts"
+import { PreviewStatus } from "../../../previewParts"
 import { SaveBar, type SaveState } from "../../saveBar"
+import { ExcelChrome } from "../ExcelChrome"
+import { OpenError } from "./OpenError"
+import { openErrorOf } from "./openReason"
 import { OpeningOverlay } from "./OpeningOverlay"
 import { useXlsxLive } from "./useXlsxLive"
 
@@ -19,11 +22,33 @@ interface EditorApi {
 /**
  * The xlsx editor on a live session: edits autosave through the office log
  * (no Ctrl+S, no remount) and agent edits merge in without a reload.
+ * Retry remounts the whole session (log fetch, editor) from scratch.
  */
 export function XlsxLiveBody({ fleetId, node }: { fleetId: string; node: FinderNode }) {
+  const [attempt, setAttempt] = useState(0)
+  return (
+    <LiveSession
+      key={attempt}
+      fleetId={fleetId}
+      node={node}
+      onRetry={() => setAttempt(attempt + 1)}
+    />
+  )
+}
+
+function LiveSession({
+  fleetId,
+  node,
+  onRetry,
+}: {
+  fleetId: string
+  node: FinderNode
+  onRetry: () => void
+}) {
   const live = useXlsxLive(fleetId, node.path)
   const [state, setState] = useState<SaveState>("idle")
   const [ready, setReady] = useState(0)
+  const [engineError, setEngineError] = useState<string | null>(null)
   const autosave = useAutosave(live.save, setState)
   const key = live.session?.key ?? 0
 
@@ -32,7 +57,14 @@ export function XlsxLiveBody({ fleetId, node }: { fleetId: string; node: FinderN
     autosave.schedule()
   }, [live, autosave])
 
-  if (live.error) return <Generic node={node} />
+  const message = openErrorOf(live.error, live.session?.base, engineError)
+  if (message !== null) {
+    return (
+      <ExcelChrome>
+        <OpenError message={message} onRetry={onRetry} />
+      </ExcelChrome>
+    )
+  }
   if (!live.session || !live.collaboration) return <PreviewStatus label="Loading document…" />
 
   return (
@@ -57,6 +89,7 @@ export function XlsxLiveBody({ fleetId, node }: { fleetId: string; node: FinderN
               autosave.attach(api)
               setReady(key)
             }}
+            onError={(e) => setEngineError(e.message || "The workbook could not be read.")}
           />
         </Suspense>
         {ready !== key && <OpeningOverlay size={live.session.base.length} />}

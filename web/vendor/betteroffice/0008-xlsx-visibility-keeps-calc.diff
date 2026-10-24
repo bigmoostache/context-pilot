@@ -11,6 +11,9 @@ formula results instead of forcing a full recalculation.
 - Test: visibility_keeps_formula_results (SUBTOTAL(109) + SUM, row and col
   hide/show, undo): values, calculation counters and evaluated formulas
   unchanged.
+- All 6 dimension ops are Kept: xlsx-calc reads neither visibility nor
+  row heights / column widths (no CELL("width"), no INFO; OFFSET height/
+  width are arguments, not geometry). Checked by grep over xlsx-calc/src.
 
 KNOWN GAP
 SUBTOTAL 101-111 and AGGREGATE do not skip hidden rows (upstream, not this
