@@ -1,20 +1,34 @@
 import { EditorToolbar, useXlsxCommand } from "@betteroffice/xlsx-react"
 import type { XlsxCommandArgs, XlsxCommandId, XlsxCommandValues } from "@betteroffice/xlsx-react"
 import {
+  AlignBottom20Regular,
+  AlignCenterVertical20Regular,
+  AlignTop20Regular,
   ArrowRedo20Regular,
   ArrowUndo20Regular,
+  BorderBottom20Regular,
   CurrencyDollarEuro20Regular,
+  DecimalArrowLeft20Regular,
+  DecimalArrowRight20Regular,
+  FontDecrease20Regular,
+  FontIncrease20Regular,
+  NumberSymbol20Regular,
+  PaintBrush20Regular,
+  PaintBucket20Regular,
   TableCellsMerge20Regular,
   TextAlignCenter20Regular,
   TextAlignLeft20Regular,
   TextAlignRight20Regular,
   TextBold20Regular,
+  TextColor20Regular,
   TextItalic20Regular,
   TextStrikethrough20Regular,
   TextWrap20Regular,
+  type FluentIcon,
 } from "@fluentui/react-icons"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { Btn, Combo, Sep } from "../fluent/controls"
+import { ColorPicker, DropBtn, Menu, MenuItem, SplitBtn } from "../fluent/menus"
 import { OfficeRibbon } from "../fluent/Frame"
 import { StatusBar, Zoom } from "../fluent/StatusBar"
 import type { Cmd } from "../fluent/tokens"
@@ -58,18 +72,50 @@ export function ExcelToolbar() {
   )
 }
 
+/** Excel web's Home tab, left to right; only groups the engine has commands for. */
 function HomeRibbon() {
   return (
     <>
       <Plain id="undo" icon={<ArrowUndo20Regular />} />
       <Plain id="redo" icon={<ArrowRedo20Regular />} />
       <Sep />
-      <FontBox />
+      <Plain id="paintFormat" icon={<PaintBrush20Regular />} />
       <Sep />
+      <FontGroup />
+      <Sep />
+      <AlignmentGroup />
+      <Sep />
+      <NumberGroup />
+    </>
+  )
+}
+
+function FontGroup() {
+  return (
+    <>
+      <FontBox />
+      <Valued id="fontSizeStep" args={{ direction: "increase" }} icon={<FontIncrease20Regular />} />
+      <Valued id="fontSizeStep" args={{ direction: "decrease" }} icon={<FontDecrease20Regular />} />
       <Plain id="bold" icon={<TextBold20Regular />} />
       <Plain id="italic" icon={<TextItalic20Regular />} />
       <Plain id="strikethrough" icon={<TextStrikethrough20Regular />} />
-      <Sep />
+      <BordersSplit />
+      <ColorSplit id="fillColor" start="FFFF00" label="Fill colours" Icon={PaintBucket20Regular} />
+      <ColorSplit id="textColor" start="FF0000" label="Font colours" Icon={TextColor20Regular} />
+    </>
+  )
+}
+
+function AlignmentGroup() {
+  return (
+    <>
+      <Valued id="verticalAlignment" args={{ value: "top" }} icon={<AlignTop20Regular />} />
+      <Valued
+        id="verticalAlignment"
+        args={{ value: "middle" }}
+        icon={<AlignCenterVertical20Regular />}
+      />
+      <Valued id="verticalAlignment" args={{ value: "bottom" }} icon={<AlignBottom20Regular />} />
       <Valued id="horizontalAlignment" args={{ value: "left" }} icon={<TextAlignLeft20Regular />} />
       <Valued
         id="horizontalAlignment"
@@ -83,14 +129,136 @@ function HomeRibbon() {
       />
       <Valued id="textWrapping" args={{ value: "wrap" }} icon={<TextWrap20Regular />} />
       <Valued id="merge" args={{ value: "all" }} icon={<TableCellsMerge20Regular />} />
-      <Sep />
+    </>
+  )
+}
+
+function NumberGroup() {
+  return (
+    <>
+      <NumberFormatMenu />
       <Valued
         id="numberFormat"
         args={{ value: "currency" }}
         icon={<CurrencyDollarEuro20Regular />}
       />
       <Valued id="numberFormat" args={{ value: "percent" }} icon={<PercentGlyph />} />
+      <Valued
+        id="decimalPlaces"
+        args={{ direction: "increase" }}
+        icon={<DecimalArrowRight20Regular />}
+      />
+      <Valued
+        id="decimalPlaces"
+        args={{ direction: "decrease" }}
+        icon={<DecimalArrowLeft20Regular />}
+      />
     </>
+  )
+}
+
+type Format = XlsxCommandArgs["numberFormat"]["value"]
+
+const FORMATS: readonly [Format, string][] = [
+  ["automatic", "General"],
+  ["number", "Number"],
+  ["currency", "Currency"],
+  ["date", "Date"],
+  ["time", "Time"],
+  ["percent", "Percentage"],
+  ["scientific", "Scientific"],
+  ["plainText", "Text"],
+]
+
+/** Number Format list: the engine's formats, the selection's one checked. */
+function NumberFormatMenu() {
+  const cmd = useExcelCmd("numberFormat")
+  const current = cmd.state.value?.kind
+  return (
+    <DropBtn
+      label="Number Format"
+      icon={<NumberSymbol20Regular />}
+      menu={
+        <Menu label="Number Format">
+          {FORMATS.map(([value, label]) => (
+            <MenuItem
+              key={value}
+              label={label}
+              checked={current === value}
+              cmd={cmd}
+              args={{ value }}
+            />
+          ))}
+        </Menu>
+      }
+    />
+  )
+}
+
+type Preset = XlsxCommandArgs["borderPreset"]["value"]
+
+const BORDERS: readonly [Preset, string][] = [
+  ["bottom", "Bottom Border"],
+  ["top", "Top Border"],
+  ["left", "Left Border"],
+  ["right", "Right Border"],
+  ["none", "No Border"],
+  ["all", "All Borders"],
+  ["outer", "Outside Borders"],
+  ["inner", "Inside Borders"],
+  ["horizontal", "Inside Horizontal Borders"],
+  ["vertical", "Inside Vertical Borders"],
+]
+
+/** Borders: main half applies the bottom border, like Excel; the menu lists every preset. */
+function BordersSplit() {
+  const cmd = useExcelCmd("borderPreset")
+  return (
+    <SplitBtn
+      cmd={{ ...cmd, label: "Borders" }}
+      args={{ value: "bottom" }}
+      icon={<BorderBottom20Regular />}
+      menu={
+        <Menu label="Borders">
+          {BORDERS.map(([value, label]) => (
+            <MenuItem key={value} label={label} cmd={cmd} args={{ value }} />
+          ))}
+        </Menu>
+      }
+    />
+  )
+}
+
+/** Fill / Font Color: main half reapplies the last pick, the menu picks a new one. */
+function ColorSplit({
+  id,
+  start,
+  label,
+  Icon,
+}: {
+  id: "fillColor" | "textColor"
+  start: string
+  label: string
+  Icon: FluentIcon
+}) {
+  const [hex, setHex] = useState(start)
+  const cmd = useExcelCmd(id)
+  return (
+    <SplitBtn
+      cmd={cmd}
+      args={{ color: `#${hex}` }}
+      icon={<Icon color={`#${hex}`} />}
+      menu={
+        <ColorPicker
+          label={label}
+          onPick={(h) => {
+            if (h === null) return
+            setHex(h)
+            void cmd.execute({ color: `#${h}` })
+          }}
+        />
+      }
+    />
   )
 }
 
@@ -147,14 +315,21 @@ function ExcelStatus() {
   )
 }
 
-type NoArgCommand = "bold" | "italic" | "strikethrough" | "undo" | "redo"
+type NoArgCommand = "bold" | "italic" | "strikethrough" | "undo" | "redo" | "paintFormat"
 
 function Plain({ id, icon }: { id: NoArgCommand; icon: ReactNode }) {
   const cmd = useExcelCmd(id)
   return <Btn cmd={cmd} args={null} icon={icon} />
 }
 
-type ValuedId = "horizontalAlignment" | "textWrapping" | "merge" | "numberFormat"
+type ValuedId =
+  | "horizontalAlignment"
+  | "verticalAlignment"
+  | "textWrapping"
+  | "merge"
+  | "numberFormat"
+  | "fontSizeStep"
+  | "decimalPlaces"
 
 /** A command bound to one value; the engine reports `active` for that value. */
 function Valued<K extends ValuedId>({
