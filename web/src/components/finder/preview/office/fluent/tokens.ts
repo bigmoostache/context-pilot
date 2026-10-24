@@ -135,6 +135,10 @@ export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
     tabLine: 3,
     tabLineBottom: 4,
     ...SINGLE_LINE,
+    // Excel web ribbon: icon buttons on a 26 px pitch (24 + the 2 px gap), measured on the reference.
+    btnW: 24,
+    splitW: 22,
+    splitChevW: 14,
   },
   powerpoint: {
     statusH: 23,
