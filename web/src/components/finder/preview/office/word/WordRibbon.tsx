@@ -1,6 +1,7 @@
 import { OfficeRibbon } from "../fluent/Frame"
 import { StatusBar, StatusItem, Zoom } from "../fluent/StatusBar"
 import type { OfficeTab, SearchItem } from "../fluent/TabRow"
+import { PictureTab, TableTab } from "./ContextTabs"
 import { HomeTab } from "./HomeTab"
 import { FileBackstage, InsertTab, LayoutTab, ModeCombo, ReviewTab } from "./MoreTabs"
 import { plain, usePageInfo, useWordCmd } from "./wordCmd"
@@ -19,10 +20,11 @@ const TABS: readonly OfficeTab[] = [
  */
 export function WordRibbon() {
   const commands = useSearchItems()
+  const contextTabs = useContextTabs()
   return (
     <OfficeRibbon
       layout="classic"
-      tabs={TABS}
+      tabs={[...TABS, ...contextTabs]}
       defaultTab="home"
       backstage={<FileBackstage />}
       tabsRight={<ModeCombo />}
@@ -30,6 +32,20 @@ export function WordRibbon() {
       status={<WordStatus />}
     />
   )
+}
+
+/**
+ * Word's contextual tabs: Picture while an image is selected, Table while the
+ * selection is in a table. The engine reports both through its commands'
+ * `enabled` state, so the tabs come and go with the selection.
+ */
+function useContextTabs(): OfficeTab[] {
+  const image = useWordCmd("imageProperties").state.enabled
+  const table = useWordCmd("tableAction").state.enabled
+  const tabs: OfficeTab[] = []
+  if (image) tabs.push({ id: "picture", label: "Picture", ribbon: <PictureTab /> })
+  if (table) tabs.push({ id: "table", label: "Table", ribbon: <TableTab /> })
+  return tabs
 }
 
 function WordStatus() {
