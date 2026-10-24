@@ -307,8 +307,9 @@ function ExcelStatus() {
   return (
     <StatusBar
       right={
-        <span style={{ display: "flex", alignItems: "center", marginRight: 11 }}>
-          <Zoom cmd={zoom} toArgs={(s) => ({ scale: s === "fit" ? 1 : s })} fit={false} />
+        // Excel web ends the zoom's + glyph 13px from the edge (the bar pads 8, buttons 8 more).
+        <span style={{ display: "flex", alignItems: "center", marginRight: -3 }}>
+          <Zoom cmd={zoom} toArgs={(s) => ({ scale: s === "fit" ? 1 : s })} fit={false} compact />
         </span>
       }
     />

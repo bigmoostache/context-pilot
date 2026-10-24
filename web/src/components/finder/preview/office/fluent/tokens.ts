@@ -31,6 +31,8 @@ export const FLUENT = {
   pressed: "#e0e0e0",
   line: "#e0e0e0",
   statusLine: "#f0efef",
+  /** Status bar fill: the chrome grey by default; Excel web's is white. */
+  statusBg: "#f5f5f5",
   cardShadow: "0 0 2px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.14)",
   titleH: 48,
   tabsH: 36,
@@ -154,7 +156,7 @@ export const HEIGHTS: Record<OfficeApp, AppGeometry> = {
 /** Measured per-app deviations from {@link FLUENT}; code stays shared. */
 const OVERRIDES: Record<OfficeApp, Partial<Record<keyof typeof FLUENT, string>>> = {
   word: { inkIcon: "#424242" },
-  excel: { inkMuted: "#707070" },
+  excel: { inkMuted: "#707070", statusBg: "#ffffff", statusLine: "#e1e1e1" },
   powerpoint: {},
 }
 
@@ -178,6 +180,7 @@ export function officeVars(app: OfficeApp): CSSProperties {
     "--of-pressed": t.pressed,
     "--of-line": t.line,
     "--of-status-line": t.statusLine,
+    "--of-status-bg": t.statusBg,
     "--of-card-shadow": t.cardShadow,
     "--of-accent": ACCENT[app],
     "--of-title-h": `${String(FLUENT.titleH)}px`,

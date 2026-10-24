@@ -19,7 +19,7 @@ export function StatusBar({ left, right }: { left?: ReactNode; right?: ReactNode
         alignItems: "center",
         gap: 2,
         padding: "0 8px",
-        background: "var(--of-chrome)",
+        background: "var(--of-status-bg)",
         borderTop: "1px solid var(--of-status-line)",
         boxSizing: "border-box",
         color: "var(--of-ink-muted)",
@@ -73,6 +73,7 @@ export function StatusItem({
  * − / slider / + / percentage zoom control. `cmd.state.value` is the scale
  * (1 = 100 %); `toArgs` maps a scale, or `"fit"`, to the engine's arguments.
  * Clicking the percentage opens the presets list, Fit included when `fit`.
+ * `compact` drops the slider and puts the percentage between − and + (Excel web).
  */
 export function Zoom<A>({
   cmd,
@@ -82,6 +83,7 @@ export function Zoom<A>({
   step = 0.1,
   presets = [0.5, 0.75, 1, 1.5, 2],
   fit = true,
+  compact = false,
 }: {
   cmd: Cmd<number, A>
   toArgs: (scale: number | "fit") => A
@@ -90,6 +92,7 @@ export function Zoom<A>({
   step?: number
   presets?: readonly number[]
   fit?: boolean
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const scale = cmd.state.value ?? 1
@@ -98,6 +101,18 @@ export function Zoom<A>({
     const target = s === "fit" ? s : clamp(round(s), min, max)
     void cmd.execute(toArgs(target))
   }
+  const percent = (
+    <StatusButton
+      label="Zoom presets"
+      enabled={enabled}
+      active={open}
+      onClick={() => setOpen(!open)}
+    >
+      <span
+        style={{ minWidth: compact ? 0 : 34, textAlign: "right" }}
+      >{`${String(Math.round(scale * 100))}%`}</span>
+    </StatusButton>
+  )
   return (
     <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
       <StatusButton
@@ -107,17 +122,21 @@ export function Zoom<A>({
       >
         <Subtract16Regular />
       </StatusButton>
-      <input
-        type="range"
-        aria-label="Zoom"
-        min={min}
-        max={max}
-        step={0.01}
-        value={scale}
-        disabled={!enabled}
-        onChange={(e) => apply(Number(e.currentTarget.value))}
-        style={{ width: 120, accentColor: "var(--of-ink-muted)" }}
-      />
+      {compact ? (
+        percent
+      ) : (
+        <input
+          type="range"
+          aria-label="Zoom"
+          min={min}
+          max={max}
+          step={0.01}
+          value={scale}
+          disabled={!enabled}
+          onChange={(e) => apply(Number(e.currentTarget.value))}
+          style={{ width: 120, accentColor: "var(--of-ink-muted)" }}
+        />
+      )}
       <StatusButton
         label="Zoom in"
         enabled={enabled && scale < max}
@@ -125,16 +144,7 @@ export function Zoom<A>({
       >
         <Add16Regular />
       </StatusButton>
-      <StatusButton
-        label="Zoom presets"
-        enabled={enabled}
-        active={open}
-        onClick={() => setOpen(!open)}
-      >
-        <span
-          style={{ minWidth: 34, textAlign: "right" }}
-        >{`${String(Math.round(scale * 100))}%`}</span>
-      </StatusButton>
+      {compact ? null : percent}
       {fit ? (
         <StatusButton label="Fit to window" enabled={enabled} onClick={() => apply("fit")}>
           <ZoomFit16Regular />
